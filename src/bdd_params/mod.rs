@@ -10,6 +10,10 @@ use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
 mod impl_bdd_parameter_encoder;
 mod impl_bdd_params;
+mod impl_fn_update;
+mod impl_static_constraints;
+
+pub use impl_static_constraints::build_static_constraints;
 
 /// A wrapper for the `Bdd` object that implements `Params`;
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

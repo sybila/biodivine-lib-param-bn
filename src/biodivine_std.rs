@@ -119,3 +119,52 @@ pub mod param {
         fn contains(&self, state: Self::State) -> &Self::Params;
     }
 }
+
+/// A simple `IdState` iterator used for graphs where the states are consecutive integers.
+pub struct RangeStateIterator {
+    next: usize,
+    remaining: usize,
+}
+
+impl RangeStateIterator {
+    pub fn new(state_count: usize) -> RangeStateIterator {
+        return RangeStateIterator {
+            next: 0,
+            remaining: state_count,
+        };
+    }
+}
+
+impl Iterator for RangeStateIterator {
+    type Item = IdState;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        return if self.remaining == 0 {
+            None
+        } else {
+            let result = self.next;
+            self.remaining -= 1;
+            self.next += 1;
+            Some(IdState::from(result))
+        };
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::IdState;
+    use crate::biodivine_std::RangeStateIterator;
+
+    #[test]
+    fn test_state_range_iterator() {
+        let mut iter = RangeStateIterator::new(6);
+        assert_eq!(Some(IdState(0)), iter.next());
+        assert_eq!(Some(IdState(1)), iter.next());
+        assert_eq!(Some(IdState(2)), iter.next());
+        assert_eq!(Some(IdState(3)), iter.next());
+        assert_eq!(Some(IdState(4)), iter.next());
+        assert_eq!(Some(IdState(5)), iter.next());
+        assert_eq!(None, iter.next());
+        assert_eq!(None, iter.next());
+    }
+}

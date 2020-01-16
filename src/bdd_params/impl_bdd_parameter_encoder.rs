@@ -1,8 +1,8 @@
+use super::BddParameterEncoder;
+use crate::bdd_params::BddParams;
 use crate::biodivine_std::IdState;
 use crate::{BooleanNetwork, ParameterId, VariableId};
 use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
-use super::BddParameterEncoder;
-use crate::bdd_params::BddParams;
 
 impl BddParameterEncoder {
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`.
@@ -73,7 +73,12 @@ impl BddParameterEncoder {
 
     /// Make a `BddParams` set which corresponds to the valuations for which the value of
     /// `parameter` function given `arguments` is `true` in the given `state`.
-    pub fn explicit_true_when(&self, state: IdState, parameter: ParameterId, arguments: &Vec<VariableId>) -> BddParams {
+    pub fn explicit_true_when(
+        &self,
+        state: IdState,
+        parameter: ParameterId,
+        arguments: &Vec<VariableId>,
+    ) -> BddParams {
         let var = self.get_explicit(state, parameter, arguments);
         return BddParams(self.bdd_variables.mk_var(var));
     }
@@ -116,11 +121,11 @@ impl BddParameterEncoder {
 
 #[cfg(test)]
 mod tests {
+    use crate::bdd_params::BddParameterEncoder;
     use crate::biodivine_std::IdState;
     use crate::BooleanNetwork;
     use crate::VariableId;
     use std::convert::TryFrom;
-    use crate::bdd_params::BddParameterEncoder;
 
     #[test]
     fn explicit_parameter_encoder_test() {

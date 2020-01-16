@@ -1,6 +1,6 @@
+use super::BddParams;
 use crate::biodivine_std::param::Params;
 use biodivine_lib_bdd::Bdd;
-use super::BddParams;
 
 impl BddParams {
     /// Consume these `BddParams` and turn them into a raw `Bdd`.
@@ -33,5 +33,11 @@ impl Params for BddParams {
     fn is_subset(&self, other: &Self) -> bool {
         // TODO: Introduce special function for this in bdd-lib to avoid allocation
         return self.minus(other).is_empty();
+    }
+}
+
+impl From<Bdd> for BddParams {
+    fn from(val: Bdd) -> Self {
+        return BddParams(val);
     }
 }
