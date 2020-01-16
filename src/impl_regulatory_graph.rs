@@ -1,5 +1,6 @@
 use super::util::build_index_map;
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
+use crate::Monotonicity;
 
 /// Methods for safely constructing new instances of `RegulatoryGraph`s.
 impl RegulatoryGraph {
@@ -18,7 +19,59 @@ impl RegulatoryGraph {
         };
     }
 
-    pub fn add_
+    /// Add a new `Regulation` to this `RegulatoryGraph`.
+    ///
+    /// Returns `Err` if `regulator` or `target` are not valid graph variables or when
+    /// the regulation between the two variables already exists.
+    pub fn add_regulation(
+        &mut self,
+        regulator: &str,
+        target: &str,
+        observable: bool,
+        monotonicity: Option<Monotonicity>,
+    ) -> Result<(), String> {
+        let regulator = self.get_regulator(regulator)?;
+        let target = self.get_target(target)?;
+        self.assert_no_regulation(regulator, target)?;
+        self.regulations.push(Regulation {
+            regulator,
+            target,
+            observable,
+            monotonicity,
+        });
+        return Ok(());
+    }
+
+    /// **(internal)** Utility method to safely obtain a regulator variable (using an appropriate error message).
+    fn get_regulator(&self, name: &str) -> Result<VariableId, String> {
+        return self
+            .find_variable(name)
+            .ok_or(format!("Invalid regulation: Unknown regulator {}.", name));
+    }
+
+    /// **(internal)** Utility method to safely obtain a target variable (using an appropriate error message).
+    fn get_target(&self, name: &str) -> Result<VariableId, String> {
+        return self
+            .find_variable(name)
+            .ok_or(format!("Invalid regulation: Unknown target {}.", name));
+    }
+
+    /// **(internal)** Utility method to ensure there is no regulation between the two variables yet.
+    fn assert_no_regulation(
+        &self,
+        regulator: VariableId,
+        target: VariableId,
+    ) -> Result<(), String> {
+        return if self.find_regulation(regulator, target) == None {
+            Ok(())
+        } else {
+            Err(format!(
+                "Invalid regulation: {} already regulates {}.",
+                self.get_variable(regulator),
+                self.get_variable(target)
+            ))
+        };
+    }
 }
 
 /// Some basic utility methods for inspecting the `RegulatoryGraph`.

@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 
+mod display_regulatory_graph;
 mod impl_regulatory_graph;
+mod impl_variable;
 mod parser;
 mod util;
 
@@ -46,6 +48,12 @@ pub struct Parameter {
 /// Observability means that the regulation must manifest itself somewhere in the
 /// corresponding update function (i.e. there is a context in which changing just
 /// the value of `regulator` changes the value of `target`).
+///
+/// Regulations can be represented as strings in the
+/// form `"regulator_name 'relationship' target_name"`. The 'relationship' is one of the arrows:
+/// `->, ->?, -|, -|?, -?, -??`. Here,`>` means activation, `|` is inhibition and `?` is
+/// not monotonous. The last question mark signifies observability — if it is present, the
+/// regulation is not necessarily observable.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Regulation {
     regulator: VariableId,
@@ -60,6 +68,27 @@ pub struct Regulation {
 ///
 /// Incidentally, regulatory graph corresponds to the part of the network that can be
 /// drawn as a graph of variables and regulations.
+///
+/// A regulatory graph can be described using a custom string format. In this format,
+/// each line represents a regulation or a comment (starting with `#`).
+///
+/// Regulations can be represented as strings in the
+/// form `"regulator_name 'relationship' target_name"`. The 'relationship' is one of the arrows:
+/// `->, ->?, -|, -|?, -?, -??`. Here,`>` means activation, `|` is inhibition and `?` is
+/// not monotonous. The last question mark signifies observability — if it is present, the
+/// regulation is not necessarily observable.
+///
+/// Example of a `RegulatoryGraph`:
+///
+/// ```rg
+///  # Regulators of a
+///  a ->? a
+///  b -|? a
+///
+///  # Regulators of b
+///  a -> b
+///  b -| b
+/// ```
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct RegulatoryGraph {
     variables: Vec<Variable>,
