@@ -1,6 +1,6 @@
 use super::util::build_index_map;
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
-use crate::Monotonicity;
+use crate::{Monotonicity, VariableIdIterator};
 
 /// Methods for safely constructing new instances of `RegulatoryGraph`s.
 impl RegulatoryGraph {
@@ -86,7 +86,7 @@ impl RegulatoryGraph {
         return self.variable_to_index.get(name).map(|id| *id);
     }
 
-    /// Return a `Variable` corresponding to the given `VariableId`
+    /// Return a `Variable` corresponding to the given `VariableId`.
     pub fn get_variable(&self, id: VariableId) -> &Variable {
         return &self.variables[id.0];
     }
@@ -103,5 +103,22 @@ impl RegulatoryGraph {
             }
         }
         return None;
+    }
+
+    /// Return a sorted list of variables that regulate the given `target` variable.
+    pub fn regulators(&self, target: VariableId) -> Vec<VariableId> {
+        let mut regulators: Vec<VariableId> = self
+            .regulations
+            .iter()
+            .filter(|r| r.target == target)
+            .map(|r| r.regulator)
+            .collect();
+        regulators.sort();
+        return regulators;
+    }
+
+    /// Return an iterator over all ids of this graph.
+    pub fn variable_ids(&self) -> VariableIdIterator {
+        return (0..self.variables.len()).map(|i| VariableId(i));
     }
 }

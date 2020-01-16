@@ -1,13 +1,19 @@
 use std::collections::HashMap;
+use std::iter::Map;
+use std::ops::Range;
 
+mod display_boolean_network;
 mod display_regulatory_graph;
+mod impl_binary_op;
+mod impl_boolean_network;
+mod impl_fn_update;
 mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
 mod util;
 
 /// A type-safe index of a `Variable` inside a `BooleanNetwork` (or a `RegulatoryGraph`).
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct VariableId(usize);
 
 /// A type-safe index of a `Parameter` inside a `BooleanNetwork`.
@@ -135,3 +141,6 @@ pub struct BooleanNetwork {
     update_functions: Vec<Option<FnUpdate>>,
     parameter_to_index: HashMap<String, ParameterId>,
 }
+
+/// An iterator over all `VariableId`s of a `RegulatoryGraph`.
+pub type VariableIdIterator = Map<Range<usize>, fn(usize) -> VariableId>;

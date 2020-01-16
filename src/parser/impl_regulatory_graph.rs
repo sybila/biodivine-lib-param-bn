@@ -26,12 +26,7 @@ impl RegulatoryGraph {
         let mut rg = RegulatoryGraph::new(variables);
 
         for template in templates {
-            rg.add_regulation(
-                &template.regulator,
-                &template.target,
-                template.observable,
-                template.monotonicity,
-            )?;
+            rg.add_regulation_temp(template)?;
         }
 
         return Ok(rg);
@@ -44,11 +39,16 @@ impl RegulatoryGraph {
     /// plus all conditions of `add_regulation` must be satisfied as well.
     pub fn add_regulation_string(&mut self, regulation: &str) -> Result<(), String> {
         let template = RegulationTemp::try_from(regulation)?;
+        return self.add_regulation_temp(template);
+    }
+
+    /// **(internal)** A utility method for adding regulations once they are parsed.
+    pub(super) fn add_regulation_temp(&mut self, regulation: RegulationTemp) -> Result<(), String> {
         return self.add_regulation(
-            &template.regulator,
-            &template.target,
-            template.observable,
-            template.monotonicity,
+            &regulation.regulator,
+            &regulation.target,
+            regulation.observable,
+            regulation.monotonicity,
         );
     }
 }
