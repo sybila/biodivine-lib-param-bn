@@ -2,9 +2,9 @@
 //! to the static constraints of the individual regulations of a `BooleanNetwork`.
 
 use crate::bdd_params::BddParameterEncoder;
-use crate::biodivine_std::IdState;
 use crate::{BooleanNetwork, FnUpdate, Monotonicity, Regulation, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd};
+use biodivine_lib_std::IdState;
 use std::ops::Range;
 
 /// Build a `Bdd` which describes all valuations satisfying the static constraints

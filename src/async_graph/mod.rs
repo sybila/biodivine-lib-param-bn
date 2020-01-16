@@ -1,7 +1,7 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
-use crate::biodivine_std::param::Graph;
-use crate::biodivine_std::{IdState, RangeStateIterator};
 use crate::{BooleanNetwork, VariableIdIterator};
+use biodivine_lib_std::param_graph::Graph;
+use biodivine_lib_std::{IdState, IdStateRange};
 
 mod impl_async_graph;
 mod impl_evolution_operators;
@@ -42,12 +42,12 @@ pub struct BwdIterator<'a> {
 impl<'a> Graph for &'a AsyncGraph {
     type State = IdState;
     type Params = BddParams;
-    type States = RangeStateIterator;
+    type States = IdStateRange;
     type FwdEdges = Fwd<'a>;
     type BwdEdges = Bwd<'a>;
 
     fn states(&self) -> Self::States {
-        return RangeStateIterator::new(self.num_states());
+        return IdStateRange::new(self.num_states());
     }
 
     fn fwd(&self) -> Self::FwdEdges {

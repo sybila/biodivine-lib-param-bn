@@ -1,8 +1,8 @@
 use crate::async_graph::AsyncGraph;
 use crate::bdd_params::{build_static_constraints, BddParameterEncoder, BddParams};
-use crate::biodivine_std::param::Params;
-use crate::biodivine_std::IdState;
 use crate::{BooleanNetwork, VariableId};
+use biodivine_lib_std::param_graph::Params;
+use biodivine_lib_std::IdState;
 
 impl AsyncGraph {
     /// Create a new `AsyncGraph` from the given `BooleanNetwork`.

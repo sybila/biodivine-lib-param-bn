@@ -1,8 +1,8 @@
 use super::BddParameterEncoder;
 use crate::bdd_params::BddParams;
-use crate::biodivine_std::IdState;
 use crate::{BooleanNetwork, ParameterId, VariableId};
 use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
+use biodivine_lib_std::IdState;
 
 impl BddParameterEncoder {
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`.
@@ -122,9 +122,9 @@ impl BddParameterEncoder {
 #[cfg(test)]
 mod tests {
     use crate::bdd_params::BddParameterEncoder;
-    use crate::biodivine_std::IdState;
     use crate::BooleanNetwork;
     use crate::VariableId;
+    use biodivine_lib_std::IdState;
     use std::convert::TryFrom;
 
     #[test]

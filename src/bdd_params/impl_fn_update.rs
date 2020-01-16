@@ -1,7 +1,7 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
-use crate::biodivine_std::IdState;
 use crate::{BinaryOp, FnUpdate};
 use biodivine_lib_bdd::Bdd;
+use biodivine_lib_std::IdState;
 
 impl FnUpdate {
     /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter

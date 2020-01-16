@@ -1,7 +1,7 @@
 use crate::async_graph::{Bwd, BwdIterator, Fwd, FwdIterator};
 use crate::bdd_params::BddParams;
-use crate::biodivine_std::param::{EvolutionOperator, Params};
-use crate::biodivine_std::IdState;
+use biodivine_lib_std::param_graph::{EvolutionOperator, Params};
+use biodivine_lib_std::IdState;
 
 impl<'a> EvolutionOperator for Fwd<'a> {
     type State = IdState;
@@ -63,9 +63,9 @@ impl Iterator for BwdIterator<'_> {
 mod tests {
     use crate::async_graph::AsyncGraph;
     use crate::bdd_params::BddParams;
-    use crate::biodivine_std::param::{EvolutionOperator, Graph, Params};
-    use crate::biodivine_std::IdState;
     use crate::BooleanNetwork;
+    use biodivine_lib_std::param_graph::{EvolutionOperator, Graph, Params};
+    use biodivine_lib_std::IdState;
     use std::collections::HashSet;
     use std::convert::TryFrom;
 

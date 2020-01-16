@@ -12,9 +12,6 @@ mod impl_fn_update;
 mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
-mod util;
-
-mod biodivine_std;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
