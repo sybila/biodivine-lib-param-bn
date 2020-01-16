@@ -2,6 +2,8 @@ use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::Range;
 
+pub mod async_graph;
+pub mod bdd_params;
 mod display_boolean_network;
 mod display_regulatory_graph;
 mod impl_binary_op;
@@ -11,6 +13,10 @@ mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
 mod util;
+
+mod biodivine_std;
+
+// TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
 /// A type-safe index of a `Variable` inside a `BooleanNetwork` (or a `RegulatoryGraph`).
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -144,3 +150,6 @@ pub struct BooleanNetwork {
 
 /// An iterator over all `VariableId`s of a `RegulatoryGraph`.
 pub type VariableIdIterator = Map<Range<usize>, fn(usize) -> VariableId>;
+
+/// An iterator over all `ParameterId`s of a `BooleanNetwork`.
+pub type ParameterIdIterator = Map<Range<usize>, fn(usize) -> ParameterId>;

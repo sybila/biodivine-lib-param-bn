@@ -98,12 +98,13 @@ mod tests {
             a -> b
             a -?? a
             b -|? c
+            a ->? c
             # Also some comments are allowed
             c -? a
             c -| d
             $a: a & (p(c) => (c | c))
             $b: p(a) <=> q(a, a)
-            # Anywhere in the file
+            # Notice that a regulates c but does not appear in the function!
             $c: q(b, b) => !(b ^ k)
         ";
 
@@ -152,6 +153,7 @@ mod tests {
         rg.add_regulation_string("a -> b").unwrap();
         rg.add_regulation_string("a -?? a").unwrap();
         rg.add_regulation_string("b -|? c").unwrap();
+        rg.add_regulation_string("a ->? c").unwrap();
         rg.add_regulation_string("c -? a").unwrap();
         rg.add_regulation_string("c -| d").unwrap();
 

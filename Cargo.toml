@@ -10,6 +10,7 @@ rustdoc-args = ["--html-in-header", "docs-head.html"]
 
 [dependencies]
 regex = "1.3.3"
+biodivine-lib-bdd = { git = "https://github.com/sybila/biodivine-lib-bdd.git" }
 
 [features]
 # With shields_up you enable explicit assertions of pre/post conditions and invariants in critical

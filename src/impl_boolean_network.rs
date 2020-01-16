@@ -1,4 +1,7 @@
-use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
+use crate::{
+    BooleanNetwork, FnUpdate, Parameter, ParameterId, ParameterIdIterator, RegulatoryGraph,
+    VariableId,
+};
 use std::collections::HashMap;
 
 /// Basic methods for safely building `BooleanNetwork`s.
@@ -134,5 +137,10 @@ impl BooleanNetwork {
     /// Get a `FnUpdate` corresponding to the given `VariableId`.
     pub fn get_update_function(&self, variable: VariableId) -> &Option<FnUpdate> {
         return &self.update_functions[variable.0];
+    }
+
+    /// Return an iterator over all parameter ids of this network.
+    pub fn parameter_ids(&self) -> ParameterIdIterator {
+        return (0..self.parameters.len()).map(|i| ParameterId(i));
     }
 }
