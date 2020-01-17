@@ -24,7 +24,7 @@ impl Iterator for FwdIterator<'_> {
         return if let Some(var) = self.variables.next() {
             let target = self.state.flip_bit(var.0);
             let edge_params = self.graph.edge_params(self.state, var);
-            Some((target, edge_params.intersect(&self.graph.unit_set)))
+            Some((target, edge_params))
         } else {
             None
         };
@@ -52,7 +52,7 @@ impl Iterator for BwdIterator<'_> {
         return if let Some(var) = self.variables.next() {
             let source = self.state.flip_bit(var.0);
             let edge_params = self.graph.edge_params(source, var);
-            Some((source, edge_params.intersect(&self.graph.unit_set)))
+            Some((source, edge_params))
         } else {
             None
         };
@@ -153,12 +153,14 @@ mod tests {
         for s in graph.states() {
             let successors = fwd.step(s);
             for (t, p) in successors {
+                let p = p.intersect(graph.unit_params());
                 if p.cardinality() > 0.0 {
                     assert!(edges.contains(&(s, t, p.cardinality() as i32)));
                 }
                 fwd_edges.insert((s, t, p));
             }
             for (t, p) in bwd.step(s) {
+                let p = p.intersect(graph.unit_params());
                 if p.cardinality() > 0.0 {
                     assert!(edges.contains(&(t, s, p.cardinality() as i32)));
                 }
