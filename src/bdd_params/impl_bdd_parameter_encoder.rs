@@ -37,17 +37,25 @@ impl BddParameterEncoder {
                 implicit_function_tables.push(Vec::new());
             } else {
                 let args = bn.graph.regulators(vid);
-                let cardinality = args.len();
-                regulators.push(args);
+                if args.is_empty() {
+                    // This variable is "effectively" a parameter...
+                    let bdd_name = format!("\\{{{}}}", v.name);
+                    let var = bdd.make_variable(&bdd_name);
+                    regulators.push(args);
+                    implicit_function_tables.push(vec![var]);
+                } else {
+                    let cardinality = args.len();
+                    regulators.push(args);
 
-                let p_vars = BddValuationIterator::new(cardinality as u16)
-                    .map(|valuation| {
-                        let bdd_name = format!("\\{{{}}}{}", v.name, valuation);
-                        bdd.make_variable(&bdd_name)
-                    })
-                    .collect();
+                    let p_vars = BddValuationIterator::new(cardinality as u16)
+                        .map(|valuation| {
+                            let bdd_name = format!("\\{{{}}}{}", v.name, valuation);
+                            bdd.make_variable(&bdd_name)
+                        })
+                        .collect();
 
-                implicit_function_tables.push(p_vars);
+                    implicit_function_tables.push(p_vars);
+                }
             }
         }
 
@@ -87,11 +95,16 @@ impl BddParameterEncoder {
     /// of the given `variable` in the given `state`.
     pub fn get_implicit(&self, state: IdState, variable: VariableId) -> BddVariable {
         let regulators = &self.regulators[variable.0];
-        if regulators.is_empty() {
+        let table = &self.implicit_function_tables[variable.0];
+        if regulators.is_empty() && table.is_empty() {
             panic!(
                 "Variable {:?} does not have an implicit update function.",
                 variable
             );
+        }
+        if regulators.is_empty() {
+            // if regulators are empty but table is not, this is a zero-regulator variable
+            return table[0];
         }
         let table_index = Self::compute_table_index(state, regulators);
         return self.implicit_function_tables[variable.0][table_index];

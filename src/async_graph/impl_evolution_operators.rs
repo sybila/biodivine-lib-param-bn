@@ -1,6 +1,6 @@
 use crate::async_graph::{Bwd, BwdIterator, Fwd, FwdIterator};
 use crate::bdd_params::BddParams;
-use biodivine_lib_std::param_graph::{EvolutionOperator, Params};
+use biodivine_lib_std::param_graph::EvolutionOperator;
 use biodivine_lib_std::IdState;
 
 impl<'a> EvolutionOperator for Fwd<'a> {
