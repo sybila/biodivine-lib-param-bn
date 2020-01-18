@@ -1,6 +1,6 @@
 use crate::async_graph::{Bwd, BwdIterator, Fwd, FwdIterator};
 use crate::bdd_params::BddParams;
-use biodivine_lib_std::param_graph::EvolutionOperator;
+use biodivine_lib_std::param_graph::{EvolutionOperator, InvertibleEvolutionOperator};
 use biodivine_lib_std::IdState;
 
 impl<'a> EvolutionOperator for Fwd<'a> {
@@ -14,6 +14,14 @@ impl<'a> EvolutionOperator for Fwd<'a> {
             variables: self.graph.network.graph.variable_ids(),
             state: current,
         };
+    }
+}
+
+impl<'a> InvertibleEvolutionOperator for Fwd<'a> {
+    type InvertedOperator = Bwd<'a>;
+
+    fn invert(&self) -> Self::InvertedOperator {
+        return Bwd { graph: self.graph };
     }
 }
 
@@ -42,6 +50,14 @@ impl<'a> EvolutionOperator for Bwd<'a> {
             variables: self.graph.network.graph.variable_ids(),
             state: current,
         };
+    }
+}
+
+impl <'a> InvertibleEvolutionOperator for Bwd<'a> {
+    type InvertedOperator = Fwd<'a>;
+
+    fn invert(&self) -> Self::InvertedOperator {
+        return Fwd { graph: self.graph };
     }
 }
 

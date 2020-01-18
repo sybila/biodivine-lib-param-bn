@@ -1,6 +1,6 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
 use crate::{BooleanNetwork, VariableIdIterator};
-use biodivine_lib_std::param_graph::Graph;
+use biodivine_lib_std::param_graph::{Graph, InvertibleGraph};
 use biodivine_lib_std::{IdState, IdStateRange};
 
 mod impl_async_graph;
@@ -57,4 +57,9 @@ impl<'a> Graph for &'a AsyncGraph {
     fn bwd(&self) -> Self::BwdEdges {
         return Bwd { graph: self };
     }
+}
+
+impl<'a> InvertibleGraph for &'a AsyncGraph {
+    type FwdEdges = Fwd<'a>;
+    type BwdEdges = Bwd<'a>;
 }
