@@ -8,6 +8,10 @@ impl BddParams {
         return self.0;
     }
 
+    pub fn as_bdd(&self) -> &Bdd {
+        return &self.0;
+    }
+
     pub fn cardinality(&self) -> f64 {
         return self.0.cardinality();
     }
