@@ -14,6 +14,7 @@ impl FnUpdate {
 
     fn args(&self, result: &mut HashSet<VariableId>) {
         match self {
+            Const(_) => {}
             Var(id) => {
                 result.insert(*id);
             }

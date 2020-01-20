@@ -8,6 +8,7 @@ impl FnUpdateTemp {
     /// unary parameters.
     pub fn unknown_variables_to_parameters(self, rg: &RegulatoryGraph) -> Box<FnUpdateTemp> {
         return Box::new(match self {
+            Const(value) => Const(value),
             Binary(op, l, r) => Binary(
                 op,
                 l.unknown_variables_to_parameters(rg),
@@ -37,6 +38,7 @@ impl FnUpdateTemp {
             }
             Not(inner) => inner.dump_parameters(result),
             Var(_) => {}
+            Const(_) => {}
             Param(name, args) => {
                 result.insert(Parameter {
                     name: name.clone(),
@@ -52,6 +54,7 @@ impl FnUpdateTemp {
     /// the network.
     pub fn into_fn_update(self, bn: &BooleanNetwork) -> Result<Box<FnUpdate>, String> {
         return Ok(Box::new(match self {
+            Const(value) => FnUpdate::Const(value),
             Var(name) => FnUpdate::Var(Self::get_variable(bn, &name)?),
             Not(inner) => FnUpdate::Not(inner.into_fn_update(bn)?),
             Binary(op, l, r) => FnUpdate::Binary(op, l.into_fn_update(bn)?, r.into_fn_update(bn)?),

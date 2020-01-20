@@ -177,7 +177,15 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
         } else if data.len() == 1 {
             // This should be either a name or a parenthesis group, everything else does not make sense.
             match &data[0] {
-                Token::Name(name) => return Ok(Box::new(Var(name.clone()))),
+                Token::Name(name) => {
+                    return if name == "true" {
+                        Ok(Box::new(Const(true)))
+                    } else if name == "false" {
+                        Ok(Box::new(Const(false)))
+                    } else {
+                        Ok(Box::new(Var(name.clone())))
+                    }
+                }
                 Token::Tokens(inner) => return Ok(parse_update_function(inner)?),
                 _ => {} // otherwise, fall through to the error at the end.
             }

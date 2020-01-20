@@ -22,6 +22,7 @@ struct RegulationTemp {
 /// integrated into a `BooleanNetwork` yet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 enum FnUpdateTemp {
+    Const(bool),
     Var(String),
     Param(String, Vec<String>),
     Not(Box<FnUpdateTemp>),

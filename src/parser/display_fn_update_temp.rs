@@ -5,6 +5,7 @@ use std::fmt::{Display, Error, Formatter};
 impl Display for FnUpdateTemp {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         match self {
+            Const(value) => write!(f, "{}", value)?,
             Var(name) => write!(f, "{}", name)?,
             Not(inner) => write!(f, "!{}", inner)?,
             Binary(op, l, r) => write!(f, "({} {} {})", l, op, r)?,

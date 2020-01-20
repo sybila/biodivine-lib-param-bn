@@ -18,6 +18,13 @@ impl FnUpdate {
 
     pub(super) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
         return match self {
+            FnUpdate::Const(value) => {
+                if *value {
+                    encoder.bdd_variables.mk_true()
+                } else {
+                    encoder.bdd_variables.mk_false()
+                }
+            }
             FnUpdate::Not(inner) => inner._symbolic_eval(state, encoder).not(),
             FnUpdate::Var(id) => {
                 if state.get_bit(id.0) {

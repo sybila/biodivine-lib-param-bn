@@ -123,6 +123,7 @@ pub enum BinaryOp {
 /// by the `RegulatoryGraph` if the network.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum FnUpdate {
+    Const(bool),
     // Variable references an actual variable of the network.
     Var(VariableId),
     // Parameter references a parameter of the network together with variables that are

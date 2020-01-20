@@ -20,6 +20,7 @@ impl Display for Fun<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         let Fun(bn, fun) = self;
         match fun {
+            FnUpdate::Const(value) => write!(f, "{}", value)?,
             FnUpdate::Binary(op, l, r) => write!(f, "({} {} {})", Fun(bn, l), op, Fun(bn, r))?,
             FnUpdate::Not(inner) => write!(f, "!{}", Fun(bn, inner))?,
             FnUpdate::Var(id) => write!(f, "{}", bn.graph.get_variable(*id))?,

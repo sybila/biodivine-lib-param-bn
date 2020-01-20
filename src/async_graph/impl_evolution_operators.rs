@@ -53,7 +53,7 @@ impl<'a> EvolutionOperator for Bwd<'a> {
     }
 }
 
-impl <'a> InvertibleEvolutionOperator for Bwd<'a> {
+impl<'a> InvertibleEvolutionOperator for Bwd<'a> {
     type InvertedOperator = Fwd<'a>;
 
     fn invert(&self) -> Self::InvertedOperator {

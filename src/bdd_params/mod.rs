@@ -9,10 +9,10 @@ use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
 mod impl_bdd_parameter_encoder;
-mod impl_witness_generator;
 mod impl_bdd_params;
 mod impl_fn_update;
 mod impl_static_constraints;
+mod impl_witness_generator;
 
 pub use impl_static_constraints::build_static_constraints;
 

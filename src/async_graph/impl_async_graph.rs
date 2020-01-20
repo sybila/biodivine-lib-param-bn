@@ -60,6 +60,10 @@ impl AsyncGraph {
             edge_params
         };
     }
+
+    pub fn make_witness(&self, params: &BddParams) -> BooleanNetwork {
+        return self.network.make_witness(params, &self.encoder);
+    }
 }
 
 #[cfg(test)]
