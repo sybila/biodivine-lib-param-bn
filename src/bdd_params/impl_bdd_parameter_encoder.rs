@@ -37,25 +37,19 @@ impl BddParameterEncoder {
                 implicit_function_tables.push(Vec::new());
             } else {
                 let args = bn.graph.regulators(vid);
-                if args.is_empty() {
-                    // This variable is "effectively" a parameter...
-                    let bdd_name = format!("\\{{{}}}", v.name);
-                    let var = bdd.make_variable(&bdd_name);
-                    regulators.push(args);
-                    implicit_function_tables.push(vec![var]);
-                } else {
-                    let cardinality = args.len();
-                    regulators.push(args);
+                let cardinality = args.len();
+                regulators.push(args);
 
-                    let p_vars = BddValuationIterator::new(cardinality as u16)
-                        .map(|valuation| {
-                            let bdd_name = format!("\\{{{}}}{}", v.name, valuation);
-                            bdd.make_variable(&bdd_name)
-                        })
-                        .collect();
+                // Note that if args are empty, one variable is still created because there is
+                // an "empty" valuation.
+                let p_vars = BddValuationIterator::new(cardinality as u16)
+                    .map(|valuation| {
+                        let bdd_name = format!("\\{{{}}}{}", v.name, valuation);
+                        bdd.make_variable(&bdd_name)
+                    })
+                    .collect();
 
-                    implicit_function_tables.push(p_vars);
-                }
+                implicit_function_tables.push(p_vars);
             }
         }
 
@@ -121,7 +115,7 @@ impl BddParameterEncoder {
     fn compute_table_index(state: IdState, args: &Vec<VariableId>) -> usize {
         let mut table_index: usize = 0;
         for i in 0..args.len() {
-            if state.get_bit(args[i].0) {
+            if state.get_bit(args[args.len() - 1 - i].0) {
                 table_index += 1;
             }
             if i < args.len() - 1 {

@@ -175,7 +175,7 @@ mod tests {
     use std::convert::TryFrom;
 
     #[test]
-    pub fn make_witness() {
+    pub fn make_witness_0() {
         let network = BooleanNetwork::try_from(
             "
             a -> b
@@ -209,5 +209,92 @@ mod tests {
         )
         .unwrap();
         assert_eq!(witness, witness_string);
+        // turn the witness into a graph again - there should be exactly one parametrisation:
+        let graph = AsyncGraph::new(witness).unwrap();
+        assert_eq!(graph.unit_params().cardinality(), 1.0);
+    }
+
+    #[test]
+    pub fn make_witness_1() {
+        let network = BooleanNetwork::try_from(
+            "
+            SSF -> SWI5
+
+            SSF -> ACE2
+
+            SBF -> SSF
+            HCM1 -> SSF
+
+            MBF -> YHP1
+            SBF -> YHP1
+
+            MBF -> HCM1
+            SBF -> HCM1
+
+            MBF -> YOX1
+            SBF -> YOX1
+
+            CLN3 -> SBF
+            MBF -> SBF
+            YHP1 -| SBF
+            YOX1 -| SBF
+
+            CLN3 -> MBF
+
+            ACE2 -> CLN3
+            YHP1 -| CLN3
+            SWI5 -> CLN3
+            YOX1 -| CLN3
+        ",
+        )
+        .unwrap();
+        let graph = AsyncGraph::new(network).unwrap();
+        let witness = graph.make_witness(graph.unit_params());
+        let witness_string = BooleanNetwork::try_from(
+            "
+            SSF -> SWI5
+
+            SSF -> ACE2
+
+            SBF -> SSF
+            HCM1 -> SSF
+
+            MBF -> YHP1
+            SBF -> YHP1
+
+            MBF -> HCM1
+            SBF -> HCM1
+
+            MBF -> YOX1
+            SBF -> YOX1
+
+            CLN3 -> SBF
+            MBF -> SBF
+            YHP1 -| SBF
+            YOX1 -| SBF
+
+            CLN3 -> MBF
+
+            ACE2 -> CLN3
+            YHP1 -| CLN3
+            SWI5 -> CLN3
+            YOX1 -| CLN3
+            $ACE2: SSF
+            $CLN3: ACE2 | SWI5 | !YHP1 | !YOX1
+            $HCM1: MBF | SBF
+            $MBF: CLN3
+            $SBF: CLN3 | MBF | !YHP1 | !YOX1
+            $SSF: HCM1 | SBF
+            $SWI5: SSF
+            $YHP1: MBF | SBF
+            $YOX1: MBF | SBF
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(witness, witness_string);
+
+        let graph = AsyncGraph::new(witness).unwrap();
+        assert_eq!(graph.unit_params().cardinality(), 1.0);
     }
 }
