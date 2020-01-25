@@ -1,12 +1,12 @@
 use super::parser::FnUpdateTemp;
 use super::parser::FnUpdateTemp::*;
 use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use xml::reader::XmlEvent;
 use xml::EventReader;
 
 impl BooleanNetwork {
-    pub fn from_sbml(model_file: &str) -> Result<BooleanNetwork, String> {
+    pub fn from_sbml(model_file: &str) -> Result<(BooleanNetwork, Layout), String> {
         let mut parser = EventReader::new(model_file.as_bytes());
         // First tag should be sbml - read it and verify that it has necessary properties, then read model
         while let Ok(event) = parser.next() {
@@ -43,10 +43,14 @@ impl BooleanNetwork {
     }
 }
 
-fn read_model(parser: &mut EventReader<&[u8]>) -> Result<BooleanNetwork, String> {
+pub type Layout = HashMap<String, (f64, f64)>;
+
+// Read a network and an associated layout!
+fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout), String> {
     let mut in_model = false;
     let mut species: Vec<String> = Vec::new();
     let mut transitions: Vec<SBMLTransition> = Vec::new();
+    let mut layout: HashMap<String, (f64, f64)> = HashMap::new();
     while let Ok(event) = parser.next() {
         match event {
             XmlEvent::EndElement { name } => {
@@ -80,7 +84,7 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<BooleanNetwork, String>
                             bn.add_update_function_template(&t.target, fun)?;
                         }
                     }
-                    return Ok(bn);
+                    return Ok((bn, layout));
                 }
             }
             XmlEvent::StartElement { name, .. } => match name.local_name.as_str() {
@@ -93,13 +97,16 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<BooleanNetwork, String>
                         if species.is_empty() {
                             return Err("No species found in the model.".to_string());
                         }
-                        println!("Species: {:?}", species);
                     }
                 }
                 "listOfTransitions" => {
                     if in_model {
                         read_transitions(parser, &mut transitions)?;
-                        println!("Transitions: {:?}", transitions);
+                    }
+                }
+                "layout" => {
+                    if in_model {
+                        read_layout(parser, &mut layout)?;
                     }
                 }
                 _ => {}
@@ -108,6 +115,64 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<BooleanNetwork, String>
         }
     }
     return Err("Expected </model>, but found end of XML document.".to_string());
+}
+
+fn read_layout(parser: &mut EventReader<&[u8]>, layout: &mut HashMap<String, (f64, f64)>) -> Result<(), String> {
+    let mut inside_glyph: Option<String> = None;
+    while let Ok(event) = parser.next() {
+        match event {
+            XmlEvent::StartElement { name, attributes, .. } => {
+                if &name.local_name == "generalGlyph" {
+                    let mut reference = None;
+                    for attr in attributes {
+                        if &attr.name.local_name == "reference" {
+                            reference = Some(attr.value);
+                        }
+                    }
+                    if inside_glyph == None && reference.is_some() {
+                        inside_glyph = reference;
+                    }
+                } else if &name.local_name == "position" {
+                    if let Some(id) = &inside_glyph {
+                        let mut x = None;
+                        let mut y = None;
+                        for attr in attributes {
+                            if &attr.name.local_name == "x" {
+                                x = Some(attr.value);
+                            } else if &attr.name.local_name == "y" {
+                                y = Some(attr.value);
+                            }
+                        }
+                        match (x,y) {
+                            (Some(x), Some(y)) => {
+                                let x_num = x.parse::<f64>();
+                                let y_num = y.parse::<f64>();
+                                match (x_num, y_num) {
+                                    (Ok(x),Ok(y)) => {
+                                        layout.insert(id.clone(), (x, y));
+                                    }
+                                    // ignore errors - god knows what we can get in those attributes...
+                                    _ => {}
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+            XmlEvent::EndElement { name } => {
+                if &name.local_name == "layout" {
+                    return Ok(());
+                } else if &name.local_name == "generalGlyph" {
+                    inside_glyph = None;
+                }
+            }
+            _ => {}
+        }
+    }
+    return Err(
+        "Expected </layout:layout>, but found end of XML document.".to_string(),
+    );
 }
 
 /// Read the list of qualitative species from the XML document.
@@ -498,14 +563,21 @@ impl SBMLTransition {
 mod tests {
     use crate::BooleanNetwork;
     use std::convert::TryFrom;
+    use std::collections::HashMap;
 
     #[test]
     fn test() {
         let model =
-            std::fs::read_to_string("/Users/daemontus/Downloads/ginsim_models/_bool/g2a.sbml")
+            std::fs::read_to_string("sbml_models/g2a.sbml")
                 .expect("Cannot open result file.");
-        let actual = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
         // Compared by hand...
+        let mut expected_layout = HashMap::new();
+        expected_layout.insert("CtrA".to_string(), (419.0, 94.0));
+        expected_layout.insert("GcrA".to_string(), (325.0, 135.0));
+        expected_layout.insert("DnaA".to_string(), (374.0, 224.0));
+        expected_layout.insert("CcrM".to_string(), (462.0, 222.0));
+        expected_layout.insert("SciP".to_string(), (506.0, 133.0));
         let expected = BooleanNetwork::try_from(
             "
             CtrA -> CtrA
@@ -532,5 +604,6 @@ mod tests {
         )
         .unwrap();
         assert_eq!(actual, expected);
+        assert_eq!(layout, expected_layout);
     }
 }
