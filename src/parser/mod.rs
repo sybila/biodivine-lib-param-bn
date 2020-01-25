@@ -21,7 +21,7 @@ struct RegulationTemp {
 /// **(internal)** A helper enum for representing parsed `FnUpdate`s that have not been
 /// integrated into a `BooleanNetwork` yet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-enum FnUpdateTemp {
+pub(super) enum FnUpdateTemp {
     Const(bool),
     Var(String),
     Param(String, Vec<String>),

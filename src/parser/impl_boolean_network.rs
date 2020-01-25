@@ -18,7 +18,7 @@ impl BooleanNetwork {
     }
 
     /// **(internal)** Utility method used in other parts of the parser.
-    pub(super) fn add_update_function_template(
+    pub(crate) fn add_update_function_template(
         &mut self,
         variable: &str,
         update_function: FnUpdateTemp,

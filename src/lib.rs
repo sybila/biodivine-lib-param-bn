@@ -12,6 +12,7 @@ mod impl_fn_update;
 mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
+pub mod sbml;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
