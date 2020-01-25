@@ -423,7 +423,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                 return Ok(args.into_iter().next().unwrap());
                             }
                         } else {
-                            return Err("Empty update function.".to_string());
+                            // if the update function is empty, it defaults to false
+                            return Ok(FnUpdateTemp::Const(false));
                         }
                     }
                     "apply" => {
