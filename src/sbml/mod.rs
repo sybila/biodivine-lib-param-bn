@@ -124,7 +124,8 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
                         if &attr.name.local_name == "maxLevel" {
                             is_boolean = &attr.value == "1";
                         }
-                        if &attr.name.local_name == "name" {
+                        if &attr.name.local_name == "id" {
+                            // IDs are actually names
                             name = attr.value;
                         }
                     }
