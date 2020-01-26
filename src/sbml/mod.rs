@@ -5,6 +5,8 @@ use std::collections::{HashSet, HashMap};
 use xml::reader::XmlEvent;
 use xml::EventReader;
 
+pub mod export;
+
 impl BooleanNetwork {
     pub fn from_sbml(model_file: &str) -> Result<(BooleanNetwork, Layout), String> {
         let mut parser = EventReader::new(model_file.as_bytes());
