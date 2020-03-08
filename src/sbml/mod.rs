@@ -186,7 +186,7 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
             } => {
                 if &name.local_name == "qualitativeSpecies" {
                     let mut name = String::new();
-                    let mut is_boolean = false;
+                    let mut is_boolean = true;
                     for attr in attributes {
                         if &attr.name.local_name == "maxLevel" {
                             is_boolean = &attr.value == "1";
@@ -197,8 +197,10 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
                         }
                     }
                     if !is_boolean {
-                        return Err(format!("Species {} is not boolean.", name));
-                    } else if name.is_empty() {
+                        println!("WARNING: Species {} is not boolean.", name);
+                    }
+
+                    if name.is_empty() {
                         return Err("Found species with no name.".to_string());
                     } else {
                         // Check taht species is unique.
