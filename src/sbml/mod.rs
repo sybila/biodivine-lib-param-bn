@@ -335,7 +335,7 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                         }
                     }
                     // a function name is read - try to get latest apply and set it as operator
-                    "and" | "or" | "xor" | "not" | "implies" | "eq" => {
+                    "and" | "or" | "xor" | "not" | "implies" | "eq" | "geq" | "leq" | "lt" | "gt" => {
                         if let Some((op, _)) = function_stack.last_mut() {
                             if op != &Op::None {
                                 return Err(format!("Unexpected function op {}", name.local_name));
@@ -496,6 +496,126 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                         BinaryOp::Iff,
                                                         Box::new(l.clone()),
                                                         Box::new(r.clone()),
+                                                    )),
+                                                }
+                                            }
+                                        } else if op.as_str() == "geq" {    // (A >= B) <=> (!B | A) <=> (B => A)
+                                            if args.len() != 2 {
+                                                Err(format!(
+                                                    "GEQ takes exactly two arguments. {} given.",
+                                                    args.len()
+                                                ))
+                                            } else {
+                                                let left = &args[0];
+                                                let right = &args[1];
+                                                match (left, right) {
+                                                    (Const(a), Const(b)) => Ok(Const(!b | a)),
+                                                    (Const(true), Var(_)) => {
+                                                        Ok(Const(true))
+                                                    }
+                                                    (Var(name), Const(true)) => {
+                                                        Ok(Var(name.clone()))
+                                                    }
+                                                    (Const(false), Var(name)) => {
+                                                        Ok(Not(Box::new(Var(name.clone()))))
+                                                    }
+                                                    (Var(_), Const(false)) => {
+                                                        Ok(Const(true))
+                                                    }
+                                                    (l, r) => Ok(Binary(
+                                                        BinaryOp::Imp,
+                                                        Box::new(r.clone()),
+                                                        Box::new(l.clone()),
+                                                    )),
+                                                }
+                                            }
+                                        } else if op.as_str() == "leq" {    // (A <= B) <=> (!A | B) <=> (A => B)
+                                            if args.len() != 2 {
+                                                Err(format!(
+                                                    "LEQ takes exactly two arguments. {} given.",
+                                                    args.len()
+                                                ))
+                                            } else {
+                                                let left = &args[0];
+                                                let right = &args[1];
+                                                match (left, right) {
+                                                    (Const(a), Const(b)) => Ok(Const(!a | b)),
+                                                    (Const(true), Var(name)) => {
+                                                        Ok(Var(name.clone()))
+                                                    }
+                                                    (Var(_), Const(true)) => {
+                                                        Ok(Const(true))
+                                                    }
+                                                    (Const(false), Var(_)) => {
+                                                        Ok(Const(true))
+                                                    }
+                                                    (Var(name), Const(false)) => {
+                                                        Ok(Not(Box::new(Var(name.clone()))))
+                                                    }
+                                                    (l, r) => Ok(Binary(
+                                                        BinaryOp::Imp,
+                                                        Box::new(l.clone()),
+                                                        Box::new(r.clone()),
+                                                    )),
+                                                }
+                                            }
+                                        } else if op.as_str() == "lt" {    // (A < B) <=> (!A & B)
+                                            if args.len() != 2 {
+                                                Err(format!(
+                                                    "LT takes exactly two arguments. {} given.",
+                                                    args.len()
+                                                ))
+                                            } else {
+                                                let left = &args[0];
+                                                let right = &args[1];
+                                                match (left, right) {
+                                                    (Const(a), Const(b)) => Ok(Const(!a & b)),
+                                                    (Const(true), Var(_)) => {
+                                                        Ok(Const(false))
+                                                    }
+                                                    (Var(name), Const(true)) => {
+                                                        Ok(Not(Box::new(Var(name.clone()))))
+                                                    }
+                                                    (Const(false), Var(name)) => {
+                                                        Ok(Var(name.clone()))
+                                                    }
+                                                    (Var(_), Const(false)) => {
+                                                        Ok(Const(false))
+                                                    }
+                                                    (l, r) => Ok(Binary(
+                                                        BinaryOp::And,
+                                                        Box::new(Not(Box::new(l.clone()))),
+                                                        Box::new(r.clone()),
+                                                    )),
+                                                }
+                                            }
+                                        } else if op.as_str() == "gt" {    // (A > B) <=> (A & !B)
+                                            if args.len() != 2 {
+                                                Err(format!(
+                                                    "GT takes exactly two arguments. {} given.",
+                                                    args.len()
+                                                ))
+                                            } else {
+                                                let left = &args[0];
+                                                let right = &args[1];
+                                                match (left, right) {
+                                                    (Const(a), Const(b)) => Ok(Const(a & !b)),
+                                                    (Const(true), Var(name)) => {
+                                                        Ok(Not(Box::new(Var(name.clone()))))
+                                                    }
+                                                    (Var(_), Const(true)) => {
+                                                        Ok(Const(false))
+                                                    }
+                                                    (Const(false), Var(_)) => {
+                                                        Ok(Const(false))
+                                                    }
+                                                    (Var(name), Const(false)) => {
+                                                        Ok(Var(name.clone()))
+                                                    }
+                                                    (l, r) => Ok(Binary(
+                                                        BinaryOp::And,
+                                                        Box::new(l.clone()),
+                                                        Box::new(Not(Box::new(r.clone()))),
                                                     )),
                                                 }
                                             }
