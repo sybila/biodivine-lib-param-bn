@@ -13,6 +13,7 @@ mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
 pub mod sbml;
+pub mod scc;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
