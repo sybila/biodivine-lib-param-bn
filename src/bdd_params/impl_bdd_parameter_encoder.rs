@@ -1,5 +1,5 @@
 use super::BddParameterEncoder;
-use crate::bdd_params::BddParams;
+use crate::bdd_params::{BddParams, FunctionTableEntry};
 use crate::{BooleanNetwork, ParameterId, VariableId};
 use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
 use biodivine_lib_std::IdState;
@@ -59,6 +59,25 @@ impl BddParameterEncoder {
             explicit_function_tables,
             implicit_function_tables,
         };
+    }
+
+    /// A vector of entries in the table of a specific function.
+    pub fn implicit_function_table(&self, target: VariableId) -> Vec<FunctionTableEntry> {
+        let regulators = &self.regulators[target.0];
+        let table = &self.implicit_function_tables[target.0];
+        return (0..table.len())
+            .map(|i| FunctionTableEntry {
+                table: target.0,
+                entry_index: i,
+                regulators,
+            })
+            .collect();
+    }
+
+    /// Get teh parameters which correspond to a specific table entry being one.
+    pub fn get_implicit_for_table(&self, entry: &FunctionTableEntry) -> BddParams {
+        let var = self.implicit_function_tables[entry.table][entry.entry_index];
+        return BddParams(self.bdd_variables.mk_var(var));
     }
 
     /// Find the `BddVariable` corresponding to the value of the `parameter` function

@@ -11,6 +11,7 @@ use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 mod impl_bdd_parameter_encoder;
 mod impl_bdd_params;
 mod impl_fn_update;
+mod impl_function_table_entry;
 mod impl_static_constraints;
 mod impl_witness_generator;
 
@@ -41,4 +42,14 @@ pub struct BddParameterEncoder {
     /// A vector of implicit function tables indexed by `VariableId`s of the `BooleanNetwork`.
     /// If the variable has an explicit update function, the table is empty.
     implicit_function_tables: Vec<Vec<BddVariable>>,
+}
+
+/// **(experimental)** Represents one "line" in a boolean function table.
+///
+/// You can query the state of input variables on this line or make a new line
+/// with updated variable values.
+pub struct FunctionTableEntry<'a> {
+    entry_index: usize, // index into the specific table
+    table: usize,       // index into the vector of tables
+    regulators: &'a Vec<VariableId>,
 }
