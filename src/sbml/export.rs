@@ -1,17 +1,24 @@
-use crate::{BooleanNetwork, Monotonicity, FnUpdate, BinaryOp};
-use std::collections::{HashMap};
-use std::io::{Write, Error};
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity};
+use std::collections::HashMap;
+use std::io::{Error, Write};
 
 impl BooleanNetwork {
-
     pub fn to_sbml(&self, layout: &HashMap<String, (f64, f64)>) -> String {
         let mut buffer: Vec<u8> = Vec::new();
-        self.write_as_sbml(&mut buffer, layout) .expect("Cannot write model to SBML.");
+        self.write_as_sbml(&mut buffer, layout)
+            .expect("Cannot write model to SBML.");
         return String::from_utf8(buffer).expect("Invalid UTF formatting in string.");
     }
 
-    pub fn write_as_sbml(&self, out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Result<(), Error> {
-        write!(out, "<?xml version='1.0' encoding='UTF-8' standalone='no'?>")?;
+    pub fn write_as_sbml(
+        &self,
+        out: &mut dyn Write,
+        layout: &HashMap<String, (f64, f64)>,
+    ) -> Result<(), Error> {
+        write!(
+            out,
+            "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
+        )?;
         write!(out, "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" layout:required=\"false\" level=\"3\" qual:required=\"true\" xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" version=\"1\" xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
         write!(out, "<model>")?;
         if !layout.is_empty() {
@@ -44,7 +51,10 @@ impl BooleanNetwork {
             write!(out, "<qual:listOfInputs>")?;
             for r in &regulators {
                 let r_var = self.graph.get_variable(*r);
-                let monotonicity = self.graph.find_regulation(*r, id).and_then(|r| r.monotonicity);
+                let monotonicity = self
+                    .graph
+                    .find_regulation(*r, id)
+                    .and_then(|r| r.monotonicity);
                 let sign = match monotonicity {
                     None => "unknown",
                     Some(Monotonicity::Activation) => "positive",
@@ -61,7 +71,10 @@ impl BooleanNetwork {
             if let Some(update_function) = &self.get_update_function(id) {
                 write!(out, "<qual:listOfFunctionTerms>")?;
                 // set default value to 0
-                write!(out, "<qual:defaultTerm qual:resultLevel=\"0\"></qual:defaultTerm>")?;
+                write!(
+                    out,
+                    "<qual:defaultTerm qual:resultLevel=\"0\"></qual:defaultTerm>"
+                )?;
                 write!(out, "<qual:functionTerm qual:resultLevel=\"1\">")?;
                 write!(out, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
                 self.write_update_function(out, update_function)?;
@@ -81,7 +94,11 @@ impl BooleanNetwork {
             FnUpdate::Const(false) => write!(out, "<false/>")?,
             FnUpdate::Var(id) => {
                 let v = self.graph.get_variable(*id);
-                write!(out, "<apply><eq/><ci>{}</ci><cn type=\"integer\">1</cn></apply>", v.name)?;
+                write!(
+                    out,
+                    "<apply><eq/><ci>{}</ci><cn type=\"integer\">1</cn></apply>",
+                    v.name
+                )?;
             }
             FnUpdate::Not(inner) => {
                 write!(out, "<apply><not/>")?;
@@ -111,7 +128,7 @@ impl BooleanNetwork {
                 write!(out, "</apply>")?;
             }
         }
-        return Ok(())
+        return Ok(());
     }
 }
 
@@ -119,29 +136,41 @@ fn write_layout(out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Re
     write!(out, "<layout:listOfLayouts xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">")?;
     write!(out, "<layout:layout layout:id=\"__layout__\">")?;
     write!(out, "<layout:listOfAdditionalGraphicalObjects>")?;
-    for (name, (x,y)) in layout {
-        write!(out, "<layout:generalGlyph layout:id=\"_ly_{}\" layout:reference=\"{}\">", name, name)?;
+    for (name, (x, y)) in layout {
+        write!(
+            out,
+            "<layout:generalGlyph layout:id=\"_ly_{}\" layout:reference=\"{}\">",
+            name, name
+        )?;
         write!(out, "<layout:boundingBox>")?;
-        write!(out, "<layout:position layout:x=\"{}\" layout:y=\"{}\"/>", x, y)?;
-        write!(out, "<layout:dimensions layout:height=\"25\" layout:width=\"45\"/>")?;
+        write!(
+            out,
+            "<layout:position layout:x=\"{}\" layout:y=\"{}\"/>",
+            x, y
+        )?;
+        write!(
+            out,
+            "<layout:dimensions layout:height=\"25\" layout:width=\"45\"/>"
+        )?;
         write!(out, "</layout:boundingBox>")?;
         write!(out, "</layout:generalGlyph>")?;
     }
     write!(out, "</layout:listOfAdditionalGraphicalObjects>")?;
     write!(out, "</layout:layout>")?;
     write!(out, "</layout:listOfLayouts>")?;
-    return Ok(())
+    return Ok(());
 }
 
 #[cfg(test)]
 mod tests {
-    use std::convert::TryFrom;
     use crate::BooleanNetwork;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     #[test]
     fn text_sbml_export() {
-        let model = BooleanNetwork::try_from("
+        let model = BooleanNetwork::try_from(
+            "
             a -? a
             c -? a
             a -> b
@@ -153,7 +182,9 @@ mod tests {
             $b: p(a) <=> q(a, a)
             # Notice that a regulates c but does not appear in the function!
             $c: q(b, b) => !(b ^ k)
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         let mut expected_layout = HashMap::new();
         expected_layout.insert("a".to_string(), (1.0, 2.0));
         expected_layout.insert("b".to_string(), (1.5, 2.8));
@@ -165,5 +196,4 @@ mod tests {
         assert_eq!(model, actual);
         assert_eq!(expected_layout, layout);
     }
-
 }

@@ -1,7 +1,6 @@
-use crate::{Regulation, Monotonicity, VariableId};
+use crate::{Monotonicity, Regulation, VariableId};
 
 impl Regulation {
-
     pub fn is_observable(&self) -> bool {
         return self.observable;
     }
@@ -17,5 +16,4 @@ impl Regulation {
     pub fn get_target(&self) -> VariableId {
         return self.target;
     }
-
 }
