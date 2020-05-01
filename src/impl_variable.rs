@@ -6,3 +6,10 @@ impl Display for Variable {
         return write!(f, "{}", self.name);
     }
 }
+
+impl Variable {
+    /// Human-readable name of this variable.
+    pub fn get_name(&self) -> &String {
+        return &self.name;
+    }
+}

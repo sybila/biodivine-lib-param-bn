@@ -11,6 +11,8 @@ mod impl_boolean_network;
 mod impl_fn_update;
 mod impl_regulatory_graph;
 mod impl_variable;
+mod impl_regulation;
+mod impl_parameter;
 mod parser;
 pub mod sbml;
 
