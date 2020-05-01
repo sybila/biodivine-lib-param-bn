@@ -80,6 +80,10 @@ impl BddParameterEncoder {
         return BddParams(self.bdd_variables.mk_var(var));
     }
 
+    pub fn get_implicit_var_for_table(&self, entry: &FunctionTableEntry) -> BddVariable {
+        return self.implicit_function_tables[entry.table][entry.entry_index];
+    }
+
     /// Find the `BddVariable` corresponding to the value of the `parameter` function
     /// in the given `state` assuming the specified `arguments`.
     pub fn get_explicit(
