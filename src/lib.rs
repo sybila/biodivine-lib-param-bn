@@ -13,6 +13,7 @@ mod impl_parameter;
 mod impl_regulation;
 mod impl_regulatory_graph;
 mod impl_variable;
+mod impl_variable_id;
 mod parser;
 pub mod sbml;
 
