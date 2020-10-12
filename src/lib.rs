@@ -14,6 +14,7 @@ mod impl_variable;
 mod parser;
 pub mod sbml;
 pub mod scc;
+pub mod pscc;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
