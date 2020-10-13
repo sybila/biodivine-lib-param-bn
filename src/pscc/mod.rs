@@ -276,9 +276,10 @@ impl PsccContext {
             println!();
         }
         return ColorVertexSet {
-            bdd: transition_post
+            bdd: par_union(transition_post)
+            /*transition_post
                 .into_iter()
-                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),
+                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),*/
         };
     }
 
@@ -332,9 +333,10 @@ impl PsccContext {
             println!();
         }
         return ColorVertexSet {
-            bdd: transition_post
+            bdd: par_union(transition_post),
+            /*transition_post
                 .into_iter()
-                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),
+                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),*/
         };
     }
 
@@ -408,9 +410,10 @@ impl PsccContext {
             println!();
         }
         return ColorVertexSet {
-            bdd: not_sinks
+            bdd: universe.and_not(&par_union(not_sinks))
+                /*not_sinks
                 .into_iter()
-                .fold(universe.clone(), |a, b| a.and_not(&b)),
+                .fold(universe.clone(), |a, b| a.and_not(&b)),*/
         };
     }
 
@@ -463,7 +466,7 @@ impl PsccContext {
         if LOG_LEVEL > 1 {
             print!("Sources.")
         };
-        let not_sinks: Vec<Bdd> = (0..self.network.graph.num_vars())
+        let not_sources: Vec<Bdd> = (0..self.network.graph.num_vars())
             .into_par_iter()
             .map(|v_i| {
                 let v = self.state_variables[v_i];
@@ -482,9 +485,10 @@ impl PsccContext {
             println!();
         }
         return ColorVertexSet {
-            bdd: not_sinks
+            bdd: universe.and_not(&par_union(not_sources))
+            /*not_sinks
                 .into_iter()
-                .fold(universe.clone(), |a, b| a.and_not(&b)),
+                .fold(universe.clone(), |a, b| a.and_not(&b))*/,
         };
     }
 }
@@ -603,10 +607,10 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
 }
 
 pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
-    println!("Decomposition: {}", universe.cardinality());
     if universe.is_empty() {
         return;
     }
+    println!("Decomposition: {}", universe.cardinality());
     let universe = trim(context, universe);
     if universe.is_empty() {
         return;
