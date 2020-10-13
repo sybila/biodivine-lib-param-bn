@@ -16,7 +16,7 @@ impl FnUpdate {
         return BddParams(self._symbolic_eval(state, encoder).not());
     }
 
-    pub(super) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
+    pub(crate) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
         return match self {
             FnUpdate::Const(value) => {
                 if *value {

@@ -35,10 +35,10 @@ pub struct BddParameterEncoder {
     /// The actual `BddVariableSet` used to represent the parameters - use this for `.dot` printing etc.
     pub bdd_variables: BddVariableSet,
     /// The actual regulators of each variable - these are used when evaluating implicit parameters.
-    regulators: Vec<Vec<VariableId>>,
+    pub(crate) regulators: Vec<Vec<VariableId>>,
     /// A vector of function tables indexed by explicit `ParameterId`s of the `BooleanNetwork`.
-    explicit_function_tables: Vec<Vec<BddVariable>>,
+    pub(crate) explicit_function_tables: Vec<Vec<BddVariable>>,
     /// A vector of implicit function tables indexed by `VariableId`s of the `BooleanNetwork`.
     /// If the variable has an explicit update function, the table is empty.
-    implicit_function_tables: Vec<Vec<BddVariable>>,
+    pub(crate) implicit_function_tables: Vec<Vec<BddVariable>>,
 }
