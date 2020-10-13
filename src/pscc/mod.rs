@@ -20,7 +20,7 @@ use std::io::Write;
 use std::ops::Shl;
 
 // higher = more verbose
-const LOG_LEVEL: usize = 3;
+const LOG_LEVEL: usize = 1;
 
 pub struct PsccContext {
     network: BooleanNetwork,
@@ -598,9 +598,9 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
     let mut test_next = context.pre(&to_trim, &result);
     while !test_next.is_empty() {
         let to_trim = context.sinks(&test_next);
-        println!("To trim: {}", to_trim.cardinality());
+        if LOG_LEVEL > 0 { println!("To trim: {}", to_trim.cardinality()); }
         result = result.minus(&to_trim);
-        if to_trim.cardinality() < 0.01 * start_cardinality { break; }
+        //if to_trim.cardinality() < 0.01 * start_cardinality { break; }
         test_next = context.pre(&to_trim, &result);
     }
 
@@ -609,9 +609,9 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
     let mut test_next = context.post(&to_trim, &result);
     while !test_next.is_empty() {
         let to_trim = context.sources(&result);
-        println!("To trim: {}", to_trim.cardinality());
+        if LOG_LEVEL > 0 { println!("To trim: {}", to_trim.cardinality()); }
         result = result.minus(&to_trim);
-        if to_trim.cardinality() < 0.01 * start_cardinality { break; }
+        //if to_trim.cardinality() < 0.01 * start_cardinality { break; }
         test_next = context.post(&to_trim, &result);
     }
 
