@@ -1,8 +1,8 @@
-use std::io::Read;
-use biodivine_lib_param_bn::BooleanNetwork;
+use biodivine_lib_bdd::{Bdd, BddValuation, BddVariableSet};
 use biodivine_lib_param_bn::scc::SymbolicBN;
-use biodivine_lib_bdd::{BddValuation, BddVariableSet, Bdd};
+use biodivine_lib_param_bn::BooleanNetwork;
 use std::convert::TryFrom;
+use std::io::Read;
 
 fn main() {
     let mut buffer = String::new();
@@ -24,7 +24,12 @@ fn main() {
     while !frontier.is_false() {
         frontier = symbolic.pre_all(&frontier).and_not(&can_reach_sink);
         can_reach_sink = can_reach_sink.or(&frontier);
-        println!("Next frontier: {} Can reach sink: {} Remaining: {}", frontier.cardinality(), can_reach_sink.cardinality(), all.cardinality() - can_reach_sink.cardinality());
+        println!(
+            "Next frontier: {} Can reach sink: {} Remaining: {}",
+            frontier.cardinality(),
+            can_reach_sink.cardinality(),
+            all.cardinality() - can_reach_sink.cardinality()
+        );
     }
     /*let mut remaining = symbolic.all_states();
     while !remaining.is_false() {
@@ -39,7 +44,6 @@ fn main() {
             println!("Next frontier: {} Remaining: {}", frontier.cardinality(), remaining.cardinality());
         }
     }*/
-
 }
 
 pub fn valuation_to_bdd(val: &BddValuation, variables: &BddVariableSet) -> Bdd {

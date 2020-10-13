@@ -1,21 +1,23 @@
-
 /*
-    Design principles: all sets are over a common BDD variable universe where we have
-    parameter variables followed by state variables (this allows simple pivot selection).
+   Design principles: all sets are over a common BDD variable universe where we have
+   parameter variables followed by state variables (this allows simple pivot selection).
 
-    In color sets, the state variables are ignored (so a color set A is represented as `A x V`)
-    and in vertex sets, the color variables are ignored (so `C x A`). This does not influence
-    normal set operations.
- */
+   In color sets, the state variables are ignored (so a color set A is represented as `A x V`)
+   and in vertex sets, the color variables are ignored (so `C x A`). This does not influence
+   normal set operations.
+*/
 
-use biodivine_lib_bdd::{BddVariableSet, Bdd, BddVariable, BddVariableSetBuilder, BddValuationIterator};
+use crate::bdd_params::{build_static_constraints, BddParameterEncoder};
 use crate::{BooleanNetwork, VariableId};
 use biodivine_lib_bdd::bdd;
-use crate::bdd_params::{BddParameterEncoder, build_static_constraints};
+use biodivine_lib_bdd::{
+    Bdd, BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder,
+};
 use biodivine_lib_std::IdState;
-use std::ops::Shl;
+use rayon::prelude::*;
 use std::io;
 use std::io::Write;
+use std::ops::Shl;
 
 // higher = more verbose
 const LOG_LEVEL: usize = 3;
@@ -33,7 +35,6 @@ pub struct PsccContext {
 }
 
 impl PsccContext {
-
     pub fn new(bn: BooleanNetwork) -> PsccContext {
         let mut bdd = BddVariableSetBuilder::new();
         let mut explicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
@@ -90,7 +91,8 @@ impl PsccContext {
 
         let bdd_variables = bdd.build();
 
-        let fake_encoder = BddParameterEncoder {    // since we first have params and then states, this works...
+        let fake_encoder = BddParameterEncoder {
+            // since we first have params and then states, this works...
             bdd_variables: bdd_variables.clone(),
             regulators,
             explicit_function_tables: explicit_function_tables.clone(),
@@ -107,17 +109,30 @@ impl PsccContext {
                 // When there is an explicit update function, we have to eval it one valuation at a time:
                 for valuation in BddValuationIterator::new(regulators.len() as u16) {
                     let valuation_vector = valuation.vector();
-                    let valuation_bdd = Self::extend_valuation_to_bdd(&bdd_variables, &state_variables, &valuation_vector, &regulators);
-                    let valuation_state = Self::extend_valuation_to_id_state(&valuation_vector, &regulators);
-                    let function_is_one_in_valuation: Bdd = function._symbolic_eval(valuation_state, &fake_encoder);
-                    function_is_one = bdd!(function_is_one & (valuation_bdd => function_is_one_in_valuation));
+                    let valuation_bdd = Self::extend_valuation_to_bdd(
+                        &bdd_variables,
+                        &state_variables,
+                        &valuation_vector,
+                        &regulators,
+                    );
+                    let valuation_state =
+                        Self::extend_valuation_to_id_state(&valuation_vector, &regulators);
+                    let function_is_one_in_valuation: Bdd =
+                        function._symbolic_eval(valuation_state, &fake_encoder);
+                    function_is_one =
+                        bdd!(function_is_one & (valuation_bdd => function_is_one_in_valuation));
                 }
             } else {
                 // When the update function is implicit, we just combine all (valuation => parameter):
                 let table = &implicit_function_tables[v.0];
                 let mut i = 0;
                 for valuation in BddValuationIterator::new(regulators.len() as u16) {
-                    let valuation_bdd = Self::extend_valuation_to_bdd(&bdd_variables, &state_variables, &valuation.vector(), &regulators);
+                    let valuation_bdd = Self::extend_valuation_to_bdd(
+                        &bdd_variables,
+                        &state_variables,
+                        &valuation.vector(),
+                        &regulators,
+                    );
                     let parameter = table[i];
                     let parameter_bdd = bdd_variables.mk_var(parameter);
                     function_is_one = bdd!(function_is_one & (valuation_bdd => parameter_bdd));
@@ -140,11 +155,16 @@ impl PsccContext {
             bdd_variables,
             state_variables,
             update_function_cache: function_cache,
-            universe
-        }
+            universe,
+        };
     }
 
-    fn extend_valuation_to_bdd(vars: &BddVariableSet, state_variables: &Vec<BddVariable>, valuation: &Vec<bool>, regulators: &Vec<VariableId>) -> Bdd {
+    fn extend_valuation_to_bdd(
+        vars: &BddVariableSet,
+        state_variables: &Vec<BddVariable>,
+        valuation: &Vec<bool>,
+        regulators: &Vec<VariableId>,
+    ) -> Bdd {
         // valuation.len == regulators.len
         // variable_id \in state_variables.indices
         let mut bdd = vars.mk_true();
@@ -152,13 +172,20 @@ impl PsccContext {
             let r = regulators[r_i];
             let bdd_var_of_r = state_variables[r.0];
             let r_is_true = valuation[r_i];
-            let r_bdd = if r_is_true { vars.mk_var(bdd_var_of_r) } else { vars.mk_not_var(bdd_var_of_r) };
+            let r_bdd = if r_is_true {
+                vars.mk_var(bdd_var_of_r)
+            } else {
+                vars.mk_not_var(bdd_var_of_r)
+            };
             bdd = bdd.and(&r_bdd);
         }
         return bdd;
     }
 
-    fn extend_valuation_to_id_state(valuation: &Vec<bool>, regulators: &Vec<VariableId>) -> IdState {
+    fn extend_valuation_to_id_state(
+        valuation: &Vec<bool>,
+        regulators: &Vec<VariableId>,
+    ) -> IdState {
         let mut state = 0;
         for r_i in 0..regulators.len() {
             if valuation[r_i] {
@@ -170,29 +197,43 @@ impl PsccContext {
     }
 
     pub fn empty_colours(&self) -> ColorSet {
-        return ColorSet { bdd: self.bdd_variables.mk_false() };
+        return ColorSet {
+            bdd: self.bdd_variables.mk_false(),
+        };
     }
 
     pub fn all_vertices(&self) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.universe.clone() };
+        return ColorVertexSet {
+            bdd: self.universe.clone(),
+        };
     }
 
     pub fn color_projection(&self, set: &ColorVertexSet) -> ColorSet {
-        return ColorSet { bdd: set.bdd.projection(self.p_count) };
+        return ColorSet {
+            bdd: set.bdd.projection(self.p_count),
+        };
     }
 
     pub fn pivots(&self, set: &ColorVertexSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: set.bdd.extended_witness(self.p_count) };
+        return ColorVertexSet {
+            bdd: set.bdd.extended_witness(self.p_count),
+        };
     }
 
     pub fn colours_cardinality(&self, set: &ColorSet) -> f64 {
         return set.bdd.cardinality() / (1.shl(self.state_variables.len()) as f64);
     }
 
-    pub fn post(&self, frontier: &ColorVertexSet, universe: &ColorVertexSet) -> ColorVertexSet {
+    pub fn _post_sequential(
+        &self,
+        frontier: &ColorVertexSet,
+        universe: &ColorVertexSet,
+    ) -> ColorVertexSet {
         let frontier = &frontier.bdd;
         let mut result = self.bdd_variables.mk_false();
-        if LOG_LEVEL > 1 { print!("Post.") };
+        if LOG_LEVEL > 1 {
+            print!("Post.")
+        };
         for v_i in 0..self.network.graph.num_vars() {
             let v = self.state_variables[v_i];
             let apply_function = &self.update_function_cache[v_i];
@@ -205,14 +246,52 @@ impl PsccContext {
                 io::stdout().flush().unwrap();
             }
         }
-        if LOG_LEVEL > 1 { println!(); }
+        if LOG_LEVEL > 1 {
+            println!();
+        }
         return ColorVertexSet { bdd: result };
     }
 
-    pub fn pre(&self, frontier: &ColorVertexSet, universe: &ColorVertexSet) -> ColorVertexSet {
+    pub fn post(&self, frontier: &ColorVertexSet, universe: &ColorVertexSet) -> ColorVertexSet {
+        let frontier = &frontier.bdd;
+        if LOG_LEVEL > 1 {
+            print!("Post.")
+        };
+        let transition_post: Vec<Bdd> = (0..self.network.graph.num_vars())
+            .into_par_iter()
+            .map(|v_i| {
+                let v = self.state_variables[v_i];
+                let apply_function = &self.update_function_cache[v_i];
+                // This is equivalent to [frontier & ((v_is_one & function_is_zero) | (v_is_zero & function_is_one))]
+                let can_perform_step: Bdd = bdd!(frontier & apply_function);
+                let after_step_performed = can_perform_step.invert_input(v).and(&universe.bdd);
+                if LOG_LEVEL > 2 {
+                    print!("{}.", v_i);
+                    io::stdout().flush().unwrap();
+                }
+                after_step_performed
+            })
+            .collect();
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: transition_post
+                .into_iter()
+                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),
+        };
+    }
+
+    pub fn _pre_sequential(
+        &self,
+        frontier: &ColorVertexSet,
+        universe: &ColorVertexSet,
+    ) -> ColorVertexSet {
         let frontier = &frontier.bdd;
         let mut result = self.bdd_variables.mk_false();
-        if LOG_LEVEL > 1 { print!("Pre."); }
+        if LOG_LEVEL > 1 {
+            print!("Pre.");
+        }
         for v_i in 0..self.network.graph.num_vars() {
             let v = self.state_variables[v_i];
             let apply_function = &self.update_function_cache[v_i];
@@ -224,8 +303,39 @@ impl PsccContext {
                 io::stdout().flush().unwrap();
             }
         }
-        if LOG_LEVEL > 1 { println!(); }
+        if LOG_LEVEL > 1 {
+            println!();
+        }
         return ColorVertexSet { bdd: result };
+    }
+
+    pub fn pre(&self, frontier: &ColorVertexSet, universe: &ColorVertexSet) -> ColorVertexSet {
+        let frontier = &frontier.bdd;
+        if LOG_LEVEL > 1 {
+            print!("Pre.")
+        };
+        let transition_post: Vec<Bdd> = (0..self.network.graph.num_vars())
+            .into_par_iter()
+            .map(|v_i| {
+                let v = self.state_variables[v_i];
+                let apply_function = &self.update_function_cache[v_i];
+                let possible_predecessors = frontier.invert_input(v).and(&universe.bdd);
+                let can_perform_step = bdd!(possible_predecessors & apply_function);
+                if LOG_LEVEL > 2 {
+                    print!("{}.", v_i);
+                    io::stdout().flush().unwrap();
+                }
+                can_perform_step
+            })
+            .collect();
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: transition_post
+                .into_iter()
+                .fold(self.bdd_variables.mk_false(), |a, b| a.or(&b)),
+        };
     }
 
     /*pub fn has_successor(&self, universe: &ColorVertexSet) -> ColorVertexSet {
@@ -247,9 +357,11 @@ impl PsccContext {
     }*/
 
     /// Compute the vertex set of items which have no successor in the given universe.
-    pub fn sinks(&self, universe: &ColorVertexSet) -> ColorVertexSet {
+    pub fn _sinks_sequential(&self, universe: &ColorVertexSet) -> ColorVertexSet {
         let mut sink_candidate = universe.bdd.clone();
-        if LOG_LEVEL > 1 { print!("Sinks."); }
+        if LOG_LEVEL > 1 {
+            print!("Sinks.");
+        }
         for v_i in 0..self.network.graph.num_vars() {
             let v = self.state_variables[v_i];
             let cached = &self.update_function_cache[v_i];
@@ -263,8 +375,43 @@ impl PsccContext {
                 io::stdout().flush().unwrap();
             }
         }
-        if LOG_LEVEL > 1 { println!(); }
-        return ColorVertexSet { bdd: sink_candidate };
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: sink_candidate,
+        };
+    }
+
+    pub fn sinks(&self, universe: &ColorVertexSet) -> ColorVertexSet {
+        let universe = &universe.bdd;
+        if LOG_LEVEL > 1 {
+            print!("Sinks.")
+        };
+        let not_sinks: Vec<Bdd> = (0..self.network.graph.num_vars())
+            .into_par_iter()
+            .map(|v_i| {
+                let v = self.state_variables[v_i];
+                let cached = &self.update_function_cache[v_i];
+                let can_do_transition = bdd!(universe & cached);
+                // This has to be universe and not sink_candidate because that's where we look for successors.
+                let after_transition = universe.and(&can_do_transition.invert_input(v));
+                let before_transition = after_transition.invert_input(v);
+                if LOG_LEVEL > 2 {
+                    print!("{}.", v_i);
+                    io::stdout().flush().unwrap();
+                }
+                before_transition
+            })
+            .collect();
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: not_sinks
+                .into_iter()
+                .fold(universe.clone(), |a, b| a.and_not(&b)),
+        };
     }
 
     /*pub fn has_predecessor(&self, universe: &ColorVertexSet) -> ColorVertexSet {
@@ -286,9 +433,11 @@ impl PsccContext {
         return ColorVertexSet { bdd: result };
     }*/
 
-    pub fn sources(&self, universe: &ColorVertexSet) -> ColorVertexSet {
+    pub fn _sources_sequential(&self, universe: &ColorVertexSet) -> ColorVertexSet {
         let mut source_candidate = universe.bdd.clone();
-        if LOG_LEVEL > 1 { print!("Sources."); }
+        if LOG_LEVEL > 1 {
+            print!("Sources.");
+        }
         for v_i in 0..self.network.graph.num_vars() {
             let v = self.state_variables[v_i];
             let cached = &self.update_function_cache[v_i];
@@ -301,73 +450,116 @@ impl PsccContext {
                 io::stdout().flush().unwrap();
             }
         }
-        if LOG_LEVEL > 1 { println!(); }
-        return ColorVertexSet { bdd: source_candidate };
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: source_candidate,
+        };
     }
 
+    pub fn sources(&self, universe: &ColorVertexSet) -> ColorVertexSet {
+        let universe = &universe.bdd;
+        if LOG_LEVEL > 1 {
+            print!("Sources.")
+        };
+        let not_sinks: Vec<Bdd> = (0..self.network.graph.num_vars())
+            .into_par_iter()
+            .map(|v_i| {
+                let v = self.state_variables[v_i];
+                let cached = &self.update_function_cache[v_i];
+                let possible_predecessors = universe.invert_input(v).and(&universe);
+                let can_do_transition = bdd!(possible_predecessors & cached);
+                let after_transition = can_do_transition.invert_input(v);
+                if LOG_LEVEL > 2 {
+                    print!("{}.", v_i);
+                    io::stdout().flush().unwrap();
+                }
+                after_transition
+            })
+            .collect();
+        if LOG_LEVEL > 1 {
+            println!();
+        }
+        return ColorVertexSet {
+            bdd: not_sinks
+                .into_iter()
+                .fold(universe.clone(), |a, b| a.and_not(&b)),
+        };
+    }
 }
 
 #[derive(Clone)]
 pub struct ColorSet {
-    bdd: Bdd
+    bdd: Bdd,
 }
 
 impl ColorSet {
-
     /*
         Operations on color sets are just operations on BDDs since state variables are all erased
         and do not play any role.
     */
 
     pub fn union(&self, other: &Self) -> Self {
-        return ColorSet { bdd: self.bdd.or(&other.bdd) };
+        return ColorSet {
+            bdd: self.bdd.or(&other.bdd),
+        };
     }
 
     pub fn minus(&self, other: &Self) -> Self {
-        return ColorSet { bdd: self.bdd.and_not(&other.bdd) };
+        return ColorSet {
+            bdd: self.bdd.and_not(&other.bdd),
+        };
     }
 
     pub fn equals(&self, other: &Self) -> bool {
         return self.bdd.eq(&other.bdd);
     }
-
 }
 
 #[derive(Clone)]
 pub struct ColorVertexSet {
-    bdd: Bdd
+    bdd: Bdd,
 }
 
 impl ColorVertexSet {
-
     pub fn is_empty(&self) -> bool {
         return self.bdd.is_false();
     }
 
     pub fn minus(&self, other: &ColorVertexSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.bdd.and_not(&other.bdd) };
+        return ColorVertexSet {
+            bdd: self.bdd.and_not(&other.bdd),
+        };
     }
 
     pub fn minus_colors(&self, other: &ColorSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.bdd.and_not(&other.bdd) };
+        return ColorVertexSet {
+            bdd: self.bdd.and_not(&other.bdd),
+        };
     }
 
     pub fn intersect_colors(&self, other: &ColorSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.bdd.and(&other.bdd) };
+        return ColorVertexSet {
+            bdd: self.bdd.and(&other.bdd),
+        };
     }
 
     pub fn union(&self, other: &ColorVertexSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.bdd.or(&other.bdd) };
+        return ColorVertexSet {
+            bdd: self.bdd.or(&other.bdd),
+        };
     }
 
     pub fn intersect(&self, other: &ColorVertexSet) -> ColorVertexSet {
-        return ColorVertexSet { bdd: self.bdd.and(&other.bdd) };
+        return ColorVertexSet {
+            bdd: self.bdd.and(&other.bdd),
+        };
     }
 
     pub fn cardinality(&self) -> f64 {
         return self.bdd.cardinality();
     }
-
 }
 
 pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
@@ -397,9 +589,13 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
 }
 
 pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
-    if universe.is_empty() { return }
+    if universe.is_empty() {
+        return;
+    }
     let universe = trim(context, universe);
-    if universe.is_empty() { return }
+    if universe.is_empty() {
+        return;
+    }
     println!("Decomposition: {}", universe.cardinality());
     let pivot = context.pivots(&universe);
     println!("Found pivot: {:?}", pivot.cardinality());
@@ -418,8 +614,12 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
         let ref new_b_frontier = context.pre(&b_frontier, &universe.minus(&b));
         f = f.union(new_f_frontier);
         b = b.union(new_b_frontier);
-        let stopped_f_colors = context.color_projection(&f_frontier).minus(&context.color_projection(&new_f_frontier));
-        let stopped_b_colors = context.color_projection(&b_frontier).minus(&context.color_projection(&new_b_frontier));
+        let stopped_f_colors = context
+            .color_projection(&f_frontier)
+            .minus(&context.color_projection(&new_f_frontier));
+        let stopped_b_colors = context
+            .color_projection(&b_frontier)
+            .minus(&context.color_projection(&new_b_frontier));
         f_lock = f_lock.union(&stopped_f_colors);
         b_lock = b_lock.union(&stopped_b_colors).minus(&f_lock);
         f_frontier = new_f_frontier.minus_colors(&b_lock);
@@ -443,12 +643,17 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
     }
 
     let scc = f.intersect(&b);
-    println!("Found scc: {:?}; Non-trivial: {:?}", scc.cardinality(), scc.minus(&pivot).cardinality());
+    println!(
+        "Found scc: {:?}; Non-trivial: {:?}",
+        scc.cardinality(),
+        scc.minus(&pivot).cardinality()
+    );
     //println!("{}", scc.bdd.to_dot_string(&context.bdd_variables, true));
 
-    let converged = f.intersect_colors(&f_lock).union(&b.intersect_colors(&b_lock));
+    let converged = f
+        .intersect_colors(&f_lock)
+        .union(&b.intersect_colors(&b_lock));
 
     decomposition(context, universe.minus(&converged));
     decomposition(context, converged.minus(&scc));
-
 }

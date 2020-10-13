@@ -12,9 +12,9 @@ mod impl_fn_update;
 mod impl_regulatory_graph;
 mod impl_variable;
 mod parser;
+pub mod pscc;
 pub mod sbml;
 pub mod scc;
-pub mod pscc;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 

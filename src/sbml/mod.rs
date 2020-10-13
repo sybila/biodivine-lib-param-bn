@@ -1,7 +1,7 @@
 use super::parser::FnUpdateTemp;
 use super::parser::FnUpdateTemp::*;
 use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
-use std::collections::{HashSet, HashMap};
+use std::collections::{HashMap, HashSet};
 use xml::reader::XmlEvent;
 use xml::EventReader;
 
@@ -119,11 +119,16 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
     return Err("Expected </model>, but found end of XML document.".to_string());
 }
 
-fn read_layout(parser: &mut EventReader<&[u8]>, layout: &mut HashMap<String, (f64, f64)>) -> Result<(), String> {
+fn read_layout(
+    parser: &mut EventReader<&[u8]>,
+    layout: &mut HashMap<String, (f64, f64)>,
+) -> Result<(), String> {
     let mut inside_glyph: Option<String> = None;
     while let Ok(event) = parser.next() {
         match event {
-            XmlEvent::StartElement { name, attributes, .. } => {
+            XmlEvent::StartElement {
+                name, attributes, ..
+            } => {
                 if &name.local_name == "generalGlyph" {
                     let mut reference = None;
                     for attr in attributes {
@@ -145,12 +150,12 @@ fn read_layout(parser: &mut EventReader<&[u8]>, layout: &mut HashMap<String, (f6
                                 y = Some(attr.value);
                             }
                         }
-                        match (x,y) {
+                        match (x, y) {
                             (Some(x), Some(y)) => {
                                 let x_num = x.parse::<f64>();
                                 let y_num = y.parse::<f64>();
                                 match (x_num, y_num) {
-                                    (Ok(x),Ok(y)) => {
+                                    (Ok(x), Ok(y)) => {
                                         layout.insert(id.clone(), (x, y));
                                     }
                                     // ignore errors - god knows what we can get in those attributes...
@@ -172,9 +177,7 @@ fn read_layout(parser: &mut EventReader<&[u8]>, layout: &mut HashMap<String, (f6
             _ => {}
         }
     }
-    return Err(
-        "Expected </layout:layout>, but found end of XML document.".to_string(),
-    );
+    return Err("Expected </layout:layout>, but found end of XML document.".to_string());
 }
 
 /// Read the list of qualitative species from the XML document.
@@ -335,7 +338,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                         }
                     }
                     // a function name is read - try to get latest apply and set it as operator
-                    "and" | "or" | "xor" | "not" | "implies" | "eq" | "geq" | "leq" | "lt" | "gt" => {
+                    "and" | "or" | "xor" | "not" | "implies" | "eq" | "geq" | "leq" | "lt"
+                    | "gt" => {
                         if let Some((op, _)) = function_stack.last_mut() {
                             if op != &Op::None {
                                 return Err(format!("Unexpected function op {}", name.local_name));
@@ -499,7 +503,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     )),
                                                 }
                                             }
-                                        } else if op.as_str() == "geq" {    // (A >= B) <=> (!B | A) <=> (B => A)
+                                        } else if op.as_str() == "geq" {
+                                            // (A >= B) <=> (!B | A) <=> (B => A)
                                             if args.len() != 2 {
                                                 Err(format!(
                                                     "GEQ takes exactly two arguments. {} given.",
@@ -510,18 +515,14 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                 let right = &args[1];
                                                 match (left, right) {
                                                     (Const(a), Const(b)) => Ok(Const(!b | a)),
-                                                    (Const(true), Var(_)) => {
-                                                        Ok(Const(true))
-                                                    }
+                                                    (Const(true), Var(_)) => Ok(Const(true)),
                                                     (Var(name), Const(true)) => {
                                                         Ok(Var(name.clone()))
                                                     }
                                                     (Const(false), Var(name)) => {
                                                         Ok(Not(Box::new(Var(name.clone()))))
                                                     }
-                                                    (Var(_), Const(false)) => {
-                                                        Ok(Const(true))
-                                                    }
+                                                    (Var(_), Const(false)) => Ok(Const(true)),
                                                     (l, r) => Ok(Binary(
                                                         BinaryOp::Imp,
                                                         Box::new(r.clone()),
@@ -529,7 +530,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     )),
                                                 }
                                             }
-                                        } else if op.as_str() == "leq" {    // (A <= B) <=> (!A | B) <=> (A => B)
+                                        } else if op.as_str() == "leq" {
+                                            // (A <= B) <=> (!A | B) <=> (A => B)
                                             if args.len() != 2 {
                                                 Err(format!(
                                                     "LEQ takes exactly two arguments. {} given.",
@@ -543,12 +545,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     (Const(true), Var(name)) => {
                                                         Ok(Var(name.clone()))
                                                     }
-                                                    (Var(_), Const(true)) => {
-                                                        Ok(Const(true))
-                                                    }
-                                                    (Const(false), Var(_)) => {
-                                                        Ok(Const(true))
-                                                    }
+                                                    (Var(_), Const(true)) => Ok(Const(true)),
+                                                    (Const(false), Var(_)) => Ok(Const(true)),
                                                     (Var(name), Const(false)) => {
                                                         Ok(Not(Box::new(Var(name.clone()))))
                                                     }
@@ -559,7 +557,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     )),
                                                 }
                                             }
-                                        } else if op.as_str() == "lt" {    // (A < B) <=> (!A & B)
+                                        } else if op.as_str() == "lt" {
+                                            // (A < B) <=> (!A & B)
                                             if args.len() != 2 {
                                                 Err(format!(
                                                     "LT takes exactly two arguments. {} given.",
@@ -570,18 +569,14 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                 let right = &args[1];
                                                 match (left, right) {
                                                     (Const(a), Const(b)) => Ok(Const(!a & b)),
-                                                    (Const(true), Var(_)) => {
-                                                        Ok(Const(false))
-                                                    }
+                                                    (Const(true), Var(_)) => Ok(Const(false)),
                                                     (Var(name), Const(true)) => {
                                                         Ok(Not(Box::new(Var(name.clone()))))
                                                     }
                                                     (Const(false), Var(name)) => {
                                                         Ok(Var(name.clone()))
                                                     }
-                                                    (Var(_), Const(false)) => {
-                                                        Ok(Const(false))
-                                                    }
+                                                    (Var(_), Const(false)) => Ok(Const(false)),
                                                     (l, r) => Ok(Binary(
                                                         BinaryOp::And,
                                                         Box::new(Not(Box::new(l.clone()))),
@@ -589,7 +584,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     )),
                                                 }
                                             }
-                                        } else if op.as_str() == "gt" {    // (A > B) <=> (A & !B)
+                                        } else if op.as_str() == "gt" {
+                                            // (A > B) <=> (A & !B)
                                             if args.len() != 2 {
                                                 Err(format!(
                                                     "GT takes exactly two arguments. {} given.",
@@ -603,12 +599,8 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                     (Const(true), Var(name)) => {
                                                         Ok(Not(Box::new(Var(name.clone()))))
                                                     }
-                                                    (Var(_), Const(true)) => {
-                                                        Ok(Const(false))
-                                                    }
-                                                    (Const(false), Var(_)) => {
-                                                        Ok(Const(false))
-                                                    }
+                                                    (Var(_), Const(true)) => Ok(Const(false)),
+                                                    (Const(false), Var(_)) => Ok(Const(false)),
                                                     (Var(name), Const(false)) => {
                                                         Ok(Var(name.clone()))
                                                     }
@@ -687,14 +679,13 @@ impl SBMLTransition {
 #[cfg(test)]
 mod tests {
     use crate::BooleanNetwork;
-    use std::convert::TryFrom;
     use std::collections::HashMap;
+    use std::convert::TryFrom;
 
     #[test]
     fn test() {
         let model =
-            std::fs::read_to_string("sbml_models/g2a.sbml")
-                .expect("Cannot open result file.");
+            std::fs::read_to_string("sbml_models/g2a.sbml").expect("Cannot open result file.");
         let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
         // Compared by hand...
         let mut expected_layout = HashMap::new();

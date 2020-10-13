@@ -1,28 +1,41 @@
-use biodivine_lib_bdd::{Bdd, BddVariableSet, BddVariable};
-use crate::{BooleanNetwork, FnUpdate, BinaryOp, VariableId};
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::bdd;
+use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
 pub struct SymbolicBN {
     pub network: BooleanNetwork,
     pub universe: BddVariableSet,
     pub bdd_vars: Vec<BddVariable>,
-    pub functions: Vec<Bdd>
+    pub functions: Vec<Bdd>,
 }
 
 impl SymbolicBN {
-
     /// Create a new symbolic network with specific update functions
     pub fn new(network: BooleanNetwork) -> Result<SymbolicBN, String> {
         // make variables with the same names as in the network (easier debugging)
-        let universe = BddVariableSet::new(network.graph.variables.iter().map(|v| v.name.as_str()).collect());
+        let universe = BddVariableSet::new(
+            network
+                .graph
+                .variables
+                .iter()
+                .map(|v| v.name.as_str())
+                .collect(),
+        );
         let bdd_vars = universe.variables();
-        let functions: Vec<Bdd> = network.update_functions.iter().filter_map(|f| {
-            f.as_ref().and_then(|f| f.to_bdd(&universe, &bdd_vars))
-        }).collect();
+        let functions: Vec<Bdd> = network
+            .update_functions
+            .iter()
+            .filter_map(|f| f.as_ref().and_then(|f| f.to_bdd(&universe, &bdd_vars)))
+            .collect();
         if functions.len() != network.graph.num_vars() {
             return Err("Not all variables have explicit update functions".to_string());
         }
-        return Ok(SymbolicBN { network, universe, bdd_vars, functions });
+        return Ok(SymbolicBN {
+            network,
+            universe,
+            bdd_vars,
+            functions,
+        });
     }
 
     pub fn all_states(&self) -> Bdd {
@@ -76,14 +89,18 @@ impl SymbolicBN {
         }
         return result;
     }
-
 }
 
 impl FnUpdate {
-
     fn to_bdd(&self, universe: &BddVariableSet, bdd_vars: &Vec<BddVariable>) -> Option<Bdd> {
         return Some(match self {
-            FnUpdate::Const(bool) => if *bool { universe.mk_true() } else { universe.mk_false() },
+            FnUpdate::Const(bool) => {
+                if *bool {
+                    universe.mk_true()
+                } else {
+                    universe.mk_false()
+                }
+            }
             FnUpdate::Var(id) => universe.mk_var(bdd_vars[id.0]),
             FnUpdate::Param(_, _) => return None,
             FnUpdate::Not(inner) => inner.to_bdd(universe, bdd_vars).map(|b| b.not())?,
@@ -98,9 +115,8 @@ impl FnUpdate {
                     BinaryOp::Xor => l.xor(&r),
                 }
             }
-        })
+        });
     }
-
 }
 
 #[cfg(test)]
@@ -111,14 +127,17 @@ mod tests {
     #[test]
     fn test_symbolic_post_small() {
         // A very simple model with one sink state and one transient loop.
-        let network = BooleanNetwork::try_from("
+        let network = BooleanNetwork::try_from(
+            "
             A -> B
             A -> A
             B -> B
             B -> A
             $A: B & !A
             $B: B & !A
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         let var_a = network.graph.find_variable("A").unwrap();
         let var_b = network.graph.find_variable("B").unwrap();
         let symbolic = SymbolicBN::new(network).unwrap();
@@ -154,20 +173,22 @@ mod tests {
         assert!(!states.is_true());
         states = states.or(&symbolic.post_all(&states));
         assert!(states.is_true());
-
     }
 
     #[test]
     fn test_symbolic_pre_small() {
         // A very simple model with one sink state and one transient loop.
-        let network = BooleanNetwork::try_from("
+        let network = BooleanNetwork::try_from(
+            "
             A -> B
             A -> A
             B -> B
             B -> A
             $A: B & !A
             $B: B & !A
-        ").unwrap();
+        ",
+        )
+        .unwrap();
         let var_a = network.graph.find_variable("A").unwrap();
         let var_b = network.graph.find_variable("B").unwrap();
         let symbolic = SymbolicBN::new(network).unwrap();
@@ -203,7 +224,5 @@ mod tests {
         assert!(!states.is_true());
         states = states.or(&symbolic.pre_all(&states));
         assert!(states.is_true());
-
     }
-
 }

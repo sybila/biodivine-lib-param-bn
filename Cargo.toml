@@ -13,6 +13,7 @@ regex = "1.3.3"     # used when parsing text format
 xml-rs = "0.8.0"    # facilitates sbml parsing
 biodivine-lib-bdd = { git = "https://github.com/sybila/biodivine-lib-bdd.git" }
 biodivine-lib-std = { git = "https://github.com/sybila/biodivine-lib-std.git" }
+rayon = "1.3.0"
 
 [features]
 # With shields_up you enable explicit assertions of pre/post conditions and invariants in critical
