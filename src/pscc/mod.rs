@@ -100,6 +100,9 @@ impl PsccContext {
         };
 
         let universe = build_static_constraints(&bn, &fake_encoder);
+        println!("BDD vars: {}", bdd_variables.num_vars());
+        println!("State space size: {}", (1.shl(state_variables.len()) as f64));
+        println!("Param. universe cardinality: {}", universe.cardinality() / (1.shl(state_variables.len()) as f64));
 
         let mut function_cache = Vec::new();
         for v in bn.graph.variable_ids() {
@@ -194,6 +197,12 @@ impl PsccContext {
             }
         }
         return IdState::from(state);
+    }
+
+    pub fn empty_set(&self) -> ColorVertexSet {
+        return ColorVertexSet {
+            bdd: self.bdd_variables.mk_false(),
+        }
     }
 
     pub fn empty_colours(&self) -> ColorSet {
@@ -589,7 +598,9 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
     let mut test_next = context.pre(&to_trim, &result);
     while !test_next.is_empty() {
         let to_trim = context.sinks(&test_next);
+        println!("To trim: {}", to_trim.cardinality());
         result = result.minus(&to_trim);
+        if to_trim.cardinality() < 0.01 * start_cardinality { break; }
         test_next = context.pre(&to_trim, &result);
     }
 
@@ -598,11 +609,14 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
     let mut test_next = context.post(&to_trim, &result);
     while !test_next.is_empty() {
         let to_trim = context.sources(&result);
+        println!("To trim: {}", to_trim.cardinality());
         result = result.minus(&to_trim);
+        if to_trim.cardinality() < 0.01 * start_cardinality { break; }
         test_next = context.post(&to_trim, &result);
     }
 
-    println!("Trimmed: {}", start_cardinality - result.bdd.cardinality());
+    let trimmed = start_cardinality - result.bdd.cardinality();
+    println!("Trimmed: {} ({}%)", trimmed, ((trimmed / start_cardinality) * 100.0) as usize);
     return result;
 }
 
@@ -626,6 +640,8 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
     let mut f_lock = context.empty_colours();
     let mut b_lock = context.empty_colours();
 
+    let mut cont_f_frontier = context.empty_set();
+    let mut cont_b_frontier = context.empty_set();
     let ref universe_colors = context.color_projection(&universe);
     while !f_lock.union(&b_lock).equals(universe_colors) {
         let ref new_f_frontier = context.post(&f_frontier, &universe.minus(&f));
@@ -637,11 +653,14 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
             .minus(&context.color_projection(&new_f_frontier));
         let stopped_b_colors = context
             .color_projection(&b_frontier)
-            .minus(&context.color_projection(&new_b_frontier));
+            .minus(&context.color_projection(&new_b_frontier))
+            .minus(&f_lock);
         f_lock = f_lock.union(&stopped_f_colors);
-        b_lock = b_lock.union(&stopped_b_colors).minus(&f_lock);
+        b_lock = b_lock.union(&stopped_b_colors);
         f_frontier = new_f_frontier.minus_colors(&b_lock);
         b_frontier = new_b_frontier.minus_colors(&f_lock);
+        cont_f_frontier = cont_f_frontier.union(&new_f_frontier.intersect_colors(&stopped_b_colors));
+        cont_b_frontier = cont_b_frontier.union(&new_b_frontier.intersect_colors(&stopped_f_colors));
         /*println!("Frontier (F):");
         println!("{}", new_f_frontier.bdd.to_dot_string(&context.bdd_variables, true));
         println!("{}", context.post(&new_f_frontier).bdd.to_dot_string(&context.bdd_variables, true));
@@ -650,14 +669,14 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
         println!("Stopped f: {}, Stopped b: {}", context.colours_cardinality(&stopped_f_colors), context.colours_cardinality(&stopped_b_colors));*/
     }
 
-    while !f_frontier.intersect(&b).is_empty() {
-        f_frontier = context.post(&f_frontier, &b.minus(&f));
-        f = f.union(&f_frontier);
+    while !cont_f_frontier.intersect(&b).is_empty() {
+        cont_f_frontier = context.post(&cont_f_frontier, &b.minus(&f));
+        f = f.union(&cont_f_frontier);
     }
 
-    while !b_frontier.intersect(&f).is_empty() {
-        b_frontier = context.pre(&b_frontier, &f.minus(&b));
-        b = b.union(&b_frontier);
+    while !cont_b_frontier.intersect(&f).is_empty() {
+        cont_b_frontier = context.pre(&cont_b_frontier, &f.minus(&b));
+        b = b.union(&cont_b_frontier);
     }
 
     let scc = f.intersect(&b);
