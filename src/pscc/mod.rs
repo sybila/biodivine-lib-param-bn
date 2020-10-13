@@ -489,6 +489,20 @@ impl PsccContext {
     }
 }
 
+fn par_union(items: Vec<Bdd>) -> Bdd {
+    if items.len() == 1 { return items[0].clone(); }
+    let join: Vec<Bdd> = items.into_par_iter()
+        .chunks(2)
+        .map(|chunk| {
+            if chunk.len() == 2 {
+                chunk[0].or(&chunk[1])
+            } else {
+                chunk[0].clone()
+            }
+        }).collect();
+    return par_union(join);
+}
+
 #[derive(Clone)]
 pub struct ColorSet {
     bdd: Bdd,
@@ -589,6 +603,7 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
 }
 
 pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
+    println!("Decomposition: {}", universe.cardinality());
     if universe.is_empty() {
         return;
     }
@@ -596,7 +611,6 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
     if universe.is_empty() {
         return;
     }
-    println!("Decomposition: {}", universe.cardinality());
     let pivot = context.pivots(&universe);
     println!("Found pivot: {:?}", pivot.cardinality());
     //println!("{}", pivot.bdd.to_dot_string(&context.bdd_variables, true));
