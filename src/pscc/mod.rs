@@ -661,6 +661,9 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
         b_frontier = new_b_frontier.minus_colors(&f_lock);
         cont_f_frontier = cont_f_frontier.union(&new_f_frontier.intersect_colors(&stopped_b_colors));
         cont_b_frontier = cont_b_frontier.union(&new_b_frontier.intersect_colors(&stopped_f_colors));
+        if LOG_LEVEL > 0 {
+            println!("Remaining: {}", context.colours_cardinality(universe_colors) - context.colours_cardinality(&f_lock.union(&b_lock)));
+        }
         /*println!("Frontier (F):");
         println!("{}", new_f_frontier.bdd.to_dot_string(&context.bdd_variables, true));
         println!("{}", context.post(&new_f_frontier).bdd.to_dot_string(&context.bdd_variables, true));
