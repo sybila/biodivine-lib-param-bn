@@ -654,6 +654,8 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
         .intersect_colors(&f_lock)
         .union(&b.intersect_colors(&b_lock));
 
-    decomposition(context, universe.minus(&converged));
-    decomposition(context, converged.minus(&scc));
+    rayon::join(
+        || decomposition(context, universe.minus(&converged)),
+        || decomposition(context, converged.minus(&scc)),
+    );
 }
