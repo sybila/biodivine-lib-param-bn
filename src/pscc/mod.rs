@@ -539,7 +539,7 @@ fn par_intersect(items: Vec<Bdd>) -> Bdd {
                 chunk[0].clone()
             }
         }).collect();
-    return par_union(join);
+    return par_intersect(join);
 }
 
 
