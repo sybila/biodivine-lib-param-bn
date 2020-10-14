@@ -125,7 +125,6 @@ impl PsccContext {
                             Self::extend_valuation_to_id_state(&valuation_vector, &regulators);
                         let function_is_one_in_valuation: Bdd =
                             function._symbolic_eval(valuation_state, &fake_encoder);
-                        if LOG_LEVEL > 0 { println!("(Partial) update function: {:?}", valuation_vector) }
                         bdd!(valuation_bdd => function_is_one_in_valuation)
                     })
                     .collect();
@@ -530,6 +529,7 @@ fn par_union(items: Vec<Bdd>) -> Bdd {
 
 fn par_intersect(items: Vec<Bdd>) -> Bdd {
     if items.len() == 1 { return items[0].clone(); }
+    if LOG_LEVEL > 0 { println!("Par intersect: {:?}", items.len()); }
     let join: Vec<Bdd> = items.into_par_iter()
         .chunks(2)
         .map(|chunk| {
