@@ -9,7 +9,7 @@
 
 use crate::bdd_params::{build_static_constraints, BddParameterEncoder};
 use crate::{BooleanNetwork, VariableId};
-use biodivine_lib_bdd::bdd;
+use biodivine_lib_bdd::{bdd, BddValuation};
 use biodivine_lib_bdd::{
     Bdd, BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
@@ -110,22 +110,32 @@ impl PsccContext {
             let mut function_is_one = bdd_variables.mk_true();
             if let Some(function) = bn.get_update_function(v) {
                 // When there is an explicit update function, we have to eval it one valuation at a time:
-                for valuation in BddValuationIterator::new(regulators.len() as u16) {
-                    let valuation_vector = valuation.vector();
-                    let valuation_bdd = Self::extend_valuation_to_bdd(
-                        &bdd_variables,
-                        &state_variables,
-                        &valuation_vector,
-                        &regulators,
-                    );
-                    let valuation_state =
-                        Self::extend_valuation_to_id_state(&valuation_vector, &regulators);
-                    let function_is_one_in_valuation: Bdd =
-                        function._symbolic_eval(valuation_state, &fake_encoder);
+                let valuations: Vec<BddValuation> = BddValuationIterator::new(regulators.len() as u16).collect();
+                let row_bdds: Vec<Bdd> = valuations
+                    .into_par_iter()
+                    .map(|valuation| {
+                        let valuation_vector = valuation.vector();
+                        let valuation_bdd = Self::extend_valuation_to_bdd(
+                            &bdd_variables,
+                            &state_variables,
+                            &valuation_vector,
+                            &regulators,
+                        );
+                        let valuation_state =
+                            Self::extend_valuation_to_id_state(&valuation_vector, &regulators);
+                        let function_is_one_in_valuation: Bdd =
+                            function._symbolic_eval(valuation_state, &fake_encoder);
+                        if LOG_LEVEL > 0 { println!("(Partial) update function: {:?}", valuation_vector) }
+                        bdd!(valuation_bdd => function_is_one_in_valuation)
+                    })
+                    .collect();
+                function_is_one = par_intersect(row_bdds);
+                /*for valuation in BddValuationIterator::new(regulators.len() as u16) {
+
                     function_is_one =
                         bdd!(function_is_one & (valuation_bdd => function_is_one_in_valuation));
                     if LOG_LEVEL > 0 { println!("(Partial) update function: {:?}", valuation_vector) }
-                }
+                }*/
             } else {
                 // When the update function is implicit, we just combine all (valuation => parameter):
                 let table = &implicit_function_tables[v.0];
@@ -517,6 +527,21 @@ fn par_union(items: Vec<Bdd>) -> Bdd {
         }).collect();
     return par_union(join);
 }
+
+fn par_intersect(items: Vec<Bdd>) -> Bdd {
+    if items.len() == 1 { return items[0].clone(); }
+    let join: Vec<Bdd> = items.into_par_iter()
+        .chunks(2)
+        .map(|chunk| {
+            if chunk.len() == 2 {
+                chunk[0].and(&chunk[1])
+            } else {
+                chunk[0].clone()
+            }
+        }).collect();
+    return par_union(join);
+}
+
 
 #[derive(Clone)]
 pub struct ColorSet {
