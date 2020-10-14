@@ -145,6 +145,7 @@ impl PsccContext {
             let v_bdd_var = state_variables[v.0];
             let v_is_zero = bdd_variables.mk_not_var(v_bdd_var);
             function_cache.push(bdd!(v_is_zero <=> function_is_one));
+            if LOG_LEVEL > 0 { println!("Update function ready: {:?}", v); }
         }
 
         /*for u in &update_functions {
