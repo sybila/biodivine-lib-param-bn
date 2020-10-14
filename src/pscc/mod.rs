@@ -124,6 +124,7 @@ impl PsccContext {
                         function._symbolic_eval(valuation_state, &fake_encoder);
                     function_is_one =
                         bdd!(function_is_one & (valuation_bdd => function_is_one_in_valuation));
+                    if LOG_LEVEL > 0 { println!("(Partial) update function: {:?}", valuation_vector) }
                 }
             } else {
                 // When the update function is implicit, we just combine all (valuation => parameter):
