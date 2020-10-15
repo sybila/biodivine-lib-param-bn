@@ -1,0 +1,41 @@
+#name:TCR Signalisation
+#description:<div class="field-label" style="font-weight: bold; color: rgb(83, 83, 83); font-family: san$
+#position:CD45:11,31
+$CD45:CD45
+CD45 -> CD45
+#position:CD8:78,31
+$CD8:CD8
+CD8 -> CD8
+#position:TCRlig:195,29
+$TCRlig:TCRlig
+TCRlig -> TCRlig
+#position:TCRbind:327.84534733938375,168.29187720003932
+$TCRbind:(TCRlig & !cCbl)
+TCRlig -> TCRbind
+cCbl -| TCRbind
+#position:cCbl:335,301
+$cCbl:ZAP70
+ZAP70 -> cCbl
+#position:PAGCsk:183.44116736182693,99.70410092583916
+$PAGCsk:!TCRbind
+TCRbind -| PAGCsk
+#position:LCK:82,208
+$LCK:((CD45 & CD8) & !PAGCsk)
+CD45 -> LCK
+CD8 -> LCK
+PAGCsk -| LCK
+#position:Fyn:196.18895879547205,181.14794953708042
+$Fyn:(((CD45 & !TCRbind) & LCK) | (CD45 & TCRbind))
+CD45 -> Fyn
+TCRbind -> Fyn
+LCK -> Fyn
+#position:ZAP70:87,302
+$ZAP70:((LCK & !cCbl) & TCRphos)
+LCK -> ZAP70
+cCbl -| ZAP70
+TCRphos -> ZAP70
+#position:TCRphos:203,261
+$TCRphos:(((!TCRbind & Fyn) | ((TCRbind & !LCK) & Fyn)) | (TCRbind & LCK))
+TCRbind -> TCRphos
+LCK -> TCRphos
+Fyn -> TCRphos

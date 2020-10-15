@@ -1,0 +1,107 @@
+#position:CD45:11,31
+$CD45:CD45
+CD45 -> CD45
+#position:CD8:78,31
+$CD8:CD8
+CD8 -> CD8
+#position:TCRlig:195,29
+$TCRlig:TCRlig
+TCRlig -> TCRlig
+#position:TCRbind:192,76
+$TCRbind:(TCRlig & !cCbl)
+TCRlig -> TCRbind
+cCbl -| TCRbind
+#position:cCbl:335,301
+$cCbl:ZAP70
+ZAP70 -> cCbl
+#position:ZAP70:87,302
+$ZAP70:((LCK & !cCbl) & TCRphos)
+LCK -> ZAP70
+cCbl -| ZAP70
+TCRphos -> ZAP70
+#position:PAGCsk:115,108
+$PAGCsk:!TCRbind
+TCRbind -| PAGCsk
+#position:LCK:82,208
+$LCK:((CD45 & CD8) & !PAGCsk)
+CD45 -> LCK
+CD8 -> LCK
+PAGCsk -| LCK
+#position:Fyn:275,177
+$Fyn:(((CD45 & !TCRbind) & LCK) | (CD45 & TCRbind))
+CD45 -> Fyn
+TCRbind -> Fyn
+LCK -> Fyn
+#position:TCRphos:203,261
+$TCRphos:(((!TCRbind & Fyn) | ((TCRbind & !LCK) & Fyn)) | (TCRbind & LCK))
+TCRbind -> TCRphos
+LCK -> TCRphos
+Fyn -> TCRphos
+#position:Rlk:447,222
+$Rlk:LCK
+LCK -> Rlk
+#position:LAT:68,401
+$LAT:ZAP70
+ZAP70 -> LAT
+#position:Gads:145,402
+$Gads:LAT
+LAT -> Gads
+#position:Itk:242,355
+$Itk:(ZAP70 & Slp76)
+ZAP70 -> Itk
+Slp76 -> Itk
+#position:Slp76:242,402
+$Slp76:Gads
+Gads -> Slp76
+#position:PLCg_a:416,469
+$PLCg_a:(((((!Rlk & ZAP70) & Itk) & Slp76) & PLCg_b) | (((Rlk & ZAP70) & Slp76) & PLCg_b))
+Rlk -> PLCg_a
+ZAP70 -> PLCg_a
+Itk -> PLCg_a
+Slp76 -> PLCg_a
+PLCg_b -> PLCg_a
+#position:PLCg_b:306,435
+$PLCg_b:LAT
+LAT -> PLCg_b
+#position:IP3:439,536
+$IP3:PLCg_a
+PLCg_a -> IP3
+#position:Ca:439,599
+$Ca:IP3
+IP3 -> Ca
+#position:Rsk:52,715
+$Rsk:ERK
+ERK -> Rsk
+#position:ERK:136,645
+$ERK:MEK
+MEK -> ERK
+#position:IKK:345,646
+$IKK:PKCth
+PKCth -> IKK
+#position:MEK:135,592
+$MEK:Raf
+Raf -> MEK
+#position:Raf:57,591
+$Raf:Ras
+Ras -> Raf
+#position:SEK:273,637
+$SEK:PKCth
+PKCth -> SEK
+#position:Ras:57,535
+$Ras:(Grb2Sos & RasGRP1)
+Grb2Sos -> Ras
+RasGRP1 -> Ras
+#position:Grb2Sos:54,484
+$Grb2Sos:LAT
+LAT -> Grb2Sos
+#position:RasGRP1:144,534
+$RasGRP1:(DAG & PKCth)
+DAG -> RasGRP1
+PKCth -> RasGRP1
+#position:DAG:273,475
+$DAG:PLCg_a
+PLCg_a -> DAG
+#position:PKCth:272,531
+$PKCth:DAG
+DAG -> PKCth
+

@@ -1,0 +1,66 @@
+#position:Ttv:34,198
+#position:Dlp:200,89
+#$Dlp:(Ttv & !Wf)
+Ttv -> Dlp
+Wf -| Dlp
+#position:Wf:122,199
+#position:Dally:201,313
+#$Dally:(Ttv & !Wf)
+Ttv -> Dally
+Wf -| Dally
+#position:Wg:202,201
+#position:Fz:298,137
+#$Fz:(Wg & Boca)
+Wg -> Fz
+Boca -> Fz
+#position:Boca:298,62
+#position:Arr:299,262
+$Arr:Wg
+Wg -> Arr
+#position:Dsh:394,204
+#$Dsh:(((!Fz & Arr) & !Nkd) | (Fz & !Nkd))
+Fz -> Dsh
+Arr -> Dsh
+Nkd -| Dsh
+#position:Nkd:291,202
+#position:Axin:499,133
+$Axin:!Dsh
+Dsh -| Axin
+#position:Sgg:500,206
+$Sgg:!Dsh
+Dsh -| Sgg
+#position:APC:500,275
+$APC:!Dsh
+Dsh -| APC
+#position:Arm:671,206
+$Arm:((((((!Axin & !Sgg) & !APC) & CK1alpha) & !Proteasome) & Hipk) | ((((((!Axin & !Sgg) & !APC) & CK1alpha) & Proteasome) & Hipk) & !Slmb))
+Axin -| Arm
+Sgg -| Arm
+APC -| Arm
+CK1alpha -> Arm
+Proteasome -| Arm
+Hipk -> Arm
+Slmb -| Arm
+#position:CK1alpha:563,241
+$CK1alpha:false
+#position:Proteasome:667,88
+#position:Hipk:676,320
+#position:Slmb:785,270
+#position:Pan:793,206
+#$Pan:(Arm & !Nemo)
+Arm -> Pan
+Nemo -| Pan
+#position:Nemo:785,112
+#position:Targets:925,203
+$Targets:(((((Pan & Lgs) & Nej) & !Gro) & Hyx) & Pygo)
+Pan -> Targets
+Lgs -> Targets
+Nej -> Targets
+Gro -| Targets
+Hyx -> Targets
+Pygo -> Targets
+#position:Lgs:883,115
+#position:Nej:974,115
+#position:Gro:925,282
+#position:Hyx:1040,165
+#position:Pygo:1028,257

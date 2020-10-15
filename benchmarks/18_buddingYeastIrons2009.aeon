@@ -1,0 +1,94 @@
+#position:Yhp1:463,95
+$Yhp1:SMBF
+SMBF -> Yhp1
+#position:Cln3:403,58
+$Cln3:!Yhp1
+Yhp1 -| Cln3
+#position:SMBF:342,141
+#$SMBF:(((((!Cln3 & !SMBF) & Cln2) & !Clb2) | ((!Cln3 & SMBF) & !Clb2)) | (Cln3 & !Clb2))
+Cln3 -> SMBF
+SMBF -> SMBF
+Cln2 -> SMBF
+Clb2 -| SMBF
+#position:Cln2:143,74
+$Cln2:SMBF
+SMBF -> Cln2
+#position:Clb2:225,269
+$Clb2:((((((((!Clb2 & !Cdc20) & !CKI) & B) | ((((!Clb2 & Cdc20) & !CKI) & !Cdh1) & B)) | ((((Clb2 & !SFF) & !Cdc20) & !CKI) & B)) | (((((Clb2 & !SFF) & Cdc20) & !CKI) & !Cdh1) & B)) | (((Clb2 & SFF) & !Cdc20) & !CKI)) | ((((Clb2 & SFF) & Cdc20) & !CKI) & !Cdh1))
+Clb2 -> Clb2
+SFF -> Clb2
+Cdc20 -| Clb2
+CKI -| Clb2
+Cdh1 -| Clb2
+B -> Clb2
+#position:Clb5:482,179
+#$Clb5:(SMBF & !Cdc20)
+SMBF -> Clb5
+Cdc20 -| Clb5
+#position:Cdc20:363,436
+#$Cdc20:((Clb2 & SFF) & M)
+Clb2 -> Cdc20
+SFF -> Cdc20
+M -> Cdc20
+#position:SFF:313,314
+$SFF:(((((((!Clb2 & !Cdc20) & !CKI) & B) | ((((!Clb2 & Cdc20) & !CKI) & !Cdh1) & B)) | ((((Clb2 & !SFF) & !Cdc20) & !CKI) & B)) | (((((Clb2 & !SFF) & Cdc20) & !CKI) & !Cdh1) & B)) | (Clb2 & SFF))
+Clb2 -> SFF
+SFF -> SFF
+Cdc20 -| SFF
+CKI -| SFF
+Cdh1 -| SFF
+B -> SFF
+#position:CKI:68,167
+$CKI:((((((((!Cln2 & !Clb5) & !Clb2) & !Swi5) & CKI) | (((!Cln2 & !Clb5) & !Clb2) & Swi5)) | ((((!Cln2 & !Clb5) & Clb2) & Cdc14) & Swi5)) | (((!Cln2 & Clb5) & Cdc14) & Swi5)) | ((Cln2 & Cdc14) & Swi5))
+Cln2 -| CKI
+Clb5 -| CKI
+Clb2 -| CKI
+Cdc14 -> CKI
+Swi5 -> CKI
+CKI -> CKI
+#position:Cdh1:412,235
+$Cdh1:(((((!Cln2 & !Clb5) & !Clb2) | (((!Cln2 & !Clb5) & Clb2) & Cdc14)) | ((!Cln2 & Clb5) & Cdc14)) | (Cln2 & Cdc14))
+Cln2 -| Cdh1
+Clb5 -| Cdh1
+Clb2 -| Cdh1
+Cdc14 -> Cdh1
+#position:B:256,37
+$B:(((((!Cln2 & !Clb5) & B) & !CD) | ((!Cln2 & Clb5) & !CD)) | (Cln2 & !CD))
+Cln2 -> B
+Clb5 -> B
+B -> B
+CD -| B
+#position:M:260,489
+$M:((((!Clb2 & M) & !CD) | (((Clb2 & !S) & M) & !CD)) | ((Clb2 & S) & !CD))
+Clb2 -> M
+S -> M
+M -> M
+CD -| M
+#position:FEAR:195,443
+$FEAR:Cdc20
+Cdc20 -> FEAR
+#position:MEN:120,418
+#$MEN:(Clb2 & FEAR)
+Clb2 -> MEN
+FEAR -> MEN
+#position:Cdc14:68,354
+#$Cdc14:(FEAR & MEN)
+FEAR -> Cdc14
+MEN -> Cdc14
+#position:Swi5:184,340
+#$Swi5:((!Clb2 & SFF) | ((Clb2 & SFF) & Cdc14))
+Clb2 -| Swi5
+SFF -> Swi5
+Cdc14 -> Swi5
+#position:S:554,219
+$S:(((((!Clb5 & !Clb2) & S) & !CD) | ((!Clb5 & Clb2) & !CD)) | (Clb5 & !CD))
+Clb5 -> S
+Clb2 -> S
+S -> S
+CD -| S
+#position:CD:6,240
+$CD:(((FEAR & Cdc14) & M) & !CD)
+FEAR -> CD
+Cdc14 -> CD
+M -> CD
+CD -| CD
