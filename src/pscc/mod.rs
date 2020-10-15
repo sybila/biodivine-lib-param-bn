@@ -21,6 +21,7 @@ use std::ops::Shl;
 
 // higher = more verbose
 const LOG_LEVEL: usize = 1;
+const TRIM_CUTOFF: bool = true;
 
 pub struct PsccContext {
     network: BooleanNetwork,
@@ -627,7 +628,7 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
         let to_trim = context.sinks(&test_next);
         if LOG_LEVEL > 0 { println!("To trim: {}", to_trim.cardinality()); }
         result = result.minus(&to_trim);
-        //if to_trim.cardinality() < 0.01 * start_cardinality { break; }
+        if TRIM_CUTOFF && to_trim.cardinality() < 0.001 * start_cardinality { break; }
         test_next = context.pre(&to_trim, &result);
     }
 
@@ -638,7 +639,7 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
         let to_trim = context.sources(&result);
         if LOG_LEVEL > 0 { println!("To trim: {}", to_trim.cardinality()); }
         result = result.minus(&to_trim);
-        //if to_trim.cardinality() < 0.01 * start_cardinality { break; }
+        if TRIM_CUTOFF && to_trim.cardinality() < 0.001 * start_cardinality { break; }
         test_next = context.post(&to_trim, &result);
     }
 
