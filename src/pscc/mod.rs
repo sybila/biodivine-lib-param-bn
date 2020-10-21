@@ -20,8 +20,8 @@ use std::io::Write;
 use std::ops::Shl;
 
 // higher = more verbose
-const LOG_LEVEL: usize = 1;
-const TRIM_CUTOFF: bool = true;
+const LOG_LEVEL: usize = 3;
+const TRIM_CUTOFF: bool = false;
 
 pub struct PsccContext {
     network: BooleanNetwork,
