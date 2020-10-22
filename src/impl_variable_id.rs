@@ -1,5 +1,5 @@
 use crate::VariableId;
-use std::fmt::{Display, Formatter, Error};
+use std::fmt::{Display, Error, Formatter};
 
 impl From<usize> for VariableId {
     fn from(val: usize) -> Self {
