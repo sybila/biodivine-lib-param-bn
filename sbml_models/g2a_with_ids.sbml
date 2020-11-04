@@ -1,0 +1,256 @@
+<?xml version='1.0' encoding='UTF-8' standalone='no'?>
+<sbml xmlns="http://www.sbml.org/sbml/level3/version1/core" layout:required="false" level="3" qual:required="true" xmlns:layout="http://www.sbml.org/sbml/level3/version1/layout/version1" version="1" xmlns:qual="http://www.sbml.org/sbml/level3/version1/qual/version1">
+  <model id="model_id">
+    <layout:listOfLayouts xmlns:layout="http://www.sbml.org/sbml/level3/version1/layout/version1" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+      <layout:layout layout:id="__layout__">
+        <layout:dimensions layout:height="249" layout:width="551"/>
+        <layout:listOfAdditionalGraphicalObjects>
+          <layout:generalGlyph layout:id="_ly_S_1" layout:reference="S_1">
+            <layout:boundingBox>
+              <layout:position layout:x="419" layout:y="94"/>
+              <layout:dimensions layout:height="25" layout:width="45"/>
+            </layout:boundingBox>
+          </layout:generalGlyph>
+          <layout:generalGlyph layout:id="_ly_S_2" layout:reference="S_2">
+            <layout:boundingBox>
+              <layout:position layout:x="325" layout:y="135"/>
+              <layout:dimensions layout:height="25" layout:width="45"/>
+            </layout:boundingBox>
+          </layout:generalGlyph>
+          <layout:generalGlyph layout:id="_ly_S_3" layout:reference="S_3">
+            <layout:boundingBox>
+              <layout:position layout:x="374" layout:y="224"/>
+              <layout:dimensions layout:height="25" layout:width="45"/>
+            </layout:boundingBox>
+          </layout:generalGlyph>
+          <layout:generalGlyph layout:id="_ly_S_4" layout:reference="S_4">
+            <layout:boundingBox>
+              <layout:position layout:x="462" layout:y="222"/>
+              <layout:dimensions layout:height="25" layout:width="45"/>
+            </layout:boundingBox>
+          </layout:generalGlyph>
+          <layout:generalGlyph layout:id="_ly_S_5" layout:reference="S_5">
+            <layout:boundingBox>
+              <layout:position layout:x="506" layout:y="133"/>
+              <layout:dimensions layout:height="25" layout:width="45"/>
+            </layout:boundingBox>
+          </layout:generalGlyph>
+        </layout:listOfAdditionalGraphicalObjects>
+      </layout:layout>
+    </layout:listOfLayouts>
+    <qual:listOfQualitativeSpecies xmlns:qual="http://www.sbml.org/sbml/level3/version1/qual/version1">
+      <!-- This specie does not have maxLevel set intentionally to test if warning is printed -->
+      <qual:qualitativeSpecies qual:compartment="comp1" qual:constant="false" qual:name="CtrA" qual:id="S_1"/>
+      <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="GcrA" qual:id="S_2"/>
+      <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="DnaA" qual:id="S_3"/>
+      <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="CcrM" qual:id="S_4"/>
+      <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="SciP" qual:id="S_5"/>
+    </qual:listOfQualitativeSpecies>
+    <qual:listOfTransitions xmlns:qual="http://www.sbml.org/sbml/level3/version1/qual/version1">
+      <qual:transition qual:id="tr_S_1">
+        <qual:listOfInputs>
+          <qual:input qual:qualitativeSpecies="S_1" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_1_in_0"/>
+          <qual:input qual:qualitativeSpecies="S_2" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_1_in_1"/>
+          <qual:input qual:qualitativeSpecies="S_4" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_1_in_3"/>
+          <qual:input qual:qualitativeSpecies="S_5" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_1_in_4"/>
+        </qual:listOfInputs>
+        <qual:listOfOutputs>
+          <qual:output qual:qualitativeSpecies="S_1" qual:transitionEffect="assignmentLevel" qual:id="tr_S_1_out"/>
+        </qual:listOfOutputs>
+        <qual:listOfFunctionTerms>
+          <qual:defaultTerm qual:resultLevel="0">
+          </qual:defaultTerm>
+          <qual:functionTerm qual:resultLevel="1">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">            
+              <apply>
+                <or/>
+                <apply>
+                  <and/>
+                  <apply>
+                    <eq/>
+                    <ci> S_1 </ci>
+                    <cn type="integer"> 0 </cn>
+                  </apply>
+                  <apply>
+                    <eq/>
+                    <ci> S_2 </ci>
+                    <cn type="integer"> 1 </cn>
+                  </apply>
+                  <apply>
+                    <eq/>
+                    <ci> S_4 </ci>
+                    <cn type="integer"> 0 </cn>
+                  </apply>
+                  <apply>
+                    <eq/>
+                    <ci> S_5 </ci>
+                    <cn type="integer"> 0 </cn>
+                  </apply>
+                </apply>
+                <apply>
+                  <and/>
+                  <apply>
+                    <eq/>
+                    <ci> S_1 </ci>
+                    <cn type="integer"> 1 </cn>
+                  </apply>
+                  <apply>
+                    <eq/>
+                    <ci> S_4 </ci>
+                    <cn type="integer"> 0 </cn>
+                  </apply>
+                  <apply>
+                    <eq/>
+                    <ci> S_5 </ci>
+                    <cn type="integer"> 0 </cn>
+                  </apply>
+                </apply>
+              </apply>
+            </math>
+                    </qual:functionTerm>
+        </qual:listOfFunctionTerms>
+      </qual:transition>
+      <qual:transition qual:id="tr_S_2">
+        <qual:listOfInputs>
+          <qual:input qual:qualitativeSpecies="S_1" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_2_in_0"/>
+          <qual:input qual:qualitativeSpecies="S_3" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_2_in_2"/>
+        </qual:listOfInputs>
+        <qual:listOfOutputs>
+          <qual:output qual:qualitativeSpecies="S_2" qual:transitionEffect="assignmentLevel" qual:id="tr_S_2_out"/>
+        </qual:listOfOutputs>
+        <qual:listOfFunctionTerms>
+          <qual:defaultTerm qual:resultLevel="0">
+          </qual:defaultTerm>
+          <qual:functionTerm qual:resultLevel="1">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">            
+              <apply>
+                <and/>
+                <apply>
+                  <eq/>
+                  <ci> S_1 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_3 </ci>
+                  <cn type="integer"> 1 </cn>
+                </apply>
+              </apply>
+            </math>
+                    </qual:functionTerm>
+        </qual:listOfFunctionTerms>
+      </qual:transition>
+      <qual:transition qual:id="tr_S_3">
+        <qual:listOfInputs>
+          <qual:input qual:qualitativeSpecies="S_1" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_3_in_0"/>
+          <qual:input qual:qualitativeSpecies="S_2" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_3_in_1"/>
+          <qual:input qual:qualitativeSpecies="S_3" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_3_in_2"/>
+          <qual:input qual:qualitativeSpecies="S_4" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_3_in_3"/>
+        </qual:listOfInputs>
+        <qual:listOfOutputs>
+          <qual:output qual:qualitativeSpecies="S_3" qual:transitionEffect="assignmentLevel" qual:id="tr_S_3_out"/>
+        </qual:listOfOutputs>
+        <qual:listOfFunctionTerms>
+          <qual:defaultTerm qual:resultLevel="0">
+          </qual:defaultTerm>
+          <qual:functionTerm qual:resultLevel="1">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">            
+              <apply>
+                <and/>
+                <apply>
+                  <eq/>
+                  <ci> S_1 </ci>
+                  <cn type="integer"> 1 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_2 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_3 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_4 </ci>
+                  <cn type="integer"> 1 </cn>
+                </apply>
+              </apply>
+            </math>
+                    </qual:functionTerm>
+        </qual:listOfFunctionTerms>
+      </qual:transition>
+      <qual:transition qual:id="tr_S_4">
+        <qual:listOfInputs>
+          <qual:input qual:qualitativeSpecies="S_1" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_4_in_0"/>
+          <qual:input qual:qualitativeSpecies="S_4" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_4_in_3"/>
+          <qual:input qual:qualitativeSpecies="S_5" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_4_in_4"/>
+        </qual:listOfInputs>
+        <qual:listOfOutputs>
+          <qual:output qual:qualitativeSpecies="S_4" qual:transitionEffect="assignmentLevel" qual:id="tr_S_4_out"/>
+        </qual:listOfOutputs>
+        <qual:listOfFunctionTerms>
+          <qual:defaultTerm qual:resultLevel="0">
+          </qual:defaultTerm>
+          <qual:functionTerm qual:resultLevel="1">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">            
+              <apply>
+                <and/>
+                <apply>
+                  <eq/>
+                  <ci> S_1 </ci>
+                  <cn type="integer"> 1 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_4 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_5 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+              </apply>
+            </math>
+                    </qual:functionTerm>
+        </qual:listOfFunctionTerms>
+      </qual:transition>
+      <qual:transition qual:id="tr_S_5">
+        <qual:listOfInputs>
+          <qual:input qual:qualitativeSpecies="S_1" qual:transitionEffect="none" qual:sign="positive" qual:id="tr_S_5_in_0"/>
+          <qual:input qual:qualitativeSpecies="S_3" qual:transitionEffect="none" qual:sign="negative" qual:id="tr_S_5_in_2"/>
+        </qual:listOfInputs>
+        <qual:listOfOutputs>
+          <qual:output qual:qualitativeSpecies="S_5" qual:transitionEffect="assignmentLevel" qual:id="tr_S_5_out"/>
+        </qual:listOfOutputs>
+        <qual:listOfFunctionTerms>
+          <qual:defaultTerm qual:resultLevel="0">
+          </qual:defaultTerm>
+          <qual:functionTerm qual:resultLevel="1">
+            <math xmlns="http://www.w3.org/1998/Math/MathML">            
+              <apply>
+                <and/>
+                <apply>
+                  <eq/>
+                  <ci> S_1 </ci>
+                  <cn type="integer"> 1 </cn>
+                </apply>
+                <apply>
+                  <eq/>
+                  <ci> S_3 </ci>
+                  <cn type="integer"> 0 </cn>
+                </apply>
+              </apply>
+            </math>
+                    </qual:functionTerm>
+        </qual:listOfFunctionTerms>
+      </qual:transition>
+    </qual:listOfTransitions>
+    <listOfCompartments>
+      <compartment constant="true" id="comp1"/>
+    </listOfCompartments>
+  </model>
+</sbml>

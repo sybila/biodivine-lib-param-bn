@@ -47,18 +47,58 @@ impl BooleanNetwork {
 
 pub type Layout = HashMap<String, (f64, f64)>;
 
+fn resolve_specie<'a, 'b>(species: &'a Vec<(String, String)>, id: &'b str) -> &'a str {
+    for (existing_id, name) in species.iter() {
+        if existing_id == id {
+            return name.as_str();
+        }
+    }
+    panic!("Unknown specie: {}.", id);
+}
+
+fn rename_fn_variables(species: &Vec<(String, String)>, fun: FnUpdateTemp) -> FnUpdateTemp {
+    return match fun {
+        Const(_) => fun,
+        Param(_, _) => fun,
+        Var(name) => Var(resolve_specie(species, &name).to_string()),
+        Binary(op, l, r) => Binary(
+            op.clone(),
+            Box::new(rename_fn_variables(species, *l)),
+            Box::new(rename_fn_variables(species, *r)),
+        ),
+        Not(inner) => Not(Box::new(rename_fn_variables(species, *inner))),
+    };
+}
+
 // Read a network and an associated layout!
 fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout), String> {
     let mut in_model = false;
-    let mut species: Vec<String> = Vec::new();
+    // species: Vec<(id,name)>
+    let mut species: Vec<(String, String)> = Vec::new();
     let mut transitions: Vec<SBMLTransition> = Vec::new();
     let mut layout: HashMap<String, (f64, f64)> = HashMap::new();
     while let Ok(event) = parser.next() {
         match event {
             XmlEvent::EndElement { name } => {
                 if name.local_name.as_str() == "model" {
-                    species.sort();
-                    let mut rg = RegulatoryGraph::new(species.clone());
+                    species.sort_by_key(|(_, name)| name.clone());
+                    // Remap transitions to use specie names instead of IDs.
+                    for t in transitions.iter_mut() {
+                        t.target = resolve_specie(&species, &t.target).to_string();
+                        for (s, _) in t.sources.iter_mut() {
+                            *s = resolve_specie(&species, s).to_string();
+                        }
+                    }
+                    // Remap items in layout to use names, not IDs.
+                    layout = layout
+                        .into_iter()
+                        .map(|(key, value)| (resolve_specie(&species, &key).to_string(), value))
+                        .collect();
+                    // Now actually build the network...
+
+                    let mut rg = RegulatoryGraph::new(
+                        species.iter().map(|(_, name)| name.clone()).collect(),
+                    );
                     for t in &transitions {
                         for (s, m) in &t.sources {
                             rg.add_regulation(s, &t.target, true, *m)?;
@@ -83,7 +123,10 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
                     // Actually build and add the functions
                     for t in transitions {
                         if let Some(fun) = t.function {
-                            bn.add_update_function_template(&t.target, fun)?;
+                            bn.add_update_function_template(
+                                &t.target,
+                                rename_fn_variables(&species, fun),
+                            )?;
                         }
                     }
                     return Ok((bn, layout));
@@ -181,13 +224,17 @@ fn read_layout(
 }
 
 /// Read the list of qualitative species from the XML document.
-fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> Result<(), String> {
+fn read_species(
+    parser: &mut EventReader<&[u8]>,
+    species: &mut Vec<(String, String)>,
+) -> Result<(), String> {
     while let Ok(event) = parser.next() {
         match event {
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
                 if &name.local_name == "qualitativeSpecies" {
+                    let mut id = String::new();
                     let mut name = String::new();
                     let mut is_boolean = true;
                     for attr in attributes {
@@ -195,7 +242,8 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
                             is_boolean = &attr.value == "1";
                         }
                         if &attr.name.local_name == "id" {
-                            // IDs are actually names
+                            id = attr.value;
+                        } else if &attr.name.local_name == "name" {
                             name = attr.value;
                         }
                     }
@@ -203,16 +251,20 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
                         println!("WARNING: Species {} is not boolean.", name);
                     }
 
-                    if name.is_empty() {
-                        return Err("Found species with no name.".to_string());
+                    if id.is_empty() {
+                        return Err("Found species with no id.".to_string());
                     } else {
-                        // Check taht species is unique.
-                        for existing in species.iter() {
-                            if existing == &name {
+                        // Name is optional, if missing default to ID.
+                        if name.is_empty() {
+                            name = id.clone();
+                        }
+                        // Check that species is unique.
+                        for (existing_id, existing_name) in species.iter() {
+                            if existing_name == &name || existing_id == &id {
                                 return Err(format!("Duplicate species {}.", name));
                             }
                         }
-                        species.push(name);
+                        species.push((id, name));
                     }
                 }
             }
@@ -719,6 +771,12 @@ mod tests {
         ",
         )
         .unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(layout, expected_layout);
+        // Do the same, but for a model with ids different than names
+        let model = std::fs::read_to_string("sbml_models/g2a_with_ids.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
         assert_eq!(actual, expected);
         assert_eq!(layout, expected_layout);
     }
