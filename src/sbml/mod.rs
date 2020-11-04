@@ -1,6 +1,7 @@
 use super::parser::FnUpdateTemp;
 use super::parser::FnUpdateTemp::*;
 use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use xml::reader::XmlEvent;
 use xml::EventReader;
@@ -47,18 +48,58 @@ impl BooleanNetwork {
 
 pub type Layout = HashMap<String, (f64, f64)>;
 
+fn resolve_specie<'a, 'b>(species: &'a Vec<(String, String)>, id: &'b str) -> &'a str {
+    for (existing_id, name) in species.iter() {
+        if existing_id == id {
+            return name.as_str();
+        }
+    }
+    panic!("Unknown specie: {}.", id);
+}
+
+fn rename_fn_variables(species: &Vec<(String, String)>, fun: FnUpdateTemp) -> FnUpdateTemp {
+    return match fun {
+        Const(_) => fun,
+        Param(_, _) => fun,
+        Var(name) => Var(resolve_specie(species, &name).to_string()),
+        Binary(op, l, r) => Binary(
+            op.clone(),
+            Box::new(rename_fn_variables(species, *l)),
+            Box::new(rename_fn_variables(species, *r)),
+        ),
+        Not(inner) => Not(Box::new(rename_fn_variables(species, *inner))),
+    };
+}
+
 // Read a network and an associated layout!
 fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout), String> {
     let mut in_model = false;
-    let mut species: Vec<String> = Vec::new();
+    // species: Vec<(id,name)>
+    let mut species: Vec<(String, String)> = Vec::new();
     let mut transitions: Vec<SBMLTransition> = Vec::new();
     let mut layout: HashMap<String, (f64, f64)> = HashMap::new();
     while let Ok(event) = parser.next() {
         match event {
             XmlEvent::EndElement { name } => {
                 if name.local_name.as_str() == "model" {
-                    species.sort();
-                    let mut rg = RegulatoryGraph::new(species.clone());
+                    species.sort_by_key(|(_, name)| name.clone());
+                    // Remap transitions to use specie names instead of IDs.
+                    for t in transitions.iter_mut() {
+                        t.target = resolve_specie(&species, &t.target).to_string();
+                        for (s, _) in t.sources.iter_mut() {
+                            *s = resolve_specie(&species, s).to_string();
+                        }
+                    }
+                    // Remap items in layout to use names, not IDs.
+                    layout = layout
+                        .into_iter()
+                        .map(|(key, value)| (resolve_specie(&species, &key).to_string(), value))
+                        .collect();
+                    // Now actually build the network...
+
+                    let mut rg = RegulatoryGraph::new(
+                        species.iter().map(|(_, name)| name.clone()).collect(),
+                    );
                     for t in &transitions {
                         for (s, m) in &t.sources {
                             rg.add_regulation(s, &t.target, true, *m)?;
@@ -83,7 +124,10 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
                     // Actually build and add the functions
                     for t in transitions {
                         if let Some(fun) = t.function {
-                            bn.add_update_function_template(&t.target, fun)?;
+                            bn.add_update_function_template(
+                                &t.target,
+                                rename_fn_variables(&species, fun),
+                            )?;
                         }
                     }
                     return Ok((bn, layout));
@@ -180,14 +224,27 @@ fn read_layout(
     return Err("Expected </layout:layout>, but found end of XML document.".to_string());
 }
 
+fn normalize_name(name: String) -> String {
+    let name_regex = Regex::new(r"[^a-zA-Z0-9_]").unwrap();
+    let normalized = name_regex.replace_all(&name, "_").to_string();
+    if normalized != name {
+        println!("WARNING: Renaming `{}` to `{}`.", name, normalized);
+    }
+    return normalized;
+}
+
 /// Read the list of qualitative species from the XML document.
-fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> Result<(), String> {
+fn read_species(
+    parser: &mut EventReader<&[u8]>,
+    species: &mut Vec<(String, String)>,
+) -> Result<(), String> {
     while let Ok(event) = parser.next() {
         match event {
             XmlEvent::StartElement {
                 name, attributes, ..
             } => {
                 if &name.local_name == "qualitativeSpecies" {
+                    let mut id = String::new();
                     let mut name = String::new();
                     let mut is_boolean = true;
                     for attr in attributes {
@@ -195,24 +252,29 @@ fn read_species(parser: &mut EventReader<&[u8]>, species: &mut Vec<String>) -> R
                             is_boolean = &attr.value == "1";
                         }
                         if &attr.name.local_name == "id" {
-                            // IDs are actually names
-                            name = attr.value;
+                            id = attr.value;
+                        } else if &attr.name.local_name == "name" {
+                            name = normalize_name(attr.value);
                         }
                     }
                     if !is_boolean {
                         println!("WARNING: Species {} is not boolean.", name);
                     }
 
-                    if name.is_empty() {
-                        return Err("Found species with no name.".to_string());
+                    if id.is_empty() {
+                        return Err("Found species with no id.".to_string());
                     } else {
-                        // Check taht species is unique.
-                        for existing in species.iter() {
-                            if existing == &name {
+                        // Name is optional, if missing default to ID.
+                        if name.is_empty() {
+                            name = id.clone();
+                        }
+                        // Check that species is unique.
+                        for (existing_id, existing_name) in species.iter() {
+                            if existing_name == &name || existing_id == &id {
                                 return Err(format!("Duplicate species {}.", name));
                             }
                         }
-                        species.push(name);
+                        species.push((id, name));
                     }
                 }
             }
@@ -678,7 +740,7 @@ impl SBMLTransition {
 
 #[cfg(test)]
 mod tests {
-    use crate::BooleanNetwork;
+    use crate::{BooleanNetwork, Monotonicity};
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
@@ -721,5 +783,73 @@ mod tests {
         .unwrap();
         assert_eq!(actual, expected);
         assert_eq!(layout, expected_layout);
+    }
+
+    #[test]
+    fn test_name_resolution() {
+        let model = std::fs::read_to_string("sbml_models/g2a_with_names.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        // Compared by hand...
+        // CtrA(+) contains three invalid characters that should be normalized to CtrA___
+        let mut expected_layout = HashMap::new();
+        expected_layout.insert("CtrA___".to_string(), (419.0, 94.0));
+        expected_layout.insert("GcrA".to_string(), (325.0, 135.0));
+        expected_layout.insert("DnaA".to_string(), (374.0, 224.0));
+        expected_layout.insert("CcrM".to_string(), (462.0, 222.0));
+        expected_layout.insert("SciP".to_string(), (506.0, 133.0));
+        let expected = BooleanNetwork::try_from(
+            "
+            CtrA___ -> CtrA___
+            GcrA -> CtrA___
+            CcrM -| CtrA___
+            SciP -| CtrA___
+            CtrA___ -| GcrA
+            DnaA -> GcrA
+            CtrA___ -> DnaA
+            GcrA -| DnaA
+            DnaA -| DnaA
+            CcrM -> DnaA
+            CtrA___ -> CcrM
+            CcrM -| CcrM
+            SciP -| CcrM
+            CtrA___ -> SciP
+            DnaA -| SciP
+            $CtrA___: ((((!CtrA___ & GcrA) & !CcrM) & !SciP) | ((CtrA___ & !CcrM) & !SciP))
+            $GcrA: (!CtrA___ & DnaA)
+            $DnaA: (((CtrA___ & !GcrA) & !DnaA) & CcrM)
+            $CcrM: ((CtrA___ & !CcrM) & !SciP)
+            $SciP: (CtrA___ & !DnaA)
+        ",
+        )
+        .unwrap();
+        assert_eq!(actual, expected);
+        assert_eq!(layout, expected_layout);
+    }
+
+    #[test]
+    fn test_cell_collective() {
+        let model = std::fs::read_to_string("sbml_models/cell_collective_vut.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        assert_eq!(actual.graph.num_vars(), 66);
+        assert_eq!(actual.graph.regulations.len(), 139);
+        assert_eq!(layout.len(), actual.graph.num_vars());
+        // Normal variable
+        assert!(actual.graph.find_variable("glucose").is_some());
+        // Normalized variable
+        assert!(actual.graph.find_variable("lactic_acid").is_some());
+        // Some regulation
+        assert_eq!(
+            actual
+                .graph
+                .find_regulation(
+                    actual.graph.find_variable("sigG").unwrap(),
+                    actual.graph.find_variable("sigK").unwrap(),
+                )
+                .unwrap()
+                .monotonicity,
+            Some(Monotonicity::Activation)
+        )
     }
 }
