@@ -4,6 +4,7 @@ use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
 use std::collections::{HashMap, HashSet};
 use xml::reader::XmlEvent;
 use xml::EventReader;
+use regex::Regex;
 
 pub mod export;
 
@@ -223,6 +224,15 @@ fn read_layout(
     return Err("Expected </layout:layout>, but found end of XML document.".to_string());
 }
 
+fn normalize_name(name: String) -> String {
+    let name_regex = Regex::new(r"[^a-zA-Z0-9_]").unwrap();
+    let normalized = name_regex.replace_all(&name, "_").to_string();
+    if normalized != name {
+        println!("WARNING: Renaming `{}` to `{}`.", name, normalized);
+    }
+    return normalized;
+}
+
 /// Read the list of qualitative species from the XML document.
 fn read_species(
     parser: &mut EventReader<&[u8]>,
@@ -244,7 +254,7 @@ fn read_species(
                         if &attr.name.local_name == "id" {
                             id = attr.value;
                         } else if &attr.name.local_name == "name" {
-                            name = attr.value;
+                            name = normalize_name(attr.value);
                         }
                     }
                     if !is_boolean {
@@ -773,10 +783,46 @@ mod tests {
         .unwrap();
         assert_eq!(actual, expected);
         assert_eq!(layout, expected_layout);
-        // Do the same, but for a model with ids different than names
-        let model = std::fs::read_to_string("sbml_models/g2a_with_ids.sbml")
-            .expect("Cannot open result file.");
+    }
+
+    #[test]
+    fn test_name_resolution() {
+        let model =
+            std::fs::read_to_string("sbml_models/g2a_with_names.sbml").expect("Cannot open result file.");
         let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        // Compared by hand...
+        // CtrA(+) contains three invalid characters that should be normalized to CtrA___
+        let mut expected_layout = HashMap::new();
+        expected_layout.insert("CtrA___".to_string(), (419.0, 94.0));
+        expected_layout.insert("GcrA".to_string(), (325.0, 135.0));
+        expected_layout.insert("DnaA".to_string(), (374.0, 224.0));
+        expected_layout.insert("CcrM".to_string(), (462.0, 222.0));
+        expected_layout.insert("SciP".to_string(), (506.0, 133.0));
+        let expected = BooleanNetwork::try_from(
+            "
+            CtrA___ -> CtrA___
+            GcrA -> CtrA___
+            CcrM -| CtrA___
+            SciP -| CtrA___
+            CtrA___ -| GcrA
+            DnaA -> GcrA
+            CtrA___ -> DnaA
+            GcrA -| DnaA
+            DnaA -| DnaA
+            CcrM -> DnaA
+            CtrA___ -> CcrM
+            CcrM -| CcrM
+            SciP -| CcrM
+            CtrA___ -> SciP
+            DnaA -| SciP
+            $CtrA___: ((((!CtrA___ & GcrA) & !CcrM) & !SciP) | ((CtrA___ & !CcrM) & !SciP))
+            $GcrA: (!CtrA___ & DnaA)
+            $DnaA: (((CtrA___ & !GcrA) & !DnaA) & CcrM)
+            $CcrM: ((CtrA___ & !CcrM) & !SciP)
+            $SciP: (CtrA___ & !DnaA)
+        ",
+        )
+            .unwrap();
         assert_eq!(actual, expected);
         assert_eq!(layout, expected_layout);
     }

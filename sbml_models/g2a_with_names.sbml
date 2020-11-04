@@ -38,9 +38,8 @@
         </layout:listOfAdditionalGraphicalObjects>
       </layout:layout>
     </layout:listOfLayouts>
-    <qual:listOfQualitativeSpecies xmlns:qual="http://www.sbml.org/sbml/level3/version1/qual/version1">
-      <!-- This specie does not have maxLevel set intentionally to test if warning is printed -->
-      <qual:qualitativeSpecies qual:compartment="comp1" qual:constant="false" qual:name="CtrA" qual:id="S_1"/>
+    <qual:listOfQualitativeSpecies xmlns:qual="http://www.sbml.org/sbml/level3/version1/qual/version1">      
+      <qual:qualitativeSpecies qual:compartment="comp1" qual:constant="false" qual:name="CtrA(+)" qual:id="S_1"/>
       <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="GcrA" qual:id="S_2"/>
       <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="DnaA" qual:id="S_3"/>
       <qual:qualitativeSpecies qual:maxLevel="1" qual:compartment="comp1" qual:constant="false" qual:name="CcrM" qual:id="S_4"/>
