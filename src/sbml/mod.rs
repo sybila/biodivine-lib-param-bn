@@ -1,10 +1,10 @@
 use super::parser::FnUpdateTemp;
 use super::parser::FnUpdateTemp::*;
 use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
+use regex::Regex;
 use std::collections::{HashMap, HashSet};
 use xml::reader::XmlEvent;
 use xml::EventReader;
-use regex::Regex;
 
 pub mod export;
 
@@ -740,7 +740,7 @@ impl SBMLTransition {
 
 #[cfg(test)]
 mod tests {
-    use crate::BooleanNetwork;
+    use crate::{BooleanNetwork, Monotonicity};
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
@@ -787,8 +787,8 @@ mod tests {
 
     #[test]
     fn test_name_resolution() {
-        let model =
-            std::fs::read_to_string("sbml_models/g2a_with_names.sbml").expect("Cannot open result file.");
+        let model = std::fs::read_to_string("sbml_models/g2a_with_names.sbml")
+            .expect("Cannot open result file.");
         let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
         // Compared by hand...
         // CtrA(+) contains three invalid characters that should be normalized to CtrA___
@@ -822,8 +822,34 @@ mod tests {
             $SciP: (CtrA___ & !DnaA)
         ",
         )
-            .unwrap();
+        .unwrap();
         assert_eq!(actual, expected);
         assert_eq!(layout, expected_layout);
+    }
+
+    #[test]
+    fn test_cell_collective() {
+        let model = std::fs::read_to_string("sbml_models/cell_collective_vut.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        assert_eq!(actual.graph.num_vars(), 66);
+        assert_eq!(actual.graph.regulations.len(), 139);
+        assert_eq!(layout.len(), actual.graph.num_vars());
+        // Normal variable
+        assert!(actual.graph.find_variable("glucose").is_some());
+        // Normalized variable
+        assert!(actual.graph.find_variable("lactic_acid").is_some());
+        // Some regulation
+        assert_eq!(
+            actual
+                .graph
+                .find_regulation(
+                    actual.graph.find_variable("sigG").unwrap(),
+                    actual.graph.find_variable("sigK").unwrap(),
+                )
+                .unwrap()
+                .monotonicity,
+            Some(Monotonicity::Activation)
+        )
     }
 }
