@@ -4,6 +4,14 @@ version = "0.1.0"
 authors = ["Samuel Pastva <daemontus@gmail.com>"]
 edition = "2018"
 
+[lib]
+name = "biodivine_lib_param_bn"
+path = "src/lib.rs"
+
+[[bin]]
+name = "dump-graph"
+path = "src/bin/dump_graph.rs"
+
 # Enable rich docs for some online docs autogen services.
 [package.metadata.docs.rs]
 rustdoc-args = ["--html-in-header", "docs-head.html"]
