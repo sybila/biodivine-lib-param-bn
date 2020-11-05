@@ -71,6 +71,31 @@ fn rename_fn_variables(species: &Vec<(String, String)>, fun: FnUpdateTemp) -> Fn
     };
 }
 
+fn resolve_name_clashes(species: &mut Vec<(String, String)>) {
+    // Sadly, some models don't use unique specie names, only unique species IDs.
+    // If we want to preserve names, we thus have to make them unique...
+    // We only change the names that actually clash so that the changes to the model are minimal...
+    let mut unique_names: HashSet<String> = HashSet::new();
+    let mut duplicates: HashSet<String> = HashSet::new();
+    for (_, name) in species.iter() {
+        if unique_names.contains(name) {
+            duplicates.insert(name.clone());
+        } else {
+            unique_names.insert(name.clone());
+        }
+    }
+    for (id, name) in species.iter_mut() {
+        if duplicates.contains(name) {
+            let normalized = format!("{}_{}", id, name);
+            println!(
+                "WARNING: Renaming duplicate `{}` to `{}`.",
+                name, normalized
+            );
+            *name = normalized;
+        }
+    }
+}
+
 // Read a network and an associated layout!
 fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout), String> {
     let mut in_model = false;
@@ -83,6 +108,7 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
             XmlEvent::EndElement { name } => {
                 if name.local_name.as_str() == "model" {
                     species.sort_by_key(|(_, name)| name.clone());
+                    resolve_name_clashes(&mut species);
                     // Remap transitions to use specie names instead of IDs.
                     for t in transitions.iter_mut() {
                         t.target = resolve_specie(&species, &t.target).to_string();
@@ -228,7 +254,7 @@ fn normalize_name(name: String) -> String {
     let name_regex = Regex::new(r"[^a-zA-Z0-9_]").unwrap();
     let normalized = name_regex.replace_all(&name, "_").to_string();
     if normalized != name {
-        println!("WARNING: Renaming `{}` to `{}`.", name, normalized);
+        println!("WARNING: Renaming invalid `{}` to `{}`.", name, normalized);
     }
     return normalized;
 }
@@ -268,9 +294,9 @@ fn read_species(
                         if name.is_empty() {
                             name = id.clone();
                         }
-                        // Check that species is unique.
-                        for (existing_id, existing_name) in species.iter() {
-                            if existing_name == &name || existing_id == &id {
+                        // Check that species is unique (names don't have to be unique - yet...)
+                        for (existing_id, _) in species.iter() {
+                            if existing_id == &id {
                                 return Err(format!("Duplicate species {}.", name));
                             }
                         }
@@ -851,5 +877,21 @@ mod tests {
                 .monotonicity,
             Some(Monotonicity::Activation)
         )
+    }
+
+    #[test]
+    fn test_apoptosis_stable() {
+        // Has colliding names/ids
+        let model = std::fs::read_to_string("sbml_models/apoptosis_stable.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        assert_eq!(layout.len(), actual.graph.num_vars());
+        // Normal variable
+        assert!(actual.graph.find_variable("Apoptosome_complex").is_some());
+        // Normalized variable
+        assert!(actual.graph.find_variable("FAS_FASL_complex").is_some());
+        // Duplicate name
+        assert!(actual.graph.find_variable("sa19_CASP9_Cytoplasm").is_some());
+        assert!(actual.graph.find_variable("sa47_CASP9_Cytoplasm").is_some());
     }
 }
