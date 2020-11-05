@@ -708,7 +708,14 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                                 "implies" => Ok(BinaryOp::Imp),
                                                 op => Err(format!("Unknown operator {}", op)),
                                             }?;
-                                            if args.len() < 2 {
+                                            if (op == BinaryOp::And || op == BinaryOp::Or)
+                                                && args.len() == 1
+                                            {
+                                                // Sometimes, tools that work with DNF/CNF representations
+                                                // of boolean functions output an and/or with just one argument.
+                                                // We can ignore those...
+                                                Ok(args[0].clone())
+                                            } else if args.len() < 2 {
                                                 Err("Function argument list must have at least two entries.".to_string())
                                             } else {
                                                 let one = args[0].clone();
@@ -893,5 +900,14 @@ mod tests {
         // Duplicate name
         assert!(actual.graph.find_variable("sa19_CASP9_Cytoplasm").is_some());
         assert!(actual.graph.find_variable("sa47_CASP9_Cytoplasm").is_some());
+    }
+
+    #[test]
+    fn test_hmox_pathway() {
+        // Has OR with one argument
+        let model = std::fs::read_to_string("sbml_models/hmox1_pathway.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        assert_eq!(layout.len(), actual.graph.num_vars());
     }
 }
