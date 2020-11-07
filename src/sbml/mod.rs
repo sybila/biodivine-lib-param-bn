@@ -42,6 +42,9 @@ impl BooleanNetwork {
                 _ => {}
             }
         }
+        if let Some(error) = parser.next().err() {
+            return Err(error.to_string());
+        }
         return Err("Expected </sbml>, but found end of XML document.".to_string());
     }
 }
@@ -186,6 +189,9 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
             _ => {}
         }
     }
+    if let Some(error) = parser.next().err() {
+        return Err(error.to_string());
+    }
     return Err("Expected </model>, but found end of XML document.".to_string());
 }
 
@@ -246,6 +252,9 @@ fn read_layout(
             }
             _ => {}
         }
+    }
+    if let Some(error) = parser.next().err() {
+        return Err(error.to_string());
     }
     return Err("Expected </layout:layout>, but found end of XML document.".to_string());
 }
@@ -311,6 +320,9 @@ fn read_species(
             }
             _ => {}
         }
+    }
+    if let Some(error) = parser.next().err() {
+        return Err(error.to_string());
     }
     return Err(
         "Expected </qual:listOfQualitativeSpecies>, but found end of XML document.".to_string(),
@@ -393,6 +405,9 @@ fn read_transitions(
             }
             _ => {}
         }
+    }
+    if let Some(error) = parser.next().err() {
+        return Err(error.to_string());
     }
     return Err("Expected </qual:listOfTransitions>, but found end of XML document.".to_string());
 }
@@ -742,6 +757,9 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
             }
             _ => {}
         }
+    }
+    if let Some(error) = parser.next().err() {
+        return Err(error.to_string());
     }
     return Err("Expected </qual:listOfFunctionTerms> but found end of document.".to_string());
 }
