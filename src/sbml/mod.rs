@@ -928,4 +928,13 @@ mod tests {
         let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
         assert_eq!(layout.len(), actual.graph.num_vars());
     }
+
+    #[test]
+    fn test_apoptosis_network() {
+        let model = std::fs::read_to_string("sbml_models/apoptosis_network.sbml")
+            .expect("Cannot open result file.");
+        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        assert_eq!(actual.graph.num_vars(), 41);
+        assert_eq!(layout.len(), 0);
+    }
 }
