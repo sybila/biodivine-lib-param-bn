@@ -8,6 +8,10 @@ impl DefaultEdgeParams {
     /// New default edge parametrisation for the given network. Warning: computes the unit set, which can be expensive.
     pub fn new(network: BooleanNetwork) -> Result<DefaultEdgeParams, String> {
         let encoder = BddParameterEncoder::new(&network);
+        return Self::new_with_custom_encoder(network, encoder);
+    }
+
+    pub fn new_with_custom_encoder(network: BooleanNetwork, encoder: BddParameterEncoder) -> Result<DefaultEdgeParams, String> {
         let unit_set = BddParams::from(build_static_constraints(&network, &encoder));
         if unit_set.is_empty() {
             Err("No update functions satisfy given constraints".to_string())
