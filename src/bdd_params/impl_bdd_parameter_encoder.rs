@@ -7,13 +7,16 @@ use biodivine_lib_std::IdState;
 impl BddParameterEncoder {
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`.
     pub fn new(bn: &BooleanNetwork) -> BddParameterEncoder {
-        let mut bdd = BddVariableSetBuilder::new();
+        let bdd = BddVariableSetBuilder::new();
         return Self::new_with_custom_variables(bn, bdd);
     }
 
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`
     /// and with variables already provided via `BddVariableSetBuilder`.
-    pub fn new_with_custom_variables(bn: &BooleanNetwork, mut bdd: BddVariableSetBuilder) -> BddParameterEncoder {
+    pub fn new_with_custom_variables(
+        bn: &BooleanNetwork,
+        mut bdd: BddVariableSetBuilder,
+    ) -> BddParameterEncoder {
         let mut explicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
         let mut implicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
         let mut regulators: Vec<Vec<VariableId>> = Vec::new();

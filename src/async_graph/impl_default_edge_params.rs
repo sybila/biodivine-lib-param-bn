@@ -11,7 +11,10 @@ impl DefaultEdgeParams {
         return Self::new_with_custom_encoder(network, encoder);
     }
 
-    pub fn new_with_custom_encoder(network: BooleanNetwork, encoder: BddParameterEncoder) -> Result<DefaultEdgeParams, String> {
+    pub fn new_with_custom_encoder(
+        network: BooleanNetwork,
+        encoder: BddParameterEncoder,
+    ) -> Result<DefaultEdgeParams, String> {
         let unit_set = BddParams::from(build_static_constraints(&network, &encoder));
         if unit_set.is_empty() {
             Err("No update functions satisfy given constraints".to_string())
