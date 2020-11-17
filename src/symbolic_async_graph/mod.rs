@@ -13,6 +13,7 @@
    counts state variable valuations). However, we can normalize this...
 */
 
+mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
 
 use biodivine_lib_bdd::Bdd;
