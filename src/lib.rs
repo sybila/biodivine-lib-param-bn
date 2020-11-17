@@ -16,6 +16,7 @@ mod impl_variable;
 mod impl_variable_id;
 mod parser;
 pub mod sbml;
+pub mod symbolic_async_graph;
 
 // TODO: Getters for properties of Variables, Parameters, Regulations, ...
 
