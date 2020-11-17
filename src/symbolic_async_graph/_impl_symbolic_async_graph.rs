@@ -233,8 +233,22 @@ impl SymbolicAsyncGraph {
         return GraphColoredVertices::new(after_step_performed, self.p_var_count);
     }
 
+    pub fn any_post(
+        &self,
+        variable: VariableId,
+        frontier: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let frontier = &frontier.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        // This is equivalent to [frontier & ((v_is_one & function_is_zero) | (v_is_zero & function_is_one))]
+        let can_perform_step: Bdd = bdd!(frontier & apply_function);
+        let after_step_performed = can_perform_step.invert_input(v);
+        return GraphColoredVertices::new(after_step_performed, self.p_var_count);
+    }
+
     /// Compute vertices in `universe` that have a direct successor under `variable` in that `universe`.
-    /// Can be used to compute sinks.
+    /// Can be used to compute sinks when trimming.
     pub fn has_post(
         &self,
         variable: VariableId,
@@ -247,6 +261,17 @@ impl SymbolicAsyncGraph {
         // This has to be universe and not sink_candidate because that's where we look for successors.
         let after_transition = universe.and(&can_do_transition.invert_input(v));
         return GraphColoredVertices::new(after_transition.invert_input(v), self.p_var_count);
+    }
+
+    pub fn has_any_post(
+        &self,
+        variable: VariableId,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let universe = &universe.bdd;
+        let apply_function = &self.update_functions[variable.0];
+        let can_do_transition = bdd!(universe & apply_function);
+        return GraphColoredVertices::new(can_do_transition, self.p_var_count);
     }
 
     /// Compute direct predecessors of `frontier` within `universe` set under the given `VariableId`.
@@ -265,8 +290,21 @@ impl SymbolicAsyncGraph {
         return GraphColoredVertices::new(can_perform_step, self.p_var_count);
     }
 
+    pub fn any_pre(
+        &self,
+        variable: VariableId,
+        frontier: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let frontier = &frontier.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        let possible_predecessors = frontier.invert_input(v);
+        let can_perform_step = bdd!(possible_predecessors & apply_function);
+        return GraphColoredVertices::new(can_perform_step, self.p_var_count);
+    }
+
     /// Compute vertices in `universe` that have a direct predecessor under `variable` in that `universe`.
-    /// Can be used to compute sources.
+    /// Can be used to compute sources when trimming.
     pub fn has_pre(
         &self,
         variable: VariableId,
@@ -276,6 +314,19 @@ impl SymbolicAsyncGraph {
         let v = self.state_variables[variable.0];
         let apply_function = &self.update_functions[variable.0];
         let possible_predecessors = universe.invert_input(v).and(&universe);
+        let can_do_transition = bdd!(possible_predecessors & apply_function);
+        return GraphColoredVertices::new(can_do_transition.invert_input(v), self.p_var_count);
+    }
+
+    pub fn has_any_pre(
+        &self,
+        variable: VariableId,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let universe = &universe.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        let possible_predecessors = universe.invert_input(v);
         let can_do_transition = bdd!(possible_predecessors & apply_function);
         return GraphColoredVertices::new(can_do_transition.invert_input(v), self.p_var_count);
     }
