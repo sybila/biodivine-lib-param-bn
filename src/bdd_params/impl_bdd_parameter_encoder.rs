@@ -1,7 +1,9 @@
 use super::BddParameterEncoder;
 use crate::bdd_params::{BddParams, FunctionTableEntry, UninterpretedFunctionContext};
 use crate::{BooleanNetwork, ParameterId, VariableId};
-use biodivine_lib_bdd::{Bdd, BddValuationIterator, BddVariable, BddVariableSetBuilder};
+use biodivine_lib_bdd::{
+    Bdd, BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder,
+};
 use biodivine_lib_std::IdState;
 
 impl BddParameterEncoder {
@@ -17,13 +19,40 @@ impl BddParameterEncoder {
         bn: &BooleanNetwork,
         mut bdd: BddVariableSetBuilder,
     ) -> BddParameterEncoder {
-        let mut explicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
-        let mut implicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
-        let mut regulators: Vec<Vec<VariableId>> = Vec::new();
+        return BddParameterEncoder {
+            regulators: Self::build_regulators_table(bn),
+            explicit_function_tables: Self::build_explicit_function_table(bn, &mut bdd),
+            implicit_function_tables: Self::build_implicit_function_table(bn, &mut bdd),
+            bdd_variables: bdd.build(),
+        };
+    }
 
-        // First, create variables for all the explicit parameters:
-        for pid in bn.parameter_ids() {
-            let p = bn.get_parameter(pid);
+    /*
+        These utility functions should probably have some separate module, like static constraint computation,
+        but right now this is good enough... (TODO)
+    */
+
+    pub(crate) fn build_custom_encoder(
+        bdd_variables: BddVariableSet,
+        explicit_function_tables: Vec<Vec<BddVariable>>,
+        implicit_function_tables: Vec<Vec<BddVariable>>,
+        regulators: Vec<Vec<VariableId>>,
+    ) -> BddParameterEncoder {
+        return BddParameterEncoder {
+            bdd_variables,
+            regulators,
+            explicit_function_tables,
+            implicit_function_tables,
+        };
+    }
+
+    pub(crate) fn build_explicit_function_table(
+        network: &BooleanNetwork,
+        bdd: &mut BddVariableSetBuilder,
+    ) -> Vec<Vec<BddVariable>> {
+        let mut table = Vec::new();
+        for pid in network.parameter_ids() {
+            let p = network.get_parameter(pid);
             // Here, we abuse BddValuationIterator to go over all possible valuations
             // of function inputs.
 
@@ -34,20 +63,24 @@ impl BddParameterEncoder {
                 })
                 .collect();
 
-            explicit_function_tables.push(p_vars);
+            table.push(p_vars);
         }
+        return table;
+    }
 
-        // Then create values for anonymous parameters:
-        for vid in bn.graph.variable_ids() {
-            let v = bn.graph.get_variable(vid);
+    pub(crate) fn build_implicit_function_table(
+        network: &BooleanNetwork,
+        bdd: &mut BddVariableSetBuilder,
+    ) -> Vec<Vec<BddVariable>> {
+        let mut table = Vec::new();
+        for vid in network.graph.variable_ids() {
+            let v = network.graph.get_variable(vid);
 
-            if let Some(_) = bn.get_update_function(vid) {
-                regulators.push(Vec::new());
-                implicit_function_tables.push(Vec::new());
+            if let Some(_) = network.get_update_function(vid) {
+                table.push(Vec::new());
             } else {
-                let args = bn.graph.regulators(vid);
+                let args = network.graph.regulators(vid);
                 let cardinality = args.len();
-                regulators.push(args);
 
                 // Note that if args are empty, one variable is still created because there is
                 // an "empty" valuation.
@@ -58,16 +91,23 @@ impl BddParameterEncoder {
                     })
                     .collect();
 
-                implicit_function_tables.push(p_vars);
+                table.push(p_vars);
             }
         }
+        return table;
+    }
 
-        return BddParameterEncoder {
-            bdd_variables: bdd.build(),
-            regulators,
-            explicit_function_tables,
-            implicit_function_tables,
-        };
+    pub(crate) fn build_regulators_table(network: &BooleanNetwork) -> Vec<Vec<VariableId>> {
+        let mut table = Vec::new();
+        for vid in network.graph.variable_ids() {
+            if let Some(_) = network.get_update_function(vid) {
+                table.push(Vec::new());
+            } else {
+                let args = network.graph.regulators(vid);
+                table.push(args);
+            }
+        }
+        return table;
     }
 
     /// A vector of entries in the table of a specific function.

@@ -24,7 +24,7 @@ impl FnUpdate {
         return BddParams(self._symbolic_eval(state, encoder).not());
     }
 
-    pub(super) fn _symbolic_eval<T: UninterpretedFunctionContext>(
+    pub(crate) fn _symbolic_eval<T: UninterpretedFunctionContext>(
         &self,
         state: IdState,
         encoder: &T,
