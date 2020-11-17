@@ -15,8 +15,10 @@
 
 mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
+mod _impl_symbolic_async_graph;
 
-use biodivine_lib_bdd::Bdd;
+use crate::BooleanNetwork;
+use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
 /*
    BDDs representing the graph colors. These still contain both state and parameter variables,
@@ -37,4 +39,16 @@ pub struct GraphColors {
 pub struct GraphColoredVertices {
     bdd: Bdd,
     p_var_count: u16,
+}
+
+pub struct SymbolicAsyncGraph {
+    network: BooleanNetwork,
+    bdd_variable_set: BddVariableSet,
+    state_variables: Vec<BddVariable>,
+    /// Number of parameter variables.
+    p_var_count: u16,
+    empty_set: Bdd,
+    unit_set: Bdd,
+    /// For every update function, store !v <=> function (used for pre/post)
+    update_functions: Vec<Bdd>,
 }
