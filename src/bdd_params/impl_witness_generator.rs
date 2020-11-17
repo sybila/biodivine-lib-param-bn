@@ -13,7 +13,14 @@ impl BooleanNetwork {
         if valuation.is_none() {
             panic!("Cannot create witness for empty parameter set.");
         }
-        let valuation = valuation.unwrap();
+        return self.make_witness_for_valuation(valuation.unwrap(), encoder);
+    }
+
+    pub fn make_witness_for_valuation(
+        &self,
+        valuation: BddValuation,
+        encoder: &BddParameterEncoder,
+    ) -> BooleanNetwork {
         // First, make functions for explicit parameters:
         let mut explicit_parameter_expressions = Vec::with_capacity(self.parameters.len());
         for i_p in 0..self.parameters.len() {

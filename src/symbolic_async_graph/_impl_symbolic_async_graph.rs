@@ -1,9 +1,10 @@
 use crate::bdd_params::{build_static_constraints, BddParameterEncoder};
-use crate::symbolic_async_graph::SymbolicAsyncGraph;
+use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsyncGraph};
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
+use biodivine_lib_std::param_graph::Params;
 use biodivine_lib_std::IdState;
 use std::ops::Shl;
 
@@ -64,14 +65,19 @@ impl SymbolicAsyncGraph {
             function_cache.push(bdd!(v_is_zero <=> function_is_one));
         }
 
+        let p_var_count = bdd_variable_set.num_vars() - network.graph.num_vars() as u16;
+        let unit_bdd = build_static_constraints(&network, &function_context);
         return SymbolicAsyncGraph {
-            p_var_count: bdd_variable_set.num_vars() - network.graph.num_vars() as u16,
-            empty_set: bdd_variable_set.mk_false(),
-            unit_set: build_static_constraints(&network, &function_context),
+            empty_color_set: GraphColors::new(bdd_variable_set.mk_false(), p_var_count),
+            unit_color_set: GraphColors::new(unit_bdd.clone(), p_var_count),
+            empty_set: GraphColoredVertices::new(bdd_variable_set.mk_false(), p_var_count),
+            unit_set: GraphColoredVertices::new(unit_bdd, p_var_count),
             update_functions: function_cache,
+            p_var_count,
             network,
             bdd_variable_set,
             state_variables,
+            function_context,
         };
     }
 
@@ -162,5 +168,115 @@ impl SymbolicAsyncGraph {
             }
         }
         return IdState::from(state);
+    }
+}
+
+/// Examine the general properties of the graph.
+impl SymbolicAsyncGraph {
+    /// Return a reference to the original Boolean network.
+    pub fn network(&self) -> &BooleanNetwork {
+        return &self.network;
+    }
+
+    /// Return the total number of states/vertices in this graph.
+    pub fn num_states(&self) -> usize {
+        return 1 << self.network().graph.num_vars();
+    }
+
+    /// Make a witness network for one color in the given set.
+    pub fn make_witness(&self, colors: &GraphColors) -> BooleanNetwork {
+        if colors.is_empty() {
+            panic!("Cannot create witness for empty color set.");
+        }
+        return self
+            .network
+            .make_witness_for_valuation(colors.bdd.sat_witness().unwrap(), &self.function_context);
+    }
+
+    /// Return an empty set of colors.
+    pub fn empty_colors(&self) -> &GraphColors {
+        return &self.empty_color_set;
+    }
+
+    /// Return a full set of colors.
+    pub fn unit_colors(&self) -> &GraphColors {
+        return &self.unit_color_set;
+    }
+
+    /// Return empty vertex set.
+    pub fn empty_vertices(&self) -> &GraphColoredVertices {
+        return &self.empty_set;
+    }
+
+    /// Return complete vertex set.
+    pub fn unit_vertices(&self) -> &GraphColoredVertices {
+        return &self.unit_set;
+    }
+}
+
+/// Symbolic graph exploration operations.
+impl SymbolicAsyncGraph {
+    /// Compute direct successors of `frontier` within the `universe` set under the given `VariableId`.
+    pub fn post(
+        &self,
+        variable: VariableId,
+        frontier: &GraphColoredVertices,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let frontier = &frontier.bdd;
+        let universe = &universe.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        // This is equivalent to [frontier & ((v_is_one & function_is_zero) | (v_is_zero & function_is_one))]
+        let can_perform_step: Bdd = bdd!(frontier & apply_function);
+        let after_step_performed = can_perform_step.invert_input(v).and(universe);
+        return GraphColoredVertices::new(after_step_performed, self.p_var_count);
+    }
+
+    /// Compute vertices in `universe` that have a direct successor under `variable` in that `universe`.
+    /// Can be used to compute sinks.
+    pub fn has_post(
+        &self,
+        variable: VariableId,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let universe = &universe.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        let can_do_transition = bdd!(universe & apply_function);
+        // This has to be universe and not sink_candidate because that's where we look for successors.
+        let after_transition = universe.and(&can_do_transition.invert_input(v));
+        return GraphColoredVertices::new(after_transition.invert_input(v), self.p_var_count);
+    }
+
+    /// Compute direct predecessors of `frontier` within `universe` set under the given `VariableId`.
+    pub fn pre(
+        &self,
+        variable: VariableId,
+        frontier: &GraphColoredVertices,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let frontier = &frontier.bdd;
+        let universe = &universe.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        let possible_predecessors = frontier.invert_input(v).and(universe);
+        let can_perform_step = bdd!(possible_predecessors & apply_function);
+        return GraphColoredVertices::new(can_perform_step, self.p_var_count);
+    }
+
+    /// Compute vertices in `universe` that have a direct predecessor under `variable` in that `universe`.
+    /// Can be used to compute sources.
+    pub fn has_pre(
+        &self,
+        variable: VariableId,
+        universe: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let universe = &universe.bdd;
+        let v = self.state_variables[variable.0];
+        let apply_function = &self.update_functions[variable.0];
+        let possible_predecessors = universe.invert_input(v).and(&universe);
+        let can_do_transition = bdd!(possible_predecessors & apply_function);
+        return GraphColoredVertices::new(can_do_transition.invert_input(v), self.p_var_count);
     }
 }

@@ -17,6 +17,7 @@ mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
 mod _impl_symbolic_async_graph;
 
+use crate::bdd_params::BddParameterEncoder;
 use crate::BooleanNetwork;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
@@ -43,12 +44,15 @@ pub struct GraphColoredVertices {
 
 pub struct SymbolicAsyncGraph {
     network: BooleanNetwork,
-    bdd_variable_set: BddVariableSet,
+    pub bdd_variable_set: BddVariableSet,
     state_variables: Vec<BddVariable>,
     /// Number of parameter variables.
     p_var_count: u16,
-    empty_set: Bdd,
-    unit_set: Bdd,
+    empty_color_set: GraphColors,
+    unit_color_set: GraphColors,
+    empty_set: GraphColoredVertices,
+    unit_set: GraphColoredVertices,
     /// For every update function, store !v <=> function (used for pre/post)
     update_functions: Vec<Bdd>,
+    function_context: BddParameterEncoder,
 }
