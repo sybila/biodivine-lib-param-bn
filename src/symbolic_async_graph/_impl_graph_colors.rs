@@ -15,8 +15,9 @@ impl GraphColors {
     }
 
     pub fn cardinality(&self) -> f64 {
+        // TODO: Does not work when var count is more than 64...
         let s_var_count = self.bdd.num_vars() - self.p_var_count;
-        return self.bdd.cardinality() / (1.shl(s_var_count) as f64);
+        return self.bdd.cardinality() / ((1 as u64).shl(s_var_count) as f64);
     }
 }
 

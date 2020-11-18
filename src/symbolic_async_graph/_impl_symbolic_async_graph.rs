@@ -178,6 +178,25 @@ impl SymbolicAsyncGraph {
         return &self.network;
     }
 
+    pub fn function_context(&self) -> &BddParameterEncoder {
+        return &self.function_context;
+    }
+
+    pub fn state_variable_true(&self, variable: VariableId) -> GraphColoredVertices {
+        let bdd_var = self.state_variables[variable.0];
+        return GraphColoredVertices::new(self.bdd_variable_set.mk_var(bdd_var), self.p_var_count)
+            .intersect(self.unit_vertices());
+    }
+
+    pub fn state_variable_false(&self, variable: VariableId) -> GraphColoredVertices {
+        let bdd_var = self.state_variables[variable.0];
+        return GraphColoredVertices::new(
+            self.bdd_variable_set.mk_not_var(bdd_var),
+            self.p_var_count,
+        )
+        .intersect(self.unit_vertices());
+    }
+
     /// Return the total number of states/vertices in this graph.
     pub fn num_states(&self) -> usize {
         return 1 << self.network().graph.num_vars();
