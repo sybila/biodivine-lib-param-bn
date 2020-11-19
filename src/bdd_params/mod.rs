@@ -32,6 +32,7 @@ pub struct BddParams(Bdd);
 /// Every explicit and implicit `Parameter` maps to a set of `BddVariable`s that represent
 /// the values in its function table. The responsibility of this struct is to create all
 /// `BddVariable`s and maintain how they map to individual parameters.
+#[derive(Clone)]
 pub struct BddParameterEncoder {
     /// The actual `BddVariableSet` used to represent the parameters - use this for `.dot` printing etc.
     pub bdd_variables: BddVariableSet,
