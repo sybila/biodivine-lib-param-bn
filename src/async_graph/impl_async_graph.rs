@@ -33,6 +33,11 @@ impl<Params: AsyncGraphEdgeParams> AsyncGraph<Params> {
         return self.edges.network();
     }
 
+    /// Expose the inner edge implementation.
+    pub fn edges(&self) -> &Params {
+        return &self.edges;
+    }
+
     /// Make a witness network for one parametrisation in the given set.
     pub fn make_witness(&self, params: &Params::ParamSet) -> BooleanNetwork {
         return self.edges.make_witness(params);
