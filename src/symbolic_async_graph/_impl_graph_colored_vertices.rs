@@ -11,6 +11,10 @@ impl GraphColoredVertices {
         return self.bdd;
     }
 
+    pub fn as_bdd(&self) -> &Bdd {
+        return &self.bdd;
+    }
+
     pub fn cardinality(&self) -> f64 {
         return self.bdd.cardinality();
     }

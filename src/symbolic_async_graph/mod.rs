@@ -26,7 +26,7 @@ use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
    but are only constrained on parameter variables. We thus need a normalization factor to
    account for this.
 */
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct GraphColors {
     bdd: Bdd,
     p_var_count: u16,
@@ -36,7 +36,7 @@ pub struct GraphColors {
    BDD representing the $V \times C$ relation (colored vertex set) of a graph. Essentially
    behaves like a relation/set.
 */
-#[derive(Clone)]
+#[derive(Clone, Eq, PartialEq, Hash)]
 pub struct GraphColoredVertices {
     bdd: Bdd,
     p_var_count: u16,

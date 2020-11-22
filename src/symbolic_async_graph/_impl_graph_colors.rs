@@ -14,6 +14,10 @@ impl GraphColors {
         return self.bdd;
     }
 
+    pub fn as_bdd(&self) -> &Bdd {
+        return &self.bdd;
+    }
+
     pub fn cardinality(&self) -> f64 {
         // TODO: Does not work when var count is more than 64...
         let s_var_count = self.bdd.num_vars() - self.p_var_count;
