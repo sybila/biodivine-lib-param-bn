@@ -20,19 +20,51 @@ pub fn build_static_constraints<T: UninterpretedFunctionContext>(
             if r.monotonicity != None {
                 let monotonicity = build_monotonicity_explicit(&ctx, r, fun);
                 condition = bdd!(condition & monotonicity);
+                if condition.is_false() {
+                    println!(
+                        "Regulation {} -> {} is not monotonous.",
+                        bn.graph.get_variable(r.regulator).name,
+                        bn.graph.get_variable(r.target).name
+                    );
+                    break;
+                }
             }
             if r.observable {
                 let observability = build_observability_explicit(&ctx, r, fun);
                 condition = bdd!(condition & observability);
+                if condition.is_false() {
+                    println!(
+                        "Regulation {} -> {} is not observable.",
+                        bn.graph.get_variable(r.regulator).name,
+                        bn.graph.get_variable(r.target).name
+                    );
+                    break;
+                }
             }
         } else {
             if r.monotonicity != None {
                 let monotonicity = build_monotonicity_implicit(&ctx, r);
                 condition = bdd!(condition & monotonicity);
+                if condition.is_false() {
+                    println!(
+                        "Regulation {} -> {} is not monotonous.",
+                        bn.graph.get_variable(r.regulator).name,
+                        bn.graph.get_variable(r.target).name
+                    );
+                    break;
+                }
             }
             if r.observable {
                 let observability = build_observability_implicit(&ctx, r);
                 condition = bdd!(condition & observability);
+                if condition.is_false() {
+                    println!(
+                        "Regulation {} -> {} is not observable.",
+                        bn.graph.get_variable(r.regulator).name,
+                        bn.graph.get_variable(r.target).name
+                    );
+                    break;
+                }
             }
         }
     }
