@@ -231,6 +231,21 @@ impl SymbolicAsyncGraph {
     pub fn unit_vertices(&self) -> &GraphColoredVertices {
         return &self.unit_set;
     }
+
+    /// Construct a vertex set that only contains one vertex.
+    pub fn vertex(&self, state: IdState) -> GraphColoredVertices {
+        let mut state_bdd = self.unit_set.bdd.clone();
+        for i_variable in 0..self.network.graph.num_vars() {
+            let bdd_var = self.state_variables[i_variable];
+            let bdd = if state.get_bit(i_variable) {
+                self.bdd_variable_set.mk_var(bdd_var)
+            } else {
+                self.bdd_variable_set.mk_not_var(bdd_var)
+            };
+            state_bdd = state_bdd.and(&bdd);
+        }
+        return GraphColoredVertices::new(state_bdd, self.p_var_count);
+    }
 }
 
 /// Symbolic graph exploration operations.
