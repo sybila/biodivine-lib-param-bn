@@ -1,4 +1,6 @@
-use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors};
+use crate::symbolic_async_graph::{
+    GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph,
+};
 use biodivine_lib_bdd::Bdd;
 
 /* Basic utility operations */
@@ -64,5 +66,19 @@ impl GraphColoredVertices {
 
     pub fn color_projection(&self) -> GraphColors {
         return GraphColors::new(self.bdd.projection(self.p_var_count), self.p_var_count);
+    }
+
+    pub fn state_projection(&self, graph: &SymbolicAsyncGraph) -> GraphVertices {
+        let mut result = self.bdd.clone();
+        for v in graph.bdd_variable_set.variables() {
+            if graph.state_variables.contains(&v) {
+                continue; // Keep state variables.
+            } else {
+                // Project and fix to zero.
+                result = result.var_projection(v);
+                result = result.and(&graph.bdd_variable_set.mk_not_var(v))
+            }
+        }
+        return GraphVertices::new(result, self.p_var_count);
     }
 }

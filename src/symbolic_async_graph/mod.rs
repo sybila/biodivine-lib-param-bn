@@ -15,11 +15,12 @@
 
 mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
+mod _impl_graph_vertices;
 mod _impl_symbolic_async_graph;
 
 use crate::bdd_params::BddParameterEncoder;
 use crate::BooleanNetwork;
-use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
+use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddVariable, BddVariableSet};
 
 /*
    BDDs representing the graph colors. These still contain both state and parameter variables,
@@ -40,6 +41,21 @@ pub struct GraphColors {
 pub struct GraphColoredVertices {
     bdd: Bdd,
     p_var_count: u16,
+}
+
+/*
+   Bdd representing the graph vertices. This has all parameter variables fixed to zero
+   because we need to be able to iterate over it. TODO: This is bad design.
+*/
+#[derive(Clone, Eq, PartialEq, Hash)]
+pub struct GraphVertices {
+    bdd: Bdd,
+    p_var_count: u16,
+}
+
+pub struct GraphVertexIterator<'a, 'b> {
+    state_variables: &'a Vec<BddVariable>,
+    iterator: BddSatisfyingValuations<'b>,
 }
 
 pub struct SymbolicAsyncGraph {
