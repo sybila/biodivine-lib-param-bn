@@ -1,0 +1,513 @@
+#position:NRF2_phosphorylated_Nucleus:998.375,909.75
+$NRF2_phosphorylated_Nucleus:NRF2_phosphorylated_Cytosol
+NRF2_phosphorylated_Cytosol -> NRF2_phosphorylated_Nucleus
+#position:Nrf2_Maf_complex:1086.375,1004.75
+$Nrf2_Maf_complex:(NRF2_phosphorylated_Nucleus & MAF)
+NRF2_phosphorylated_Nucleus -> Nrf2_Maf_complex
+MAF -> Nrf2_Maf_complex
+#position:MAF:1159.375,909.75
+#position:BACH1_Maf_complex:1226.375,1003.75
+$BACH1_Maf_complex:(MAF & BACH1)
+MAF -> BACH1_Maf_complex
+BACH1 -> BACH1_Maf_complex
+#position:BACH1:1291.875,910.75
+$BACH1:!miRNA_155_rna
+miRNA_155_rna -| BACH1
+#position:CAND1:1428.875,595.75
+#position:csa8_Ubiquitin_Ligase_Complex_complex_Cytosol:855.875,411.75
+$csa8_Ubiquitin_Ligase_Complex_complex_Cytosol:((!CAND1 | CUL3_RBX1_complex) | ((NRF2_empty & KEAP1) & !Dimethly_fumarate_drug))
+CAND1 -| csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+CUL3_RBX1_complex -> csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+NRF2_empty -> csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+KEAP1 -> csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+Dimethly_fumarate_drug -| csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+#position:CUL3_RBX1_complex:1260,220
+#position:NRF2_empty:1832.875,523.75
+#position:KEAP1:1831.875,461.5500000000002
+#position:Dimethly_fumarate_drug:1650.875,424.75
+#position:csa10_Ubiquitin_Ligase_Complex_complex_Cytosol:558.2750000000001,416.5500000000002
+$csa10_Ubiquitin_Ligase_Complex_complex_Cytosol:csa8_Ubiquitin_Ligase_Complex_complex_Cytosol
+csa8_Ubiquitin_Ligase_Complex_complex_Cytosol -> csa10_Ubiquitin_Ligase_Complex_complex_Cytosol
+#position:NLRP3_elicitors_NLRP3_oligomer_ASC_complex:4359.5,927
+$NLRP3_elicitors_NLRP3_oligomer_ASC_complex:((NLRP3_elicitors_NLRP3_oligomer_complex & ASC) | (NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex & CTSG))
+NLRP3_elicitors_NLRP3_oligomer_complex -> NLRP3_elicitors_NLRP3_oligomer_ASC_complex
+ASC -> NLRP3_elicitors_NLRP3_oligomer_ASC_complex
+NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex -> NLRP3_elicitors_NLRP3_oligomer_ASC_complex
+CTSG -> NLRP3_elicitors_NLRP3_oligomer_ASC_complex
+#position:NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex:4284.75,1198.5
+$NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex:(NLRP3_elicitors_NLRP3_oligomer_ASC_complex & proCaspase_1)
+NLRP3_elicitors_NLRP3_oligomer_ASC_complex -> NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex
+proCaspase_1 -> NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex
+#position:proCaspase_1:4625,1130
+#position:SLC40A1_rna:1249.875,1402.25
+$SLC40A1_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> SLC40A1_rna
+#position:SLC40A1_CP_Cu2__complex:1816.875,1739.75
+$SLC40A1_CP_Cu2__complex:SLC40A1_rna
+SLC40A1_rna -> SLC40A1_CP_Cu2__complex
+#position:NLRP3_elicitors_NLRP3_oligomer_complex:4425,655
+$NLRP3_elicitors_NLRP3_oligomer_complex:NLRP3_elicitors_NLRP3_complex
+NLRP3_elicitors_NLRP3_complex -> NLRP3_elicitors_NLRP3_oligomer_complex
+#position:ASC:4700,860
+#position:CTSG:4485,1385
+#position:TFRC_TF_complex_Cytosol:54.40625,1485.125
+$TFRC_TF_complex_Cytosol:TFRC_TF_complex_Endosome_Lumen
+TFRC_TF_complex_Endosome_Lumen -> TFRC_TF_complex_Cytosol
+#position:TFRC_holoTF_complex_Cytosol:306.75,1753.625
+$TFRC_holoTF_complex_Cytosol:(TFRC_TF_complex_Cytosol | (Fe3__ion_default_compartment & Transferrin))
+TFRC_TF_complex_Cytosol -> TFRC_holoTF_complex_Cytosol
+Fe3__ion_default_compartment -> TFRC_holoTF_complex_Cytosol
+Transferrin -> TFRC_holoTF_complex_Cytosol
+#position:Fe3__ion_default_compartment:1740.5,1935.5
+$Fe3__ion_default_compartment:((((sa135_Fe2__ion_default_compartment & sa156_O2_simple_molecule_default_compartment) & sa157_H__ion_default_compartment) & SLC40A1_CP_Cu2__complex) | (((sa135_Fe2__ion_default_compartment & sa212_H__ion_default_compartment) & sa213_O2_simple_molecule_default_compartment) & SLC40A1_HEPH_Cu2__complex))
+sa135_Fe2__ion_default_compartment -> Fe3__ion_default_compartment
+sa156_O2_simple_molecule_default_compartment -> Fe3__ion_default_compartment
+sa157_H__ion_default_compartment -> Fe3__ion_default_compartment
+SLC40A1_CP_Cu2__complex -> Fe3__ion_default_compartment
+sa212_H__ion_default_compartment -> Fe3__ion_default_compartment
+sa213_O2_simple_molecule_default_compartment -> Fe3__ion_default_compartment
+SLC40A1_HEPH_Cu2__complex -> Fe3__ion_default_compartment
+#position:Transferrin:1700,2114
+$Transferrin:TFRC_TF_complex_Cytosol
+TFRC_TF_complex_Cytosol -> Transferrin
+#position:TFRC_holoTF_complex_Endosome_Lumen:298.1875,1468.125
+$TFRC_holoTF_complex_Endosome_Lumen:TFRC_holoTF_complex_Cytosol
+TFRC_holoTF_complex_Cytosol -> TFRC_holoTF_complex_Endosome_Lumen
+#position:TFRC_TF_complex_Endosome_Lumen:299.1875,1228.125
+$TFRC_TF_complex_Endosome_Lumen:TFRC_holoTF_complex_Endosome_Lumen
+TFRC_holoTF_complex_Endosome_Lumen -> TFRC_TF_complex_Endosome_Lumen
+#position:csa32_Ubiquitin_Ligase_Complex_complex_Cytosol:213.375,435.75
+$csa32_Ubiquitin_Ligase_Complex_complex_Cytosol:csa10_Ubiquitin_Ligase_Complex_complex_Cytosol
+csa10_Ubiquitin_Ligase_Complex_complex_Cytosol -> csa32_Ubiquitin_Ligase_Complex_complex_Cytosol
+#position:NLRP3_elicitors_NLRP3_complex:4462.5,405
+$NLRP3_elicitors_NLRP3_complex:((NLRP3_Elicitor_Small_Molecules_simple_molecule & NLRP3_SUGT1_HSP90_complex) | (NLRP3_Elicitor_Proteins & NLRP3_SUGT1_HSP90_complex))
+NLRP3_Elicitor_Small_Molecules_simple_molecule -> NLRP3_elicitors_NLRP3_complex
+NLRP3_SUGT1_HSP90_complex -> NLRP3_elicitors_NLRP3_complex
+NLRP3_Elicitor_Proteins -> NLRP3_elicitors_NLRP3_complex
+#position:NLRP3_Elicitor_Proteins:3855,510
+#position:NLRP3_SUGT1_HSP90_complex:3903.5,352.5
+$NLRP3_SUGT1_HSP90_complex:(((NLRP3_Elicitor_Proteins & NLRP3_SUGT1_HSP90_complex) | (NLRP3_Elicitor_Small_Molecules_simple_molecule & NLRP3_SUGT1_HSP90_complex)) | ((((TXNIP_NLRP3_complex | SARS_E) | SARS_Orf3a) | sa524_Reactive_Oxygen_Species_simple_molecule_Cytosol) & NLRP3))
+NLRP3_Elicitor_Proteins -> NLRP3_SUGT1_HSP90_complex
+NLRP3_SUGT1_HSP90_complex -> NLRP3_SUGT1_HSP90_complex
+NLRP3_Elicitor_Small_Molecules_simple_molecule -> NLRP3_SUGT1_HSP90_complex
+NLRP3 -> NLRP3_SUGT1_HSP90_complex
+TXNIP_NLRP3_complex -> NLRP3_SUGT1_HSP90_complex
+SARS_E -> NLRP3_SUGT1_HSP90_complex
+SARS_Orf3a -> NLRP3_SUGT1_HSP90_complex
+sa524_Reactive_Oxygen_Species_simple_molecule_Cytosol -> NLRP3_SUGT1_HSP90_complex
+#position:NLRP3_Elicitor_Small_Molecules_simple_molecule:3802.5,583.75
+#position:NLRP3:3469,406.5
+$NLRP3:NLRP3_rna
+NLRP3_rna -> NLRP3
+#position:TXNIP_NLRP3_complex:3585,485
+$TXNIP_NLRP3_complex:(NLRP3 & TXNIP)
+NLRP3 -> TXNIP_NLRP3_complex
+TXNIP -> TXNIP_NLRP3_complex
+#position:SARS_E:3670,340
+#position:SARS_Orf3a:3520,340
+#position:sa524_Reactive_Oxygen_Species_simple_molecule_Cytosol:3538.5,295
+$sa524_Reactive_Oxygen_Species_simple_molecule_Cytosol:!CO_simple_molecule
+CO_simple_molecule -| sa524_Reactive_Oxygen_Species_simple_molecule_Cytosol
+#position:TXNIP:3469.5,493
+$TXNIP:Oxidized_thioredoxin_TXNIP_complex
+Oxidized_thioredoxin_TXNIP_complex -> TXNIP
+#position:Thioredoxin_TXNIP_complex:3280,458.75
+$Thioredoxin_TXNIP_complex:(TXNIP & TXN)
+TXNIP -> Thioredoxin_TXNIP_complex
+TXN -> Thioredoxin_TXNIP_complex
+#position:TXN:3470,572.5
+#position:BLVRA_rna:1247.875,1233.25
+$BLVRA_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> BLVRA_rna
+#position:BLVRA_Zn2__complex:2511.875,1134.75
+$BLVRA_Zn2__complex:BLVRA_rna
+BLVRA_rna -> BLVRA_Zn2__complex
+#position:Pyrin_trimer_complex:4690,405
+#position:PSTPIP1_trimer_Pyrin_trimer_complex:4980,347.5
+$PSTPIP1_trimer_Pyrin_trimer_complex:(Pyrin_trimer_complex & PSTPIP1)
+Pyrin_trimer_complex -> PSTPIP1_trimer_Pyrin_trimer_complex
+PSTPIP1 -> PSTPIP1_trimer_Pyrin_trimer_complex
+#position:PSTPIP1:4704,324
+#position:dsDNA_AIM2_complex:4880,652.5
+$dsDNA_AIM2_complex:(Double_Strand_DNA_simple_molecule & AIM2)
+Double_Strand_DNA_simple_molecule -> dsDNA_AIM2_complex
+AIM2 -> dsDNA_AIM2_complex
+#position:dsDNA_AIM2_oligomer_complex:4870,777.5
+$dsDNA_AIM2_oligomer_complex:dsDNA_AIM2_complex
+dsDNA_AIM2_complex -> dsDNA_AIM2_oligomer_complex
+#position:dsDNA_AIM2_oligomer_ASC_complex:4835,942.5
+$dsDNA_AIM2_oligomer_ASC_complex:(dsDNA_AIM2_oligomer_complex & ASC)
+dsDNA_AIM2_oligomer_complex -> dsDNA_AIM2_oligomer_ASC_complex
+ASC -> dsDNA_AIM2_oligomer_ASC_complex
+#position:Double_Strand_DNA_simple_molecule:4882.5,568.75
+#position:AIM2:4995,590
+#position:Pyrin_trimer_ASC_complex:4950,455
+$Pyrin_trimer_ASC_complex:(ASC & Pyrin_trimer_complex)
+ASC -> Pyrin_trimer_ASC_complex
+Pyrin_trimer_complex -> Pyrin_trimer_ASC_complex
+#position:dsDNA_AIM2_oligomer_ASC_Procaspase_1_complex:4803.75,1156.875
+$dsDNA_AIM2_oligomer_ASC_Procaspase_1_complex:(dsDNA_AIM2_oligomer_ASC_complex & proCaspase_1)
+dsDNA_AIM2_oligomer_ASC_complex -> dsDNA_AIM2_oligomer_ASC_Procaspase_1_complex
+proCaspase_1 -> dsDNA_AIM2_oligomer_ASC_Procaspase_1_complex
+#position:FTH1_rna:1248.875,1359.25
+$FTH1_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> FTH1_rna
+#position:Ferritin_complex:2295.875,1413.75
+$Ferritin_complex:(FTH1_rna | FTL_rna)
+FTH1_rna -> Ferritin_complex
+FTL_rna -> Ferritin_complex
+#position:FTL_rna:1251.875,1317.25
+$FTL_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> FTL_rna
+#position:Bilirubin_simple_molecule:2905,1077.5
+$Bilirubin_simple_molecule:(((BLVRB | BLVRA_Zn2__complex) & Biliverdin_simple_molecule) & sa33_NADPH_simple_molecule_Cytosol)
+Biliverdin_simple_molecule -> Bilirubin_simple_molecule
+sa33_NADPH_simple_molecule_Cytosol -> Bilirubin_simple_molecule
+BLVRB -> Bilirubin_simple_molecule
+BLVRA_Zn2__complex -> Bilirubin_simple_molecule
+#position:ALB_BIL_complex:2850,1976
+$ALB_BIL_complex:(Bilirubin_simple_molecule & ABCC1)
+Bilirubin_simple_molecule -> ALB_BIL_complex
+ABCC1 -> ALB_BIL_complex
+#position:ABCC1:2975.875,1785.75
+$ABCC1:Orf9c
+Orf9c -> ABCC1
+#position:CASP1_120_197__CASP1_317_404__complex:4291.25,1568.75
+$CASP1_120_197__CASP1_317_404__complex:((NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex & CTSG) | (NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex & CTSG))
+NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex -> CASP1_120_197__CASP1_317_404__complex
+CTSG -> CASP1_120_197__CASP1_317_404__complex
+#position:Caspase_1_Tetramer_complex:3987.5,1563
+$Caspase_1_Tetramer_complex:CASP1_120_197__CASP1_317_404__complex
+CASP1_120_197__CASP1_317_404__complex -> Caspase_1_Tetramer_complex
+#position:Heme_simple_molecule_Mitochondrial_Matrix:2255.625,661.75
+$Heme_simple_molecule_Mitochondrial_Matrix:(((PRIN9_simple_molecule_Mitochondrial_Matrix & Fe2__ion_Mitochondrial_Matrix) & FECH) & !Pb2__ion)
+PRIN9_simple_molecule_Mitochondrial_Matrix -> Heme_simple_molecule_Mitochondrial_Matrix
+Fe2__ion_Mitochondrial_Matrix -> Heme_simple_molecule_Mitochondrial_Matrix
+FECH -> Heme_simple_molecule_Mitochondrial_Matrix
+Pb2__ion -| Heme_simple_molecule_Mitochondrial_Matrix
+#position:Heme_simple_molecule_Cytosol:1971,1077
+$Heme_simple_molecule_Cytosol:(Heme_simple_molecule_Mitochondrial_Matrix & FLVCR1_2)
+Heme_simple_molecule_Mitochondrial_Matrix -> Heme_simple_molecule_Cytosol
+FLVCR1_2 -> Heme_simple_molecule_Cytosol
+#position:FLVCR1_2:2104.3458534708675,720.8682030344781
+#position:Biliverdin_simple_molecule:2303,1076.5
+$Biliverdin_simple_molecule:(((Heme_simple_molecule_Cytosol & sa24_O2_simple_molecule_Cytosol) & sa25_NADPH_simple_molecule_Cytosol) & sa168_HMOX1_Cytosol)
+Heme_simple_molecule_Cytosol -> Biliverdin_simple_molecule
+sa24_O2_simple_molecule_Cytosol -> Biliverdin_simple_molecule
+sa25_NADPH_simple_molecule_Cytosol -> Biliverdin_simple_molecule
+sa168_HMOX1_Cytosol -> Biliverdin_simple_molecule
+#position:sa24_O2_simple_molecule_Cytosol:2097.5,1118.5
+#position:sa25_NADPH_simple_molecule_Cytosol:2049.5,1095.5
+#position:sa168_HMOX1_Cytosol:1920,1140
+$sa168_HMOX1_Cytosol:(sa29_HMOX1_Cytosol & SARS_CoV_2_Orf3a)
+sa29_HMOX1_Cytosol -> sa168_HMOX1_Cytosol
+SARS_CoV_2_Orf3a -> sa168_HMOX1_Cytosol
+#position:PRIN9_simple_molecule_Mitochondrial_Matrix:2512.625,661.75
+$PRIN9_simple_molecule_Mitochondrial_Matrix:PRIN9_simple_molecule_Mitochondrion
+PRIN9_simple_molecule_Mitochondrion -> PRIN9_simple_molecule_Mitochondrial_Matrix
+#position:Fe2__ion_Mitochondrial_Matrix:2468.125,699.75
+#position:FECH:2370.625,598.25
+$FECH:FECH_rna
+FECH_rna -> FECH
+#position:Pb2__ion:2385.125,720.75
+#position:sa26_H2O_simple_molecule_Cytosol:2336,1106.5
+$sa26_H2O_simple_molecule_Cytosol:(((Heme_simple_molecule_Cytosol & sa24_O2_simple_molecule_Cytosol) & sa25_NADPH_simple_molecule_Cytosol) & sa168_HMOX1_Cytosol)
+Heme_simple_molecule_Cytosol -> sa26_H2O_simple_molecule_Cytosol
+sa24_O2_simple_molecule_Cytosol -> sa26_H2O_simple_molecule_Cytosol
+sa25_NADPH_simple_molecule_Cytosol -> sa26_H2O_simple_molecule_Cytosol
+sa168_HMOX1_Cytosol -> sa26_H2O_simple_molecule_Cytosol
+#position:sa27_NADP__simple_molecule_Cytosol:2252,1109
+$sa27_NADP__simple_molecule_Cytosol:(((Heme_simple_molecule_Cytosol & sa24_O2_simple_molecule_Cytosol) & sa25_NADPH_simple_molecule_Cytosol) & sa168_HMOX1_Cytosol)
+Heme_simple_molecule_Cytosol -> sa27_NADP__simple_molecule_Cytosol
+sa24_O2_simple_molecule_Cytosol -> sa27_NADP__simple_molecule_Cytosol
+sa25_NADPH_simple_molecule_Cytosol -> sa27_NADP__simple_molecule_Cytosol
+sa168_HMOX1_Cytosol -> sa27_NADP__simple_molecule_Cytosol
+#position:sa28_Fe2__ion_Cytosol:2138.125,1330.75
+$sa28_Fe2__ion_Cytosol:(((((Heme_simple_molecule_Cytosol & sa24_O2_simple_molecule_Cytosol) & sa25_NADPH_simple_molecule_Cytosol) & sa168_HMOX1_Cytosol) | (sa162_Fe2__ion_default_compartment & SLC11A2)) | sa240_Fe2__ion_Cytosol)
+Heme_simple_molecule_Cytosol -> sa28_Fe2__ion_Cytosol
+sa24_O2_simple_molecule_Cytosol -> sa28_Fe2__ion_Cytosol
+sa25_NADPH_simple_molecule_Cytosol -> sa28_Fe2__ion_Cytosol
+sa168_HMOX1_Cytosol -> sa28_Fe2__ion_Cytosol
+sa162_Fe2__ion_default_compartment -> sa28_Fe2__ion_Cytosol
+SLC11A2 -> sa28_Fe2__ion_Cytosol
+sa240_Fe2__ion_Cytosol -> sa28_Fe2__ion_Cytosol
+#position:sa162_Fe2__ion_default_compartment:1489.5,1933.5
+$sa162_Fe2__ion_default_compartment:((Fe3__ion_default_compartment & e__ion_default_compartment) & CYBRD1_Heme_complex)
+Fe3__ion_default_compartment -> sa162_Fe2__ion_default_compartment
+e__ion_default_compartment -> sa162_Fe2__ion_default_compartment
+CYBRD1_Heme_complex -> sa162_Fe2__ion_default_compartment
+#position:SLC11A2:1285.875,1772.75
+#position:sa240_Fe2__ion_Cytosol:924.75,1541.625
+$sa240_Fe2__ion_Cytosol:(Fe2__ion_Endosome_Lumen & MCOLN1)
+Fe2__ion_Endosome_Lumen -> sa240_Fe2__ion_Cytosol
+MCOLN1 -> sa240_Fe2__ion_Cytosol
+#position:HMOX1_rna:1256.875,1150.25
+$HMOX1_rna:(Nrf2_Maf_complex & !BACH1_Maf_complex)
+Nrf2_Maf_complex -> HMOX1_rna
+BACH1_Maf_complex -| HMOX1_rna
+#position:sa29_HMOX1_Cytosol:1750,1140
+$sa29_HMOX1_Cytosol:HMOX1_rna
+HMOX1_rna -> sa29_HMOX1_Cytosol
+#position:CO_simple_molecule:2423.25,1034.25
+$CO_simple_molecule:(((Heme_simple_molecule_Cytosol & sa24_O2_simple_molecule_Cytosol) & sa25_NADPH_simple_molecule_Cytosol) & sa168_HMOX1_Cytosol)
+Heme_simple_molecule_Cytosol -> CO_simple_molecule
+sa24_O2_simple_molecule_Cytosol -> CO_simple_molecule
+sa25_NADPH_simple_molecule_Cytosol -> CO_simple_molecule
+sa168_HMOX1_Cytosol -> CO_simple_molecule
+#position:sa33_NADPH_simple_molecule_Cytosol:2447,1107.5
+#position:BLVRB:2619.875,1135.75
+$BLVRB:BLVRB_rna
+BLVRB_rna -> BLVRB
+#position:sa34_NADP__simple_molecule_Cytosol:2749.5,1099
+$sa34_NADP__simple_molecule_Cytosol:(((BLVRB | BLVRA_Zn2__complex) & Biliverdin_simple_molecule) & sa33_NADPH_simple_molecule_Cytosol)
+Biliverdin_simple_molecule -> sa34_NADP__simple_molecule_Cytosol
+sa33_NADPH_simple_molecule_Cytosol -> sa34_NADP__simple_molecule_Cytosol
+BLVRB -> sa34_NADP__simple_molecule_Cytosol
+BLVRA_Zn2__complex -> sa34_NADP__simple_molecule_Cytosol
+#position:BLVRB_rna:1255.875,1276.25
+$BLVRB_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> BLVRB_rna
+#position:Orf9c:3050,1710
+#position:NRF2_phosphorylated_Cytosol:1833.375,664.75
+$NRF2_phosphorylated_Cytosol:(NRF2_empty & PKC)
+NRF2_empty -> NRF2_phosphorylated_Cytosol
+PKC -> NRF2_phosphorylated_Cytosol
+#position:miRNA_155_rna:1399.875,954.25
+#position:FECH_rna:1273.875,799.25
+$FECH_rna:NRF2_phosphorylated_Nucleus
+NRF2_phosphorylated_Nucleus -> FECH_rna
+#position:PRIN9_simple_molecule_Mitochondrion:2640.875,663.25
+$PRIN9_simple_molecule_Mitochondrion:((PPGEN9_simple_molecule & sa124_O2_simple_molecule_Mitochondrion) & PPO_FAD_complex)
+PPGEN9_simple_molecule -> PRIN9_simple_molecule_Mitochondrion
+sa124_O2_simple_molecule_Mitochondrion -> PRIN9_simple_molecule_Mitochondrion
+PPO_FAD_complex -> PRIN9_simple_molecule_Mitochondrion
+#position:sa57_H__ion_Mitochondrial_Matrix:2345.125,704.75
+$sa57_H__ion_Mitochondrial_Matrix:(((PRIN9_simple_molecule_Mitochondrial_Matrix & Fe2__ion_Mitochondrial_Matrix) & FECH) & !Pb2__ion)
+PRIN9_simple_molecule_Mitochondrial_Matrix -> sa57_H__ion_Mitochondrial_Matrix
+Fe2__ion_Mitochondrial_Matrix -> sa57_H__ion_Mitochondrial_Matrix
+FECH -> sa57_H__ion_Mitochondrial_Matrix
+Pb2__ion -| sa57_H__ion_Mitochondrial_Matrix
+#position:SUCC_CoA_simple_molecule:2179.625,511.75
+#position:dALA_simple_molecule_Mitochondrial_Matrix:2499.875,512.25
+$dALA_simple_molecule_Mitochondrial_Matrix:(((((SUCC_CoA_simple_molecule & Gly_simple_molecule) & sa67_H__ion_Mitochondrial_Matrix) & ALAS1_ALAS2_complex) & !Heme_simple_molecule_Mitochondrial_Matrix) & !Panhematin_drug)
+SUCC_CoA_simple_molecule -> dALA_simple_molecule_Mitochondrial_Matrix
+Gly_simple_molecule -> dALA_simple_molecule_Mitochondrial_Matrix
+sa67_H__ion_Mitochondrial_Matrix -> dALA_simple_molecule_Mitochondrial_Matrix
+ALAS1_ALAS2_complex -> dALA_simple_molecule_Mitochondrial_Matrix
+Heme_simple_molecule_Mitochondrial_Matrix -| dALA_simple_molecule_Mitochondrial_Matrix
+Panhematin_drug -| dALA_simple_molecule_Mitochondrial_Matrix
+#position:Gly_simple_molecule:2259.875,532.25
+#position:sa67_H__ion_Mitochondrial_Matrix:2281.125,556.75
+#position:ALAS1_ALAS2_complex:2325.625,329.25
+#position:Panhematin_drug:2223.5,456
+#position:CO2_simple_molecule_Mitochondrial_Matrix:2439.625,458.75
+$CO2_simple_molecule_Mitochondrial_Matrix:(((((SUCC_CoA_simple_molecule & Gly_simple_molecule) & sa67_H__ion_Mitochondrial_Matrix) & ALAS1_ALAS2_complex) & !Heme_simple_molecule_Mitochondrial_Matrix) & !Panhematin_drug)
+SUCC_CoA_simple_molecule -> CO2_simple_molecule_Mitochondrial_Matrix
+Gly_simple_molecule -> CO2_simple_molecule_Mitochondrial_Matrix
+sa67_H__ion_Mitochondrial_Matrix -> CO2_simple_molecule_Mitochondrial_Matrix
+ALAS1_ALAS2_complex -> CO2_simple_molecule_Mitochondrial_Matrix
+Heme_simple_molecule_Mitochondrial_Matrix -| CO2_simple_molecule_Mitochondrial_Matrix
+Panhematin_drug -| CO2_simple_molecule_Mitochondrial_Matrix
+#position:CoA_SH_simple_molecule:2464.625,479.75
+$CoA_SH_simple_molecule:(((((SUCC_CoA_simple_molecule & Gly_simple_molecule) & sa67_H__ion_Mitochondrial_Matrix) & ALAS1_ALAS2_complex) & !Heme_simple_molecule_Mitochondrial_Matrix) & !Panhematin_drug)
+SUCC_CoA_simple_molecule -> CoA_SH_simple_molecule
+Gly_simple_molecule -> CoA_SH_simple_molecule
+sa67_H__ion_Mitochondrial_Matrix -> CoA_SH_simple_molecule
+ALAS1_ALAS2_complex -> CoA_SH_simple_molecule
+Heme_simple_molecule_Mitochondrial_Matrix -| CoA_SH_simple_molecule
+Panhematin_drug -| CoA_SH_simple_molecule
+#position:dALA_simple_molecule_Cytosol:2822.875,512.25
+$dALA_simple_molecule_Cytosol:dALA_simple_molecule_Mitochondrial_Matrix
+dALA_simple_molecule_Mitochondrial_Matrix -> dALA_simple_molecule_Cytosol
+#position:PBG_simple_molecule:3017.875,591.25
+$PBG_simple_molecule:(dALA_simple_molecule_Cytosol & ALAD_Zn2__complex)
+dALA_simple_molecule_Cytosol -> PBG_simple_molecule
+ALAD_Zn2__complex -> PBG_simple_molecule
+#position:ALAD_Zn2__complex:2902.875,367.75
+#position:sa103_H2O_simple_molecule_Cytosol:3011.875,470.25
+$sa103_H2O_simple_molecule_Cytosol:(dALA_simple_molecule_Cytosol & ALAD_Zn2__complex)
+dALA_simple_molecule_Cytosol -> sa103_H2O_simple_molecule_Cytosol
+ALAD_Zn2__complex -> sa103_H2O_simple_molecule_Cytosol
+#position:sa104_H__ion_Cytosol:3016.375,499.25
+$sa104_H__ion_Cytosol:(dALA_simple_molecule_Cytosol & ALAD_Zn2__complex)
+dALA_simple_molecule_Cytosol -> sa104_H__ion_Cytosol
+ALAD_Zn2__complex -> sa104_H__ion_Cytosol
+#position:HMBL_simple_molecule:3016.875,720.25
+$HMBL_simple_molecule:((PBG_simple_molecule & sa106_H2O_simple_molecule_Cytosol) & HMBS_DIPY_complex)
+PBG_simple_molecule -> HMBL_simple_molecule
+sa106_H2O_simple_molecule_Cytosol -> HMBL_simple_molecule
+HMBS_DIPY_complex -> HMBL_simple_molecule
+#position:sa106_H2O_simple_molecule_Cytosol:2977.875,616.25
+#position:HMBS_DIPY_complex:2850,610
+#position:NH4__ion:2984.275,704.35
+$NH4__ion:((PBG_simple_molecule & sa106_H2O_simple_molecule_Cytosol) & HMBS_DIPY_complex)
+PBG_simple_molecule -> NH4__ion
+sa106_H2O_simple_molecule_Cytosol -> NH4__ion
+HMBS_DIPY_complex -> NH4__ion
+#position:URO3_simple_molecule:3019.875,859.25
+$URO3_simple_molecule:(HMBL_simple_molecule & UROS)
+HMBL_simple_molecule -> URO3_simple_molecule
+UROS -> URO3_simple_molecule
+#position:UROS:2880,780
+#position:COPRO3_simple_molecule_Cytosol:2818.875,974.25
+$COPRO3_simple_molecule_Cytosol:(URO3_simple_molecule & UROD)
+URO3_simple_molecule -> COPRO3_simple_molecule_Cytosol
+UROD -> COPRO3_simple_molecule_Cytosol
+#position:UROD:2920,890
+#position:COPRO3_simple_molecule_Mitochondrion:2639.375,969
+$COPRO3_simple_molecule_Mitochondrion:COPRO3_simple_molecule_Cytosol
+COPRO3_simple_molecule_Cytosol -> COPRO3_simple_molecule_Mitochondrion
+#position:PPGEN9_simple_molecule:2640.875,812.25
+$PPGEN9_simple_molecule:((COPRO3_simple_molecule_Mitochondrion & sa121_O2_simple_molecule_Mitochondrion) & CPOX)
+COPRO3_simple_molecule_Mitochondrion -> PPGEN9_simple_molecule
+sa121_O2_simple_molecule_Mitochondrion -> PPGEN9_simple_molecule
+CPOX -> PPGEN9_simple_molecule
+#position:sa121_O2_simple_molecule_Mitochondrion:2605.875,939.25
+#position:CPOX:2526.875,883.75
+#position:sa124_O2_simple_molecule_Mitochondrion:2687.875,770.25
+#position:PPO_FAD_complex:2546.875,699.75
+#position:CO2_simple_molecule_Mitochondrion:2715.875,867.25
+$CO2_simple_molecule_Mitochondrion:((COPRO3_simple_molecule_Mitochondrion & sa121_O2_simple_molecule_Mitochondrion) & CPOX)
+COPRO3_simple_molecule_Mitochondrion -> CO2_simple_molecule_Mitochondrion
+sa121_O2_simple_molecule_Mitochondrion -> CO2_simple_molecule_Mitochondrion
+CPOX -> CO2_simple_molecule_Mitochondrion
+#position:sa123_H2O2_simple_molecule_Mitochondrion:2714.875,825.25
+$sa123_H2O2_simple_molecule_Mitochondrion:((COPRO3_simple_molecule_Mitochondrion & sa121_O2_simple_molecule_Mitochondrion) & CPOX)
+COPRO3_simple_molecule_Mitochondrion -> sa123_H2O2_simple_molecule_Mitochondrion
+sa121_O2_simple_molecule_Mitochondrion -> sa123_H2O2_simple_molecule_Mitochondrion
+CPOX -> sa123_H2O2_simple_molecule_Mitochondrion
+#position:sa125_H2O2_simple_molecule_Mitochondrion:2693.875,691.25
+$sa125_H2O2_simple_molecule_Mitochondrion:((PPGEN9_simple_molecule & sa124_O2_simple_molecule_Mitochondrion) & PPO_FAD_complex)
+PPGEN9_simple_molecule -> sa125_H2O2_simple_molecule_Mitochondrion
+sa124_O2_simple_molecule_Mitochondrion -> sa125_H2O2_simple_molecule_Mitochondrion
+PPO_FAD_complex -> sa125_H2O2_simple_molecule_Mitochondrion
+#position:Lipid_Peroxide_simple_molecule:2556,1716
+$Lipid_Peroxide_simple_molecule:(Poly_unsaturated_fatty_acid_simple_molecule & sa165_Reactive_Oxygen_Species_simple_molecule_Cytosol)
+Poly_unsaturated_fatty_acid_simple_molecule -> Lipid_Peroxide_simple_molecule
+sa165_Reactive_Oxygen_Species_simple_molecule_Cytosol -> Lipid_Peroxide_simple_molecule
+#position:Ferroptosis_phenotype:2751.5,1704.5
+$Ferroptosis_phenotype:Lipid_Peroxide_simple_molecule
+Lipid_Peroxide_simple_molecule -> Ferroptosis_phenotype
+#position:Poly_unsaturated_fatty_acid_simple_molecule:2253.5,1715.5
+#position:sa165_Reactive_Oxygen_Species_simple_molecule_Cytosol:2418.5,1645
+$sa165_Reactive_Oxygen_Species_simple_molecule_Cytosol:sa28_Fe2__ion_Cytosol
+sa28_Fe2__ion_Cytosol -> sa165_Reactive_Oxygen_Species_simple_molecule_Cytosol
+#position:sa135_Fe2__ion_default_compartment:2005.5,1933.5
+$sa135_Fe2__ion_default_compartment:((sa28_Fe2__ion_Cytosol & SLC40A1_CP_Cu2__complex) | (sa28_Fe2__ion_Cytosol & SLC40A1_HEPH_Cu2__complex))
+sa28_Fe2__ion_Cytosol -> sa135_Fe2__ion_default_compartment
+SLC40A1_CP_Cu2__complex -> sa135_Fe2__ion_default_compartment
+SLC40A1_HEPH_Cu2__complex -> sa135_Fe2__ion_default_compartment
+#position:SLC40A1_HEPH_Cu2__complex:2090.875,1740.75
+#position:sa156_O2_simple_molecule_default_compartment:1938.5,1905.5
+#position:sa157_H__ion_default_compartment:1924.5,1890.5
+#position:sa212_H__ion_default_compartment:1931.875,1999.125
+#position:sa213_O2_simple_molecule_default_compartment:1943.875,1974.125
+#position:Fe_3__O_OH__simple_molecule:2482.875,1336.25
+$Fe_3__O_OH__simple_molecule:(((sa28_Fe2__ion_Cytosol & sa136_O2_simple_molecule_Cytosol) & sa137_H__ion_Cytosol) & Ferritin_complex)
+sa28_Fe2__ion_Cytosol -> Fe_3__O_OH__simple_molecule
+sa136_O2_simple_molecule_Cytosol -> Fe_3__O_OH__simple_molecule
+sa137_H__ion_Cytosol -> Fe_3__O_OH__simple_molecule
+Ferritin_complex -> Fe_3__O_OH__simple_molecule
+#position:sa136_O2_simple_molecule_Cytosol:2262.875,1377.25
+#position:sa137_H__ion_Cytosol:2245.875,1359.25
+#position:sa158_H2O_simple_molecule_default_compartment:1796.5,1903.5
+$sa158_H2O_simple_molecule_default_compartment:(((sa135_Fe2__ion_default_compartment & sa156_O2_simple_molecule_default_compartment) & sa157_H__ion_default_compartment) & SLC40A1_CP_Cu2__complex)
+sa135_Fe2__ion_default_compartment -> sa158_H2O_simple_molecule_default_compartment
+sa156_O2_simple_molecule_default_compartment -> sa158_H2O_simple_molecule_default_compartment
+sa157_H__ion_default_compartment -> sa158_H2O_simple_molecule_default_compartment
+SLC40A1_CP_Cu2__complex -> sa158_H2O_simple_molecule_default_compartment
+#position:e__ion_default_compartment:1675.5,1962.5
+#position:CYBRD1_Heme_complex:1586.875,1744.75
+#position:Lipid_alcohol_simple_molecule:2653,1535.5
+$Lipid_alcohol_simple_molecule:(Lipid_Peroxide_simple_molecule & GPX4)
+Lipid_Peroxide_simple_molecule -> Lipid_alcohol_simple_molecule
+GPX4 -> Lipid_alcohol_simple_molecule
+#position:GPX4:2750,1600
+#position:SARS_CoV_2_Orf3a:1840,1070
+#position:PKC:1724.875,594.75
+#position:Heme_simple_molecule_default_compartment:1979.5,91.5
+$Heme_simple_molecule_default_compartment:((Heme_simple_molecule_Cytosol & FLVCR1_1) | (((Heme_simple_molecule_Cytosol & sa206_H2O_simple_molecule_Cytosol) & ATP_simple_molecule) & ABCG2))
+Heme_simple_molecule_Cytosol -> Heme_simple_molecule_default_compartment
+FLVCR1_1 -> Heme_simple_molecule_default_compartment
+sa206_H2O_simple_molecule_Cytosol -> Heme_simple_molecule_default_compartment
+ATP_simple_molecule -> Heme_simple_molecule_default_compartment
+ABCG2 -> Heme_simple_molecule_default_compartment
+#position:FLVCR1_1:2088.875,157.75
+#position:sa206_H2O_simple_molecule_Cytosol:1956,646.5
+#position:ATP_simple_molecule:1956.5,687.5
+#position:ABCG2:1791.875,151.75
+#position:ADP_simple_molecule:1945,377.5
+$ADP_simple_molecule:(((Heme_simple_molecule_Cytosol & sa206_H2O_simple_molecule_Cytosol) & ATP_simple_molecule) & ABCG2)
+Heme_simple_molecule_Cytosol -> ADP_simple_molecule
+sa206_H2O_simple_molecule_Cytosol -> ADP_simple_molecule
+ATP_simple_molecule -> ADP_simple_molecule
+ABCG2 -> ADP_simple_molecule
+#position:Pi_simple_molecule:1945,422
+$Pi_simple_molecule:(((Heme_simple_molecule_Cytosol & sa206_H2O_simple_molecule_Cytosol) & ATP_simple_molecule) & ABCG2)
+Heme_simple_molecule_Cytosol -> Pi_simple_molecule
+sa206_H2O_simple_molecule_Cytosol -> Pi_simple_molecule
+ATP_simple_molecule -> Pi_simple_molecule
+ABCG2 -> Pi_simple_molecule
+#position:sa211_H2O_simple_molecule_default_compartment:1796.875,1978.125
+$sa211_H2O_simple_molecule_default_compartment:(((sa135_Fe2__ion_default_compartment & sa212_H__ion_default_compartment) & sa213_O2_simple_molecule_default_compartment) & SLC40A1_HEPH_Cu2__complex)
+sa135_Fe2__ion_default_compartment -> sa211_H2O_simple_molecule_default_compartment
+sa212_H__ion_default_compartment -> sa211_H2O_simple_molecule_default_compartment
+sa213_O2_simple_molecule_default_compartment -> sa211_H2O_simple_molecule_default_compartment
+SLC40A1_HEPH_Cu2__complex -> sa211_H2O_simple_molecule_default_compartment
+#position:Fe3__ion_Endosome_Lumen:445.25,1410.125
+$Fe3__ion_Endosome_Lumen:TFRC_holoTF_complex_Endosome_Lumen
+TFRC_holoTF_complex_Endosome_Lumen -> Fe3__ion_Endosome_Lumen
+#position:Fe2__ion_Endosome_Lumen:569.75,1409.625
+$Fe2__ion_Endosome_Lumen:((Fe3__ion_Endosome_Lumen & e__ion_Endosome_Lumen) & STEAP3)
+Fe3__ion_Endosome_Lumen -> Fe2__ion_Endosome_Lumen
+e__ion_Endosome_Lumen -> Fe2__ion_Endosome_Lumen
+STEAP3 -> Fe2__ion_Endosome_Lumen
+#position:e__ion_Endosome_Lumen:486.75,1451.625
+#position:STEAP3:488.875,1336.75
+#position:MCOLN1:712.875,1346.75
+#position:NRF2_ubiquitinated:369.9749999999999,633.9499999999998
+$NRF2_ubiquitinated:csa10_Ubiquitin_Ligase_Complex_complex_Cytosol
+csa10_Ubiquitin_Ligase_Complex_complex_Cytosol -> NRF2_ubiquitinated
+#position:NLRP3_rna:1605,827.5
+$NLRP3_rna:Nf_KB_Complex_complex
+Nf_KB_Complex_complex -> NLRP3_rna
+#position:Oxidized_thioredoxin_TXNIP_complex:3280,568.125
+#position:2xHC_TXN:3497.25,686.25
+$2xHC_TXN:(Oxidized_thioredoxin_TXNIP_complex | (TXN & sa493_Reactive_Oxygen_Species_simple_molecule_Cytosol))
+Oxidized_thioredoxin_TXNIP_complex -> 2xHC_TXN
+TXN -> 2xHC_TXN
+sa493_Reactive_Oxygen_Species_simple_molecule_Cytosol -> 2xHC_TXN
+#position:sa493_Reactive_Oxygen_Species_simple_molecule_Cytosol:3268.5,735
+#position:Nf_KB_Complex_complex:1502.5,915
+#position:CASP1_1_119_:4550,1485
+$CASP1_1_119_:(NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex & CTSG)
+NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex -> CASP1_1_119_
+CTSG -> CASP1_1_119_
+#position:CASP1_298_316_:4595,1445
+$CASP1_298_316_:(NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex & CTSG)
+NLRP3_elicitors_NLRP3_oligomer_ASC_Procaspase1_complex -> CASP1_298_316_
+CTSG -> CASP1_298_316_
+#position:proIL_1B:3845,1555
+#position:proIL_1B_1_116_:3960,1670
+$proIL_1B_1_116_:(proIL_1B & Caspase_1_Tetramer_complex)
+proIL_1B -> proIL_1B_1_116_
+Caspase_1_Tetramer_complex -> proIL_1B_1_116_
+#position:proIL_18:3730,1555
+#position:proIL_18_1_36_:3580,1678.75
+$proIL_18_1_36_:(proIL_18 & Caspase_1_Tetramer_complex)
+proIL_18 -> proIL_18_1_36_
+Caspase_1_Tetramer_complex -> proIL_18_1_36_
+#position:IL_1B_Cytosol:3845,1692.5
+$IL_1B_Cytosol:(proIL_1B & Caspase_1_Tetramer_complex)
+proIL_1B -> IL_1B_Cytosol
+Caspase_1_Tetramer_complex -> IL_1B_Cytosol
+#position:IL_18_Cytosol:3740,1692.5
+$IL_18_Cytosol:(proIL_18 & Caspase_1_Tetramer_complex)
+proIL_18 -> IL_18_Cytosol
+Caspase_1_Tetramer_complex -> IL_18_Cytosol
+#position:IL_1B_default_compartment:3850,1860
+$IL_1B_default_compartment:IL_1B_Cytosol
+IL_1B_Cytosol -> IL_1B_default_compartment
+#position:IL_18_default_compartment:3740,1860
+$IL_18_default_compartment:IL_18_Cytosol
+IL_18_Cytosol -> IL_18_default_compartment

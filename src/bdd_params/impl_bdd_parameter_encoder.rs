@@ -6,9 +6,17 @@ use biodivine_lib_bdd::{
 };
 use biodivine_lib_std::IdState;
 
+const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
+
 impl BddParameterEncoder {
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`.
     pub fn new(bn: &BooleanNetwork) -> BddParameterEncoder {
+        if bn.graph.num_vars() > MAX_VARIABLES {
+            panic!(
+                "Only up to {} variables supported by this parameter encoder.",
+                MAX_VARIABLES
+            );
+        }
         let bdd = BddVariableSetBuilder::new();
         return Self::new_with_custom_variables(bn, bdd);
     }

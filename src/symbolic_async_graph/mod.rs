@@ -17,6 +17,7 @@ mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
 mod _impl_graph_vertices;
 mod _impl_symbolic_async_graph;
+mod _impl_symbolic_function_context;
 
 use crate::bdd_params::BddParameterEncoder;
 use crate::BooleanNetwork;
