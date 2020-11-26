@@ -5,7 +5,7 @@
 //! and the `BddParameterEncoder` struct which allows creating new `Bdd` and `BddParams` that
 //! correspond to situations where individual parameters have a specific value.
 
-use crate::{ParameterId, VariableId};
+use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
 mod impl_bdd_parameter_encoder;
@@ -15,7 +15,6 @@ mod impl_function_table_entry;
 mod impl_static_constraints;
 mod impl_witness_generator;
 
-use biodivine_lib_std::IdState;
 pub use impl_static_constraints::build_static_constraints;
 
 /// A wrapper for the `Bdd` object that implements `Params`;
@@ -53,25 +52,4 @@ pub struct FunctionTableEntry<'a> {
     entry_index: usize, // index into the specific table
     table: usize,       // index into the vector of tables
     regulators: &'a Vec<VariableId>,
-}
-
-/// This trait is vaguely based on the properties of the `BddParameterEncoder`. It generalizes
-/// objects that can assign meaning to uninterpreted functions that we consider in PBNs.
-///
-/// It allows creating true/false `BDDs`, as well as `BDDs` for individual rows of both implicit
-/// and explicit uninterpreted functions of the network.
-///
-/// The point is that things like symbolic eval, or constraint definition require only these operations
-/// and none of the `BddParameterEncoder` specific properties. For other representations (like fully symbolic),
-/// we thus don't have to completely reimplement these common operations...
-pub trait UninterpretedFunctionContext {
-    fn mk_true(&self) -> Bdd;
-    fn mk_false(&self) -> Bdd;
-    fn mk_explicit_function(
-        &self,
-        state: IdState,
-        parameter: ParameterId,
-        arguments: &Vec<VariableId>,
-    ) -> Bdd;
-    fn mk_implicit_function(&self, state: IdState, variable: VariableId) -> Bdd;
 }

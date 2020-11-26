@@ -1,9 +1,7 @@
 use super::BddParameterEncoder;
-use crate::bdd_params::{BddParams, FunctionTableEntry, UninterpretedFunctionContext};
+use crate::bdd_params::{BddParams, FunctionTableEntry};
 use crate::{BooleanNetwork, ParameterId, VariableId};
-use biodivine_lib_bdd::{
-    Bdd, BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder,
-};
+use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder};
 use biodivine_lib_std::IdState;
 
 const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
@@ -203,31 +201,6 @@ impl BddParameterEncoder {
             }
         }
         return table_index;
-    }
-}
-
-impl UninterpretedFunctionContext for BddParameterEncoder {
-    fn mk_true(&self) -> Bdd {
-        return self.bdd_variables.mk_true();
-    }
-
-    fn mk_false(&self) -> Bdd {
-        return self.bdd_variables.mk_false();
-    }
-
-    fn mk_explicit_function(
-        &self,
-        state: IdState,
-        parameter: ParameterId,
-        arguments: &Vec<VariableId>,
-    ) -> Bdd {
-        let var = self.get_explicit(state, parameter, arguments);
-        return self.bdd_variables.mk_var(var);
-    }
-
-    fn mk_implicit_function(&self, state: IdState, variable: VariableId) -> Bdd {
-        let var = self.get_implicit(state, variable);
-        return self.bdd_variables.mk_var(var);
     }
 }
 

@@ -1,7 +1,7 @@
 //! **(internal)** This module implements functions for creating `Bdd`s corresponding
 //! to the static constraints of the individual regulations of a `BooleanNetwork`.
 
-use crate::bdd_params::UninterpretedFunctionContext;
+use crate::bdd_params::BddParameterEncoder;
 use crate::{BooleanNetwork, FnUpdate, Monotonicity, Regulation, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd};
 use biodivine_lib_std::IdState;
@@ -9,11 +9,8 @@ use std::ops::Range;
 
 /// Build a `Bdd` which describes all valuations satisfying the static constraints
 /// of the given `BooleanNetwork`.
-pub fn build_static_constraints<T: UninterpretedFunctionContext>(
-    bn: &BooleanNetwork,
-    encoder: &T,
-) -> Bdd {
-    let mut condition = encoder.mk_true();
+pub fn build_static_constraints(bn: &BooleanNetwork, encoder: &BddParameterEncoder) -> Bdd {
+    let mut condition = encoder.bdd_variables.mk_true();
     let ctx = Ctx::new(bn, encoder);
     for r in &bn.graph.regulations {
         if let Some(fun) = bn.get_update_function(r.target) {
@@ -71,13 +68,13 @@ pub fn build_static_constraints<T: UninterpretedFunctionContext>(
     return condition;
 }
 
-struct Ctx<'a, T: UninterpretedFunctionContext> {
+struct Ctx<'a> {
     bn: &'a BooleanNetwork,
-    encoder: &'a T,
+    encoder: &'a BddParameterEncoder,
 }
 
-impl<'a, T: UninterpretedFunctionContext> Ctx<'a, T> {
-    pub fn new(bn: &'a BooleanNetwork, encoder: &'a T) -> Ctx<'a, T> {
+impl<'a> Ctx<'a> {
+    pub fn new(bn: &'a BooleanNetwork, encoder: &'a BddParameterEncoder) -> Ctx<'a> {
         return Ctx { bn, encoder };
     }
 
@@ -92,17 +89,16 @@ impl<'a, T: UninterpretedFunctionContext> Ctx<'a, T> {
     /// Transform a table pair into a pair of `Bdd`s assuming an implicit update function.
     pub fn pair_implicit(&self, states: (IdState, IdState), variable: VariableId) -> (Bdd, Bdd) {
         let (inactive, active) = states;
-        let inactive = self.encoder.mk_implicit_function(inactive, variable);
-        let active = self.encoder.mk_implicit_function(active, variable);
+        let inactive = self.encoder.get_implicit(inactive, variable);
+        let active = self.encoder.get_implicit(active, variable);
+        let inactive = self.encoder.bdd_variables.mk_var(inactive);
+        let active = self.encoder.bdd_variables.mk_var(active);
         return (inactive, active);
     }
 }
 
-fn build_monotonicity_implicit<'a, T: UninterpretedFunctionContext>(
-    ctx: &Ctx<'a, T>,
-    regulation: &'a Regulation,
-) -> Bdd {
-    let mut condition = ctx.encoder.mk_true();
+fn build_monotonicity_implicit<'a>(ctx: &Ctx<'a>, regulation: &'a Regulation) -> Bdd {
+    let mut condition = ctx.encoder.bdd_variables.mk_true();
     for states in InputStatesPairIterator::new(ctx.bn, regulation) {
         let (inactive, active) = ctx.pair_implicit(states, regulation.target);
         let monotonous =
@@ -112,11 +108,8 @@ fn build_monotonicity_implicit<'a, T: UninterpretedFunctionContext>(
     return condition;
 }
 
-fn build_observability_implicit<'a, T: UninterpretedFunctionContext>(
-    ctx: &Ctx<'a, T>,
-    regulation: &'a Regulation,
-) -> Bdd {
-    let mut condition = ctx.encoder.mk_false();
+fn build_observability_implicit<'a>(ctx: &Ctx<'a>, regulation: &'a Regulation) -> Bdd {
+    let mut condition = ctx.encoder.bdd_variables.mk_false();
     for states in InputStatesPairIterator::new(ctx.bn, regulation) {
         let (inactive, active) = ctx.pair_implicit(states, regulation.target);
         condition = bdd!(condition | (!(inactive <=> active)));
@@ -124,12 +117,12 @@ fn build_observability_implicit<'a, T: UninterpretedFunctionContext>(
     return condition;
 }
 
-fn build_monotonicity_explicit<'a, T: UninterpretedFunctionContext>(
-    ctx: &Ctx<'a, T>,
+fn build_monotonicity_explicit<'a>(
+    ctx: &Ctx<'a>,
     regulation: &'a Regulation,
     update_function: &'a FnUpdate,
 ) -> Bdd {
-    let mut condition = ctx.encoder.mk_true();
+    let mut condition = ctx.encoder.bdd_variables.mk_true();
     for states in InputStatesPairIterator::new(ctx.bn, regulation) {
         let (inactive, active) = ctx.pair_explicit(states, update_function);
         let monotonous =
@@ -139,12 +132,12 @@ fn build_monotonicity_explicit<'a, T: UninterpretedFunctionContext>(
     return condition;
 }
 
-fn build_observability_explicit<'a, T: UninterpretedFunctionContext>(
-    ctx: &Ctx<'a, T>,
+fn build_observability_explicit<'a>(
+    ctx: &Ctx<'a>,
     regulation: &'a Regulation,
     update_function: &'a FnUpdate,
 ) -> Bdd {
-    let mut condition = ctx.encoder.mk_false();
+    let mut condition = ctx.encoder.bdd_variables.mk_false();
     for states in InputStatesPairIterator::new(ctx.bn, regulation) {
         let (inactive, active) = ctx.pair_explicit(states, update_function);
         condition = bdd!(condition | (!(inactive <=> active)));
