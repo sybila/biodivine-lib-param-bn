@@ -22,7 +22,7 @@ impl GraphVertices {
 
     pub fn states<'a, 'b>(&'b self, graph: &'a SymbolicAsyncGraph) -> GraphVertexIterator<'a, 'b> {
         return GraphVertexIterator {
-            state_variables: &graph.state_variables,
+            state_variables: &graph.symbolic_context.state_variables,
             iterator: self.bdd.sat_valuations(),
         };
     }

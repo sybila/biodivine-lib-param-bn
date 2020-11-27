@@ -1,7 +1,7 @@
 use super::BddParameterEncoder;
 use crate::bdd_params::{BddParams, FunctionTableEntry};
 use crate::{BooleanNetwork, ParameterId, VariableId};
-use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSet, BddVariableSetBuilder};
+use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
 use biodivine_lib_std::IdState;
 
 const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
@@ -37,20 +37,6 @@ impl BddParameterEncoder {
         These utility functions should probably have some separate module, like static constraint computation,
         but right now this is good enough... (TODO)
     */
-
-    pub(crate) fn build_custom_encoder(
-        bdd_variables: BddVariableSet,
-        explicit_function_tables: Vec<Vec<BddVariable>>,
-        implicit_function_tables: Vec<Vec<BddVariable>>,
-        regulators: Vec<Vec<VariableId>>,
-    ) -> BddParameterEncoder {
-        return BddParameterEncoder {
-            bdd_variables,
-            regulators,
-            explicit_function_tables,
-            implicit_function_tables,
-        };
-    }
 
     pub(crate) fn build_explicit_function_table(
         network: &BooleanNetwork,

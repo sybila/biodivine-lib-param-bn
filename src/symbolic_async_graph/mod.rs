@@ -19,9 +19,11 @@ mod _impl_graph_vertices;
 mod _impl_symbolic_async_graph;
 mod _impl_symbolic_function_context;
 
-use crate::bdd_params::BddParameterEncoder;
 use crate::BooleanNetwork;
-use biodivine_lib_bdd::{Bdd, BddSatisfyingValuations, BddVariable, BddVariableSet};
+use biodivine_lib_bdd::{
+    Bdd, BddSatisfyingValuations, BddValuationIterator, BddVariable, BddVariableSet,
+};
+use std::iter::Enumerate;
 
 /*
    BDDs representing the graph colors. These still contain both state and parameter variables,
@@ -61,15 +63,31 @@ pub struct GraphVertexIterator<'a, 'b> {
 
 pub struct SymbolicAsyncGraph {
     network: BooleanNetwork,
-    pub bdd_variable_set: BddVariableSet,
-    state_variables: Vec<BddVariable>,
-    /// Number of parameter variables.
-    p_var_count: u16,
+    symbolic_context: SymbolicFunctionContext,
     empty_color_set: GraphColors,
     unit_color_set: GraphColors,
     empty_set: GraphColoredVertices,
     unit_set: GraphColoredVertices,
     /// For every update function, store !v <=> function (used for pre/post)
     update_functions: Vec<Bdd>,
-    function_context: BddParameterEncoder,
+}
+
+pub struct SymbolicFunctionContext {
+    bdd: BddVariableSet,
+    state_variables: Vec<BddVariable>,
+    parameter_variables: Vec<BddVariable>,
+    p_var_count: u16,
+    explicit_function_tables: Vec<FunctionTable>,
+    implicit_function_tables: Vec<Option<FunctionTable>>,
+}
+
+#[derive(Debug, Clone)]
+struct FunctionTable {
+    pub arity: u16,
+    rows: Vec<BddVariable>,
+}
+
+struct FunctionTableIterator<'a> {
+    inner_iterator: Enumerate<BddValuationIterator>,
+    table: &'a FunctionTable,
 }
