@@ -1,6 +1,6 @@
 use crate::symbolic_async_graph::{GraphVertexIterator, GraphVertices, SymbolicAsyncGraph};
 use biodivine_lib_bdd::Bdd;
-use biodivine_lib_std::IdState;
+use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
 
 impl GraphVertices {
     pub fn new(bdd: Bdd, p_var_count: u16) -> GraphVertices {
@@ -29,14 +29,14 @@ impl GraphVertices {
 }
 
 impl Iterator for GraphVertexIterator<'_, '_> {
-    type Item = IdState;
+    type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
         return if let Some(valuation) = self.iterator.next() {
-            let mut state = IdState::from(0usize);
+            let mut state = ArrayBitVector::empty(self.state_variables.len());
             for (i, v) in self.state_variables.iter().enumerate() {
                 if valuation.value(*v) {
-                    state = state.flip_bit(i);
+                    state.flip(i);
                 }
             }
             Some(state)

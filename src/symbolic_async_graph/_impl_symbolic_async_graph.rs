@@ -4,8 +4,8 @@ use crate::symbolic_async_graph::{
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity, RegulatoryGraph, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
 use biodivine_lib_bdd::{bdd, Bdd};
+use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
 use biodivine_lib_std::param_graph::Params;
-use biodivine_lib_std::IdState;
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
@@ -222,11 +222,11 @@ impl SymbolicAsyncGraph {
     }
 
     /// Construct a vertex set that only contains one vertex.
-    pub fn vertex(&self, state: IdState) -> GraphColoredVertices {
+    pub fn vertex(&self, state: ArrayBitVector) -> GraphColoredVertices {
         let mut state_bdd = self.unit_set.bdd.clone();
         for i_variable in 0..self.network.graph.num_vars() {
             let bdd_var = self.symbolic_context.state_variables[i_variable];
-            let bdd = if state.get_bit(i_variable) {
+            let bdd = if state.get(i_variable) {
                 self.symbolic_context.bdd.mk_var(bdd_var)
             } else {
                 self.symbolic_context.bdd.mk_not_var(bdd_var)
