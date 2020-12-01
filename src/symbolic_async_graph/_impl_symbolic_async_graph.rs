@@ -222,7 +222,7 @@ impl SymbolicAsyncGraph {
     }
 
     /// Construct a vertex set that only contains one vertex.
-    pub fn vertex(&self, state: ArrayBitVector) -> GraphColoredVertices {
+    pub fn vertex(&self, state: &ArrayBitVector) -> GraphColoredVertices {
         let mut state_bdd = self.unit_set.bdd.clone();
         for i_variable in 0..self.network.graph.num_vars() {
             let bdd_var = self.symbolic_context.state_variables[i_variable];
