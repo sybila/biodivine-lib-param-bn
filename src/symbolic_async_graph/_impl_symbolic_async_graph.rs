@@ -3,7 +3,7 @@ use crate::symbolic_async_graph::{
 };
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity, RegulatoryGraph, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
-use biodivine_lib_bdd::{bdd, Bdd};
+use biodivine_lib_bdd::{bdd, Bdd, BddVariableSet};
 use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
 use biodivine_lib_std::param_graph::Params;
 
@@ -234,6 +234,10 @@ impl SymbolicAsyncGraph {
             state_bdd = state_bdd.and(&bdd);
         }
         return GraphColoredVertices::new(state_bdd, self.symbolic_context.p_var_count);
+    }
+
+    pub fn bdd_variables(&self) -> &BddVariableSet {
+        return &self.symbolic_context.bdd;
     }
 }
 
