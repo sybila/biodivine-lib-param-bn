@@ -25,6 +25,7 @@ impl SymbolicAsyncGraph {
             })
             .collect();
 
+        let mut error_message = String::new();
         let mut unit_bdd = context.mk_constant(true);
         for reg in &network.graph.regulations {
             let reg_is_one = context.true_when_variable(reg.regulator);
@@ -59,11 +60,13 @@ impl SymbolicAsyncGraph {
                 context.mk_constant(true)
             };
             if observability.is_false() {
-                println!(
-                    "Variable {} not observable in {}.",
+                let problem = format!(
+                    " - {} has no effect in {}.\n",
                     network.graph.get_variable(reg.regulator).name,
                     network.graph.get_variable(reg.target).name,
                 );
+                error_message = format!("{}{}", error_message, problem);
+                print!("{}", problem);
             }
             let non_monotonous_pairs = match reg.monotonicity {
                 Some(Monotonicity::Activation) => {
@@ -85,11 +88,19 @@ impl SymbolicAsyncGraph {
                 .fold(non_monotonous_pairs, |a, b| a.var_projection(*b))
                 .not();
             if monotonicity.is_false() {
-                println!(
-                    "Variable {} not monotonous in {}.",
+                let monotonicity_str = match reg.monotonicity {
+                    Some(Monotonicity::Activation) => "activating",
+                    Some(Monotonicity::Inhibition) => "inhibiting",
+                    None => "monotonous",
+                };
+                let problem = format!(
+                    " - {} not {} in {}.\n",
                     network.graph.get_variable(reg.regulator).name,
+                    monotonicity_str,
                     network.graph.get_variable(reg.target).name,
                 );
+                error_message = format!("{}{}", error_message, problem);
+                print!("{}", problem);
             }
 
             // At this point, monotonicity and observability should be only
@@ -109,7 +120,10 @@ impl SymbolicAsyncGraph {
         }
 
         if unit_bdd.is_false() {
-            return Err("No update functions satisfy given constraints.".to_string());
+            return Err(format!(
+                "No update functions satisfy given constraints: \n{}",
+                error_message
+            ));
         }
 
         // Compute pre-evaluated functions
@@ -480,5 +494,16 @@ mod tests {
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
         assert_eq!(168.0, graph.unit_colors().cardinality());
+    }
+
+    #[test]
+    fn test_invalid_function() {
+        let network = "
+            a -> t \n b -| t \n
+            $a: true \n $b: true \n $t: b
+        ";
+        let network = BooleanNetwork::try_from(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(network);
+        assert!(graph.is_err());
     }
 }
