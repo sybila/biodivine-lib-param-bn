@@ -22,6 +22,14 @@ impl GraphColors {
         let states = (2.0f64).powi(s_var_count);
         return self.bdd.cardinality() / states;
     }
+
+    pub fn intersect_bdd(&self, other: &Bdd) -> Self {
+        return Self::new(self.bdd.and(other), self.p_var_count);
+    }
+
+    pub fn minus_bdd(&self, other: &Bdd) -> Self {
+        return Self::new(self.bdd.and_not(other), self.p_var_count);
+    }
 }
 
 impl Params for GraphColors {
