@@ -14,7 +14,6 @@ impl SymbolicFunctionContext {
             .variable_ids()
             .map(|v| {
                 let variable = network.graph.get_variable(v);
-                let var = builder.make_variable(&variable.name);
                 let has_implicit_function = network.get_update_function(v).is_none();
                 implicit_function_tables.push(if has_implicit_function {
                     let arity = network.graph.regulators(v).len();
@@ -31,7 +30,7 @@ impl SymbolicFunctionContext {
                 } else {
                     None
                 });
-                var
+                builder.make_variable(&variable.name)
             })
             .collect();
 
