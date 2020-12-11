@@ -8,21 +8,15 @@ impl SymbolicFunctionContext {
     pub fn new(network: &BooleanNetwork) -> SymbolicFunctionContext {
         let mut builder = BddVariableSetBuilder::new();
 
+        let mut implicit_function_tables: Vec<Option<FunctionTable>> = Vec::new();
         let state_variables: Vec<BddVariable> = network
             .graph
             .variable_ids()
             .map(|v| {
                 let variable = network.graph.get_variable(v);
-                builder.make_variable(&variable.name)
-            })
-            .collect();
-
-        let implicit_function_tables: Vec<Option<FunctionTable>> = network
-            .graph
-            .variable_ids()
-            .map(|v| {
+                let var = builder.make_variable(&variable.name);
                 let has_implicit_function = network.get_update_function(v).is_none();
-                if has_implicit_function {
+                implicit_function_tables.push(if has_implicit_function {
                     let arity = network.graph.regulators(v).len();
                     let variable = network.graph.get_variable(v);
                     if arity > (u16::MAX as usize) {
@@ -36,7 +30,8 @@ impl SymbolicFunctionContext {
                     Some(function_table)
                 } else {
                     None
-                }
+                });
+                var
             })
             .collect();
 
