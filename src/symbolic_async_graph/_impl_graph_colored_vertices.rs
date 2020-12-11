@@ -73,7 +73,11 @@ impl GraphColoredVertices {
             // Pick colours with that state from remaining:
             let pick = remaining.and(&state);
             println!("Picked: {}", pick.cardinality());
-            remaining = remaining.and_not(&pick);
+            let mut picked_colors = pick.clone();
+            for v in &graph.symbolic_context.state_variables {
+                picked_colors = picked_colors.var_projection(*v);
+            }
+            remaining = remaining.and_not(&picked_colors);
             pivots = pivots.or(&pick);
             println!("Remaining: {}", remaining.cardinality());
         }
