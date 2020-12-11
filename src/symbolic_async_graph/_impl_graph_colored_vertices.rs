@@ -63,15 +63,19 @@ impl GraphColoredVertices {
         while !remaining.is_false() {
             // Pick (state, colour)
             let pick: Bdd = remaining.sat_witness().unwrap().into();
+            println!("Pick: {}", pick.cardinality());
             // Compute (state, ANY_COLOUR)
             let mut state = pick.clone();
             for v in &graph.symbolic_context.parameter_variables {
                 state = state.var_projection(*v);
             }
+            println!("State: {}", state.cardinality());
             // Pick colours with that state from remaining:
             let pick = remaining.and(&state);
+            println!("Picked: {}", pick.cardinality());
             remaining = remaining.and_not(&pick);
             pivots = pivots.or(&pick);
+            println!("Remaining: {}", remaining.cardinality());
         }
         return GraphColoredVertices::new(pivots, self.p_var_count);
     }
