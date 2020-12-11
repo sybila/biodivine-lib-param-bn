@@ -16,8 +16,10 @@ impl GraphVertices {
     }
 
     pub fn cardinality(&self) -> f64 {
-        let parameters = (2.0f64).powi(self.p_var_count as i32);
-        return self.bdd.cardinality() / parameters;
+        // TODO: This should be used when we move to representation without fixed param. variables.
+        //let parameters = (2.0f64).powi(self.p_var_count as i32);
+        //return self.bdd.cardinality() / parameters;
+        return self.bdd.cardinality();
     }
 
     pub fn states<'a, 'b>(&'b self, graph: &'a SymbolicAsyncGraph) -> GraphVertexIterator<'a, 'b> {
