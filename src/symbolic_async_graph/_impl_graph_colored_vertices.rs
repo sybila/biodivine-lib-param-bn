@@ -57,15 +57,31 @@ impl GraphColoredVertices {
         return Self::new(self.bdd.and(&colors.bdd), self.p_var_count);
     }
 
-    pub fn pivots(&self) -> Self {
-        return Self::new(
-            self.bdd.extended_witness(self.p_var_count),
-            self.p_var_count,
-        );
+    pub fn pivots(&self, graph: &SymbolicAsyncGraph) -> Self {
+        let mut pivots = graph.symbolic_context.bdd.mk_false();
+        let mut remaining = self.bdd.clone();
+        while !remaining.is_false() {
+            // Pick (state, colour)
+            let pick: Bdd = remaining.sat_witness().unwrap().into();
+            // Compute (state, ANY_COLOUR)
+            let mut state = pick.clone();
+            for v in &graph.symbolic_context.parameter_variables {
+                state = state.var_projection(*v);
+            }
+            // Pick colours with that state from remaining:
+            let pick = remaining.and(&state);
+            remaining = remaining.and_not(&pick);
+            pivots = pivots.or(&pick);
+        }
+        return GraphColoredVertices::new(pivots, self.p_var_count);
     }
 
-    pub fn color_projection(&self) -> GraphColors {
-        return GraphColors::new(self.bdd.projection(self.p_var_count), self.p_var_count);
+    pub fn color_projection(&self, graph: &SymbolicAsyncGraph) -> GraphColors {
+        let mut result = self.bdd.clone();
+        for v in graph.symbolic_context.state_variables.iter().rev() {
+            result = result.var_projection(*v);
+        }
+        return GraphColors::new(result, self.p_var_count);
     }
 
     pub fn state_projection(&self, graph: &SymbolicAsyncGraph) -> GraphVertices {
