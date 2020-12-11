@@ -7,6 +7,16 @@ use biodivine_lib_bdd::{
 impl SymbolicFunctionContext {
     pub fn new(network: &BooleanNetwork) -> SymbolicFunctionContext {
         let mut builder = BddVariableSetBuilder::new();
+
+        let state_variables: Vec<BddVariable> = network
+            .graph
+            .variable_ids()
+            .map(|v| {
+                let variable = network.graph.get_variable(v);
+                builder.make_variable(&variable.name)
+            })
+            .collect();
+
         let implicit_function_tables: Vec<Option<FunctionTable>> = network
             .graph
             .variable_ids()
@@ -38,15 +48,6 @@ impl SymbolicFunctionContext {
                     panic!("Parameter {} has too many arguments.", p.name);
                 }
                 FunctionTable::new(&p.name, p.cardinality as u16, &mut builder)
-            })
-            .collect();
-
-        let state_variables: Vec<BddVariable> = network
-            .graph
-            .variable_ids()
-            .map(|v| {
-                let variable = network.graph.get_variable(v);
-                builder.make_variable(&variable.name)
             })
             .collect();
 
