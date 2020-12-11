@@ -1,4 +1,4 @@
-use crate::symbolic_async_graph::GraphColors;
+use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph};
 use biodivine_lib_bdd::Bdd;
 use biodivine_lib_std::param_graph::Params;
 
@@ -15,6 +15,17 @@ impl GraphColors {
 
     pub fn as_bdd(&self) -> &Bdd {
         return &self.bdd;
+    }
+
+    /// Essentially "sat witness" function, but it works around the fact that the BDD also contains
+    /// state variables which we do not consider.
+    pub fn pick_color(&self, graph: &SymbolicAsyncGraph) -> Option<GraphColors> {
+        let mut witness: Bdd = self.bdd.sat_witness()?.into();
+        // Remove all unnecessarily fixed BDD vars. TODO: Introduce extended sat with custom variables.
+        for state_variable in graph.symbolic_context.state_variables.iter() {
+            witness = witness.var_projection(*state_variable);
+        }
+        return Some(GraphColors::new(witness, self.p_var_count));
     }
 
     pub fn cardinality(&self) -> f64 {
