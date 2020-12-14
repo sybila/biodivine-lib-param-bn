@@ -13,10 +13,22 @@
    counts state variable valuations). However, we can normalize this...
 */
 
+use crate::BooleanNetwork;
+use biodivine_lib_bdd::{
+    Bdd, BddSatisfyingValuations, BddValuationIterator, BddVariable, BddVariableSet,
+};
+use std::iter::Enumerate;
+
 mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
 mod _impl_graph_vertices;
 mod _impl_symbolic_async_graph;
+
+/// **(internal)** Implementing conversion between `FnUpdate` and `BooleanExpression`.
+mod _impl_fn_update_from_boolean_expression;
+
+/// **(internal)** Utility methods for validation of static constraints on network regulations.
+mod _impl_regulation_constraint;
 
 /// **(internal)** Implementation of the `SymbolicContext`.
 mod _impl_symbolic_context;
@@ -24,56 +36,61 @@ mod _impl_symbolic_context;
 /// **(internal)** Implementation for `FunctionTable` and `FunctionTableIterator`.
 mod _impl_function_table;
 
-use crate::BooleanNetwork;
-use biodivine_lib_bdd::{
-    Bdd, BddSatisfyingValuations, BddValuationIterator, BddVariable, BddVariableSet,
-};
-use std::iter::Enumerate;
-
-/*
-   BDDs representing the graph colors. These still contain both state and parameter variables,
-   but are only constrained on parameter variables. We thus need a normalization factor to
-   account for this.
-*/
+/// Symbolic representation of a color set.
+///
+/// Implementation contains all symbolic variables, but state variables are unconstrained.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct GraphColors {
     bdd: Bdd,
-    p_var_count: u16,
+    parameter_variables: Vec<BddVariable>,
 }
 
-/*
-   BDD representing the $V \times C$ relation (colored vertex set) of a graph. Essentially
-   behaves like a relation/set.
-*/
+/// Symbolic representation of a coloured set of graph vertices, i.e. a subset of $V \times C$.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct GraphColoredVertices {
     bdd: Bdd,
-    p_var_count: u16,
+    state_variables: Vec<BddVariable>,
+    parameter_variables: Vec<BddVariable>,
 }
 
-/*
-   Bdd representing the graph vertices. This has all parameter variables fixed to zero
-   because we need to be able to iterate over it. TODO: This is bad design.
-*/
+/// Symbolic representation of a vertex set.
+///
+/// Implementation contains all symbolic variables, but parameter variables are unconstrained.
 #[derive(Clone, Eq, PartialEq, Hash)]
 pub struct GraphVertices {
     bdd: Bdd,
-    p_var_count: u16,
+    state_variables: Vec<BddVariable>,
 }
 
-pub struct GraphVertexIterator<'a, 'b> {
-    state_variables: &'a Vec<BddVariable>,
-    iterator: BddSatisfyingValuations<'b>,
+/// A helper struct that we need in order to make `GraphVertices` iterable. Elements of such
+/// iterable set are bitvectors, specifically `ArrayBitVector`.
+///
+/// Internally, this struct contains a `Bdd` that has all parameter variables fixed to false,
+/// so that we only iterate over vertices and can safely disregard colors.
+pub struct IterableVertices {
+    materialized_bdd: Bdd,
+    state_variables: Vec<BddVariable>,
 }
 
+/// Iterator over graph vertices.
+pub struct GraphVertexIterator<'a> {
+    iterator: BddSatisfyingValuations<'a>,
+    state_variables: Vec<BddVariable>,
+}
+
+/// A symbolic encoding of asynchronous transition system of a `BooleanNetwork`.
+///
+/// Provides standard pre/post operations for exploring the graph symbolically.
 pub struct SymbolicAsyncGraph {
     network: BooleanNetwork,
     symbolic_context: SymbolicContext,
-    empty_color_set: GraphColors,
-    unit_color_set: GraphColors,
-    empty_set: GraphColoredVertices,
-    unit_set: GraphColoredVertices,
-    /// For every update function, store !v <=> function (used for pre/post)
+    // Empty and unit vertex set.
+    vertex_space: (GraphColoredVertices, GraphColoredVertices),
+    // Empty and unit color set.
+    color_space: (GraphColors, GraphColors),
+    // General symbolic unit bdd.
+    unit_bdd: Bdd,
+    // For every update function, store !v <=> function (used for pre/post)
     update_functions: Vec<Bdd>,
 }
 
@@ -83,13 +100,12 @@ pub struct SymbolicAsyncGraph {
 /// It also provides utility methods for creating `Bdd` objects that match different conditions
 /// imposed on the parameter space of the network.
 ///
-/// Currently, it is internal because we don't want users of this library to play with raw `Bdd`
-/// objects since it can be rather unsafe.
-struct SymbolicContext {
+/// Note that while this is technically public, it should not be used unless absolutely necessary.
+/// Playing with raw `Bdds` is dangerous.
+pub struct SymbolicContext {
     bdd: BddVariableSet,
     state_variables: Vec<BddVariable>,
     parameter_variables: Vec<BddVariable>,
-    p_var_count: u16,
     explicit_function_tables: Vec<FunctionTable>,
     implicit_function_tables: Vec<Option<FunctionTable>>,
 }

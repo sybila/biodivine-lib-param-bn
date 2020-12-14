@@ -1,149 +1,45 @@
+use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
 };
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity, RegulatoryGraph, VariableId};
-use biodivine_lib_bdd::boolean_expression::BooleanExpression;
-use biodivine_lib_bdd::{bdd, Bdd, BddVariableSet};
+use crate::{BooleanNetwork, FnUpdate, VariableId};
+use biodivine_lib_bdd::{bdd, BddVariable};
 use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
 use biodivine_lib_std::param_graph::Params;
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
         let context = SymbolicContext::new(&network)?;
+        let unit_bdd = apply_regulation_constraints(context.bdd.mk_true(), &network, &context)?;
 
-        // For each variable, compute Bdd that is true exactly when its update function is true.
-        let update_function_one: Vec<Bdd> = network
-            .graph
-            .variables()
-            .map(|id| {
-                let function = network.get_update_function(id);
-                if let Some(function) = function {
-                    context.mk_fn_update_true(function)
-                } else {
-                    context.mk_implicit_function_is_true(id, &network.regulators(id))
-                }
-            })
-            .collect();
-
-        let mut error_message = String::new();
-        let mut unit_bdd = context.mk_constant(true);
-        for reg in &network.graph.regulations {
-            let reg_is_one = context.mk_state_variable_is_true(reg.regulator);
-            let reg_is_zero = reg_is_one.not();
-            let reg_var = context.state_variables[reg.regulator.0];
-            let fn_is_one = &update_function_one[reg.target.0];
-            let fn_is_zero = fn_is_one.not();
-            /*
-               Observability: { p | f_p is observable } =
-                = projection({ (s, p) | f_p(s[x=0]) != f_p(s[x=1]) })
-                ("exists an input where value of f changes")
-               Activation: { p | f_p is activation } =
-                = ! projection({ (s, p) | f_p(s[x=0]) = 1 & f_p(s[x=1]) = 0 })
-               Inhibition: { p | f_p is inhibition } =
-                = ! projection({ (s, p) | f_p(s[x=0]) = 0 & f_p(s[x=1]) = 1 })
-                ("does not exist an input that validates monotonicity")
-
-                                       !!!!!!
-               Note that (f_p(s[x=1]) = 0) is NOT !(f_p(s[x=1]) = 1), because these
-               translate to (f_p(s) = 0 & x=1)|x and !(f_p(s) = 1 & x=1) = f_p(s)=0 | x=0.
-                                       !!!!!!
-            */
-            let observability = if reg.observable {
-                let fn_x1_to_1 = bdd!(fn_is_one & reg_is_one).var_projection(reg_var);
-                let fn_x0_to_1 = bdd!(fn_is_one & reg_is_zero).var_projection(reg_var);
-                let observable = bdd!(!(fn_x1_to_1 <=> fn_x0_to_1));
-                context
-                    .state_variables
-                    .iter()
-                    .fold(observable, |a, b| a.var_projection(*b))
-            } else {
-                context.mk_constant(true)
-            };
-            if observability.is_false() {
-                let problem = format!(
-                    " - {} has no effect in {}.\n",
-                    network.graph.get_variable(reg.regulator).name,
-                    network.graph.get_variable(reg.target).name,
-                );
-                error_message = format!("{}{}", error_message, problem);
-                print!("{}", problem);
-            }
-            let non_monotonous_pairs = match reg.monotonicity {
-                Some(Monotonicity::Activation) => {
-                    let fn_x0_to_1 = bdd!(fn_is_one & reg_is_zero).var_projection(reg_var);
-                    let fn_x1_to_0 = bdd!(fn_is_zero & reg_is_one).var_projection(reg_var);
-                    bdd!(fn_x0_to_1 & fn_x1_to_0)
-                }
-                Some(Monotonicity::Inhibition) => {
-                    let fn_x0_to_0 = bdd!(fn_is_zero & reg_is_zero).var_projection(reg_var);
-                    let fn_x1_to_1 = bdd!(fn_is_one & reg_is_one).var_projection(reg_var);
-                    bdd!(fn_x0_to_0 & fn_x1_to_1)
-                }
-                None => context.mk_constant(false),
-            };
-
-            let monotonicity = context
-                .state_variables
-                .iter()
-                .fold(non_monotonous_pairs, |a, b| a.var_projection(*b))
-                .not();
-            if monotonicity.is_false() {
-                let monotonicity_str = match reg.monotonicity {
-                    Some(Monotonicity::Activation) => "activating",
-                    Some(Monotonicity::Inhibition) => "inhibiting",
-                    None => "monotonous",
-                };
-                let problem = format!(
-                    " - {} not {} in {}.\n",
-                    network.graph.get_variable(reg.regulator).name,
-                    monotonicity_str,
-                    network.graph.get_variable(reg.target).name,
-                );
-                error_message = format!("{}{}", error_message, problem);
-                print!("{}", problem);
-            }
-
-            // At this point, monotonicity and observability should be only
-            // constrained on parameters, not state variables.
-
-            let function_constraint = bdd!(monotonicity & observability);
-
-            if function_constraint.is_false() {
-                println!(
-                    "Regulation {} -> {} has invalid constraints.",
-                    network.graph.get_variable(reg.regulator).name,
-                    network.graph.get_variable(reg.target).name,
-                );
-            }
-
-            unit_bdd = bdd!(unit_bdd & function_constraint);
-        }
-
-        if unit_bdd.is_false() {
-            return Err(format!(
-                "No update functions satisfy given constraints: \n{}",
-                error_message
-            ));
-        }
-
-        // Compute pre-evaluated functions
+        // For each variable, pre-compute contexts where the update function can be applied, i.e.
+        // (F = 1 & var = 0) | (F = 0 & var = 1)
         let update_functions = network
             .graph
             .variables()
-            .map(|v| {
-                let function_is_one = &update_function_one[v.0];
-                let variable_is_zero = context.mk_state_variable_is_true(v).not();
+            .map(|variable| {
+                let regulators = network.regulators(variable);
+                let function_is_one = network
+                    .get_update_function(variable)
+                    .as_ref()
+                    .map(|fun| context.mk_fn_update_true(fun))
+                    .unwrap_or_else(|| context.mk_implicit_function_is_true(variable, &regulators));
+                let variable_is_zero = context.mk_state_variable_is_true(variable).not();
                 bdd!(variable_is_zero <=> function_is_one)
             })
             .collect();
 
-        let p_var_count = context.bdd.num_vars() - network.graph.num_vars() as u16;
         return Ok(SymbolicAsyncGraph {
-            empty_color_set: GraphColors::new(context.mk_constant(false), p_var_count),
-            unit_color_set: GraphColors::new(unit_bdd.clone(), p_var_count),
-            empty_set: GraphColoredVertices::new(context.mk_constant(false), p_var_count),
-            unit_set: GraphColoredVertices::new(unit_bdd, p_var_count),
+            vertex_space: (
+                GraphColoredVertices::new(context.bdd.mk_false(), &context),
+                GraphColoredVertices::new(unit_bdd.clone(), &context),
+            ),
+            color_space: (
+                GraphColors::new(context.bdd.mk_false(), &context),
+                GraphColors::new(unit_bdd.clone(), &context),
+            ),
             symbolic_context: context,
+            unit_bdd,
             network,
             update_functions,
         });
@@ -157,31 +53,22 @@ impl SymbolicAsyncGraph {
         return &self.network;
     }
 
-    pub fn state_variable_true(&self, variable: VariableId) -> GraphColoredVertices {
-        let bdd_var = self.symbolic_context.state_variables[variable.0];
-        return GraphColoredVertices::new(
-            self.symbolic_context.bdd.mk_var(bdd_var),
-            self.symbolic_context.p_var_count,
-        )
-        .intersect(self.unit_vertices());
+    /// Return a reference to the symbolic context of this graph.
+    pub fn symbolic_context(&self) -> &SymbolicContext {
+        return &self.symbolic_context;
     }
 
-    pub fn state_variable_false(&self, variable: VariableId) -> GraphColoredVertices {
-        let bdd_var = self.symbolic_context.state_variables[variable.0];
-        return GraphColoredVertices::new(
-            self.symbolic_context.bdd.mk_not_var(bdd_var),
-            self.symbolic_context.p_var_count,
+    /// Create a colored vertex set with a fixed value of the given variable.
+    pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> GraphColoredVertices {
+        let bdd_variable = self.symbolic_context.state_variables[variable.0];
+        GraphColoredVertices::new(
+            self.unit_bdd.var_select(bdd_variable, value),
+            &self.symbolic_context,
         )
-        .intersect(self.unit_vertices());
-    }
-
-    /// Return the total number of states/vertices in this graph.
-    pub fn num_states(&self) -> usize {
-        return 1 << self.network().graph.num_vars();
     }
 
     /// Make a witness network for one color in the given set.
-    pub fn make_witness(&self, colors: &GraphColors) -> BooleanNetwork {
+    pub fn pick_witness(&self, colors: &GraphColors) -> BooleanNetwork {
         if colors.is_empty() {
             panic!("Cannot create witness for empty color set.");
         }
@@ -189,100 +76,85 @@ impl SymbolicAsyncGraph {
         let mut witness = self.network.clone();
         for variable in witness.graph.variables() {
             if let Some(function) = &mut witness.update_functions[variable.0] {
-                *function = to_fn_update(
-                    self.symbolic_context
-                        .instantiate_fn_update(&witness_valuation, function)
-                        .to_boolean_expression(&self.symbolic_context.bdd),
+                let instantiated_expression = self
+                    .symbolic_context
+                    .instantiate_fn_update(&witness_valuation, function)
+                    .to_boolean_expression(&self.symbolic_context.bdd);
+                *function = FnUpdate::from_boolean_expression(
+                    instantiated_expression,
                     self.network.as_graph(),
                 );
             } else {
-                witness.update_functions[variable.0] = Some(to_fn_update(
-                    self.symbolic_context
-                        .instantiate_implicit_function(
-                            &witness_valuation,
-                            variable,
-                            &self.network.graph.regulators(variable),
-                        )
-                        .to_boolean_expression(&self.symbolic_context.bdd),
+                let regulators = self.network.regulators(variable);
+                let instantiated_expression = self
+                    .symbolic_context
+                    .instantiate_implicit_function(&witness_valuation, variable, &regulators)
+                    .to_boolean_expression(&self.symbolic_context.bdd);
+                let instantiated_fn_update = FnUpdate::from_boolean_expression(
+                    instantiated_expression,
                     self.network.as_graph(),
-                ));
+                );
+                witness.update_functions[variable.0] = Some(instantiated_fn_update);
             }
         }
         return witness;
     }
 
-    /// Return an empty set of colors.
+    /// Reference to an empty color set.
     pub fn empty_colors(&self) -> &GraphColors {
-        return &self.empty_color_set;
+        return &self.color_space.0;
     }
 
-    /// Return a full set of colors.
+    /// Make a new copy of empty color set.
+    pub fn mk_empty_colors(&self) -> GraphColors {
+        return self.color_space.0.clone();
+    }
+
+    /// Reference to a unit color set.
     pub fn unit_colors(&self) -> &GraphColors {
-        return &self.unit_color_set;
+        return &self.color_space.1;
     }
 
-    /// Return empty vertex set.
+    /// Make a new copy of unit color set.
+    pub fn mk_unit_colors(&self) -> GraphColors {
+        return self.color_space.1.clone();
+    }
+
+    /// Reference to an empty colored vertex set.
     pub fn empty_vertices(&self) -> &GraphColoredVertices {
-        return &self.empty_set;
+        return &self.vertex_space.0;
     }
 
-    /// Return complete vertex set.
+    /// Make a new copy of empty vertex set.
+    pub fn mk_empty_vertices(&self) -> GraphColoredVertices {
+        return self.vertex_space.0.clone();
+    }
+
+    /// Reference to a unit colored vertex set.
     pub fn unit_vertices(&self) -> &GraphColoredVertices {
-        return &self.unit_set;
+        return &self.vertex_space.1;
     }
 
-    /// Construct a vertex set that only contains one vertex.
+    /// Make a new copy of unit vertex set.
+    pub fn mk_unit_vertices(&self) -> GraphColoredVertices {
+        return self.vertex_space.1.clone();
+    }
+
+    /// Construct a vertex set that only contains one vertex, but all colors
     pub fn vertex(&self, state: &ArrayBitVector) -> GraphColoredVertices {
-        let mut state_bdd = self.unit_set.bdd.clone();
-        for i_variable in 0..self.network.graph.num_vars() {
-            let bdd_var = self.symbolic_context.state_variables[i_variable];
-            let bdd = if state.get(i_variable) {
-                self.symbolic_context.bdd.mk_var(bdd_var)
-            } else {
-                self.symbolic_context.bdd.mk_not_var(bdd_var)
-            };
-            state_bdd = state_bdd.and(&bdd);
-        }
-        return GraphColoredVertices::new(state_bdd, self.symbolic_context.p_var_count);
-    }
-
-    pub fn bdd_variables(&self) -> &BddVariableSet {
-        return &self.symbolic_context.bdd;
+        let partial_valuation: Vec<(BddVariable, bool)> = state
+            .values()
+            .into_iter()
+            .enumerate()
+            .map(|(i, v)| (self.symbolic_context.state_variables[i], v))
+            .collect();
+        GraphColoredVertices::new(
+            self.unit_bdd.select(&partial_valuation),
+            &self.symbolic_context,
+        )
     }
 }
 
-pub fn to_fn_update(e: BooleanExpression, graph: &RegulatoryGraph) -> FnUpdate {
-    match e {
-        BooleanExpression::Const(value) => FnUpdate::Const(value),
-        BooleanExpression::Variable(name) => FnUpdate::Var(graph.find_variable(&name).unwrap()),
-        BooleanExpression::Not(inner) => FnUpdate::Not(Box::new(to_fn_update(*inner, graph))),
-        BooleanExpression::Or(l, r) => FnUpdate::Binary(
-            BinaryOp::Or,
-            Box::new(to_fn_update(*l, graph)),
-            Box::new(to_fn_update(*r, graph)),
-        ),
-        BooleanExpression::And(l, r) => FnUpdate::Binary(
-            BinaryOp::And,
-            Box::new(to_fn_update(*l, graph)),
-            Box::new(to_fn_update(*r, graph)),
-        ),
-        BooleanExpression::Iff(l, r) => FnUpdate::Binary(
-            BinaryOp::Iff,
-            Box::new(to_fn_update(*l, graph)),
-            Box::new(to_fn_update(*r, graph)),
-        ),
-        BooleanExpression::Imp(l, r) => FnUpdate::Binary(
-            BinaryOp::Imp,
-            Box::new(to_fn_update(*l, graph)),
-            Box::new(to_fn_update(*r, graph)),
-        ),
-        BooleanExpression::Xor(l, r) => FnUpdate::Binary(
-            BinaryOp::Xor,
-            Box::new(to_fn_update(*l, graph)),
-            Box::new(to_fn_update(*r, graph)),
-        ),
-    }
-}
 /*
 /// Symbolic graph exploration operations.
 impl SymbolicAsyncGraph {
@@ -421,22 +293,22 @@ mod tests {
     fn test_constraints_1() {
         let network = BooleanNetwork::try_from("a -> t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(1.0, graph.unit_colors().cardinality());
+        assert_eq!(1.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -| t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(1.0, graph.unit_colors().cardinality());
+        assert_eq!(1.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a ->? t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(3.0, graph.unit_colors().cardinality());
+        assert_eq!(3.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -|? t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(3.0, graph.unit_colors().cardinality());
+        assert_eq!(3.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -? t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(2.0, graph.unit_colors().cardinality());
+        assert_eq!(2.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -?? t \n $a: true").unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(4.0, graph.unit_colors().cardinality());
+        assert_eq!(4.0, graph.unit_colors().approx_cardinality());
     }
 
     #[test]
@@ -454,7 +326,7 @@ mod tests {
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(3.0, graph.unit_colors().cardinality());
+        assert_eq!(3.0, graph.unit_colors().approx_cardinality());
     }
 
     /* For a monotonous function, the cardinality should follow dedekind numbers... */
@@ -467,7 +339,7 @@ mod tests {
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(6.0, graph.unit_colors().cardinality());
+        assert_eq!(6.0, graph.unit_colors().approx_cardinality());
     }
 
     #[test]
@@ -478,7 +350,7 @@ mod tests {
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(20.0, graph.unit_colors().cardinality());
+        assert_eq!(20.0, graph.unit_colors().approx_cardinality());
     }
 
     #[test]
@@ -489,7 +361,7 @@ mod tests {
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert_eq!(168.0, graph.unit_colors().cardinality());
+        assert_eq!(168.0, graph.unit_colors().approx_cardinality());
     }
 
     #[test]

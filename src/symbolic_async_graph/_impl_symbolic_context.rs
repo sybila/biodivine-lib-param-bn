@@ -1,7 +1,9 @@
 use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use biodivine_lib_bdd::op_function::{and, and_not};
-use biodivine_lib_bdd::{bdd, Bdd, BddValuation, BddVariable, BddVariableSetBuilder};
+use biodivine_lib_bdd::{
+    bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
+};
 use std::convert::TryInto;
 
 impl SymbolicContext {
@@ -97,12 +99,26 @@ impl SymbolicContext {
 
         Ok(SymbolicContext {
             bdd: builder.build(),
-            p_var_count: parameter_variables.len() as u16,
             state_variables,
             parameter_variables,
             explicit_function_tables,
             implicit_function_tables,
         })
+    }
+
+    /// Provides access to the raw `Bdd` context.
+    pub fn bdd_variable_set(&self) -> &BddVariableSet {
+        return &self.bdd;
+    }
+
+    /// Getter for variables encoding the state variables of the network.
+    pub fn state_variables(&self) -> &Vec<BddVariable> {
+        return &self.state_variables;
+    }
+
+    /// Getter for variables encoding the parameter variables of the network.
+    pub fn parameter_variables(&self) -> &Vec<BddVariable> {
+        return &self.parameter_variables;
     }
 
     /// Create a constant true/false `Bdd`.
@@ -319,7 +335,6 @@ mod tests {
     fn hmox_pathway() {
         let model = std::fs::read_to_string("aeon_models/hmox_pathway.aeon").unwrap();
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
-        println!("Variables: {}", network.graph.num_vars());
         let graph = SymbolicAsyncGraph::new(network).unwrap();
         assert!(!graph.unit_vertices().is_empty());
     }
