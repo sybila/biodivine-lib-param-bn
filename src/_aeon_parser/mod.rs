@@ -1,12 +1,19 @@
 use crate::{BinaryOp, Monotonicity};
 
-mod display_fn_update_temp;
-mod from_string_boolean_network;
-mod from_string_fn_update_temp;
-mod from_string_regulation_temp;
-mod impl_boolean_network;
-mod impl_fn_update_temp;
-mod impl_regulatory_graph;
+/// **(internal)** Convert `FnUpdateTemp` back to boolean expression.
+mod _display_fn_update_temp;
+/// **(internal)** `BooleanNetwork` parsing.
+mod _from_string_for_boolean_network;
+/// **(internal)** `FnUpdateTemp` parsing.
+mod _from_string_for_fn_update_temp;
+/// **(internal)** `RegulatoryGraph` parsing.
+mod _from_string_for_regulation_temp;
+/// **(internal)** Parsing utility methods for the `BooleanNetwork`.
+mod _impl_boolean_network;
+/// **(internal)** Implementation of `FnUpdateTemp`.
+mod _impl_fn_update_temp;
+/// **(internal)** Parsing utility methods for the `RegulatoryGraph`.
+mod _impl_regulatory_graph;
 
 /// **(internal)** A helper struct for representing parsed `Regulation`s that have not been
 /// integrated into a `RegulatoryGraph` yet.

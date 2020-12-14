@@ -4,21 +4,31 @@ use std::ops::Range;
 
 pub mod async_graph;
 pub mod bdd_params;
-mod display_boolean_network;
-mod display_regulatory_graph;
-mod impl_binary_op;
-mod impl_boolean_network;
-mod impl_fn_update;
-mod impl_parameter;
-mod impl_regulation;
-mod impl_regulatory_graph;
-mod impl_variable;
-mod impl_variable_id;
-mod parser;
 pub mod sbml;
 pub mod symbolic_async_graph;
 
-// TODO: Getters for properties of Variables, Parameters, Regulations, ...
+/// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
+mod _aeon_parser;
+/// **(internal)** Utility methods for `BinaryOp`.
+mod _impl_binary_op;
+/// **(internal)** Utility methods for `BooleanNetwork`.
+mod _impl_boolean_network;
+/// **(internal)** `BooleanNetwork` to `.aeon` string.
+mod _impl_display_for_boolean_network;
+/// **(internal)** `RegulatoryGraph` to `.aeon` string.
+mod _impl_display_regulatory_graph;
+/// **(internal)** Utility methods for `FnUpdate`.
+mod _impl_fn_update;
+/// **(internal)** Utility methods for `Parameter`.
+mod _impl_parameter;
+/// **(internal)** Utility methods for `Regulation`.
+mod _impl_regulation;
+/// **(internal)** Utility methods for `RegulatoryGraph`.
+mod _impl_regulatory_graph;
+/// **(internal)** Utility methods for `Variable`.
+mod _impl_variable;
+/// **(internal)** Utility methods for `VariableId`.
+mod _impl_variable_id;
 
 /// A type-safe index of a `Variable` inside a `BooleanNetwork` (or a `RegulatoryGraph`).
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]

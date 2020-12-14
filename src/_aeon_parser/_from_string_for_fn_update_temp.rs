@@ -1,6 +1,6 @@
-use crate::parser::FnUpdateTemp;
-use crate::parser::FnUpdateTemp::*;
 use crate::BinaryOp::*;
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp::*;
 use std::convert::TryFrom;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -230,7 +230,7 @@ fn read_args(data: &[Token]) -> Result<Vec<String>, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::FnUpdateTemp;
+    use crate::_aeon_parser::FnUpdateTemp;
     use std::convert::TryFrom;
 
     #[test]

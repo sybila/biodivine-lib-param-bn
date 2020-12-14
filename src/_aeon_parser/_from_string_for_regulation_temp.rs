@@ -1,5 +1,5 @@
-use crate::parser::RegulationTemp;
 use crate::Monotonicity;
+use crate::_aeon_parser::RegulationTemp;
 use regex::Regex;
 use std::convert::TryFrom;
 
@@ -31,8 +31,8 @@ impl TryFrom<&str> for RegulationTemp {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::RegulationTemp;
     use crate::Monotonicity::{Activation, Inhibition};
+    use crate::_aeon_parser::RegulationTemp;
     use std::convert::TryFrom;
 
     #[test]

@@ -1,5 +1,5 @@
-use crate::parser::FnUpdateTemp;
-use crate::parser::FnUpdateTemp::*;
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp::*;
 use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
 use std::collections::HashSet;
 use std::convert::TryFrom;
@@ -106,7 +106,7 @@ impl FnUpdateTemp {
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::FnUpdateTemp;
+    use crate::_aeon_parser::FnUpdateTemp;
     use crate::{Parameter, RegulatoryGraph};
     use std::collections::HashSet;
     use std::convert::TryFrom;

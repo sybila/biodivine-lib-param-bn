@@ -1,4 +1,4 @@
-use crate::parser::{FnUpdateTemp, RegulationTemp};
+use crate::_aeon_parser::{FnUpdateTemp, RegulationTemp};
 use crate::{BooleanNetwork, Parameter, RegulatoryGraph};
 use regex::Regex;
 use std::collections::HashSet;

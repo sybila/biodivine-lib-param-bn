@@ -1,5 +1,5 @@
-use super::parser::FnUpdateTemp;
-use super::parser::FnUpdateTemp::*;
+use super::_aeon_parser::FnUpdateTemp;
+use super::_aeon_parser::FnUpdateTemp::*;
 use super::{BinaryOp, BooleanNetwork, Monotonicity, Parameter, RegulatoryGraph};
 use regex::Regex;
 use std::collections::{HashMap, HashSet};

@@ -1,4 +1,4 @@
-use crate::parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp;
 use crate::{BooleanNetwork, VariableId};
 use std::convert::TryFrom;
 
