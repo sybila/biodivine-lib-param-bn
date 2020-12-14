@@ -17,7 +17,12 @@ mod _impl_graph_colored_vertices;
 mod _impl_graph_colors;
 mod _impl_graph_vertices;
 mod _impl_symbolic_async_graph;
-mod _impl_symbolic_function_context;
+
+/// **(internal)** Implementation of the `SymbolicContext`.
+mod _impl_symbolic_context;
+
+/// **(internal)** Implementation for `FunctionTable` and `FunctionTableIterator`.
+mod _impl_function_table;
 
 use crate::BooleanNetwork;
 use biodivine_lib_bdd::{
@@ -63,7 +68,7 @@ pub struct GraphVertexIterator<'a, 'b> {
 
 pub struct SymbolicAsyncGraph {
     network: BooleanNetwork,
-    symbolic_context: SymbolicFunctionContext,
+    symbolic_context: SymbolicContext,
     empty_color_set: GraphColors,
     unit_color_set: GraphColors,
     empty_set: GraphColoredVertices,
@@ -72,7 +77,15 @@ pub struct SymbolicAsyncGraph {
     update_functions: Vec<Bdd>,
 }
 
-pub struct SymbolicFunctionContext {
+/// **(internal)** Symbolic context manages the mapping between entities of the Boolean network
+/// (variables, parameters, uninterpreted functions) and `BddVariables` used in `bdd-lib`.
+///
+/// It also provides utility methods for creating `Bdd` objects that match different conditions
+/// imposed on the parameter space of the network.
+///
+/// Currently, it is internal because we don't want users of this library to play with raw `Bdd`
+/// objects since it can be rather unsafe.
+struct SymbolicContext {
     bdd: BddVariableSet,
     state_variables: Vec<BddVariable>,
     parameter_variables: Vec<BddVariable>,
@@ -81,12 +94,19 @@ pub struct SymbolicFunctionContext {
     implicit_function_tables: Vec<Option<FunctionTable>>,
 }
 
+/// **(internal)** Function table maps one the table of an uninterpreted function to corresponding
+/// `Bdd`  variables.
+///
+/// The main functionality of a `FunctionTable` is that it provides an iterator over
+/// pairs of `Vec<bool>` (function input assignment) and `BddVariable`
+/// (corresponding symbolic variable).
 #[derive(Debug, Clone)]
 struct FunctionTable {
     pub arity: u16,
     rows: Vec<BddVariable>,
 }
 
+/// **(internal)** Iterator over elements of the `FunctionTable`.
 struct FunctionTableIterator<'a> {
     inner_iterator: Enumerate<BddValuationIterator>,
     table: &'a FunctionTable,

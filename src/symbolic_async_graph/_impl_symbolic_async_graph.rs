@@ -1,5 +1,5 @@
 use crate::symbolic_async_graph::{
-    GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicFunctionContext,
+    GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity, RegulatoryGraph, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
@@ -9,18 +9,18 @@ use biodivine_lib_std::param_graph::Params;
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
-        let context = SymbolicFunctionContext::new(&network);
+        let context = SymbolicContext::new(&network)?;
 
         // For each variable, compute Bdd that is true exactly when its update function is true.
         let update_function_one: Vec<Bdd> = network
             .graph
-            .variable_ids()
+            .variables()
             .map(|id| {
                 let function = network.get_update_function(id);
                 if let Some(function) = function {
-                    context.true_when_function(function)
+                    context.mk_fn_update_true(function)
                 } else {
-                    context.true_when_implicit_parameter(id, network.graph.regulators(id))
+                    context.mk_implicit_function_is_true(id, &network.regulators(id))
                 }
             })
             .collect();
@@ -28,7 +28,7 @@ impl SymbolicAsyncGraph {
         let mut error_message = String::new();
         let mut unit_bdd = context.mk_constant(true);
         for reg in &network.graph.regulations {
-            let reg_is_one = context.true_when_variable(reg.regulator);
+            let reg_is_one = context.mk_state_variable_is_true(reg.regulator);
             let reg_is_zero = reg_is_one.not();
             let reg_var = context.state_variables[reg.regulator.0];
             let fn_is_one = &update_function_one[reg.target.0];
@@ -129,10 +129,10 @@ impl SymbolicAsyncGraph {
         // Compute pre-evaluated functions
         let update_functions = network
             .graph
-            .variable_ids()
+            .variables()
             .map(|v| {
                 let function_is_one = &update_function_one[v.0];
-                let variable_is_zero = context.true_when_variable(v).not();
+                let variable_is_zero = context.mk_state_variable_is_true(v).not();
                 bdd!(variable_is_zero <=> function_is_one)
             })
             .collect();
@@ -155,10 +155,6 @@ impl SymbolicAsyncGraph {
     /// Return a reference to the original Boolean network.
     pub fn network(&self) -> &BooleanNetwork {
         return &self.network;
-    }
-
-    pub fn function_context(&self) -> &SymbolicFunctionContext {
-        return &self.symbolic_context;
     }
 
     pub fn state_variable_true(&self, variable: VariableId) -> GraphColoredVertices {
@@ -191,24 +187,24 @@ impl SymbolicAsyncGraph {
         }
         let witness_valuation = colors.bdd.sat_witness().unwrap();
         let mut witness = self.network.clone();
-        for variable in witness.graph.variable_ids() {
+        for variable in witness.graph.variables() {
             if let Some(function) = &mut witness.update_functions[variable.0] {
                 *function = to_fn_update(
                     self.symbolic_context
-                        .function_instantiation(&witness_valuation, function)
+                        .instantiate_fn_update(&witness_valuation, function)
                         .to_boolean_expression(&self.symbolic_context.bdd),
-                    self.network.graph(),
+                    self.network.as_graph(),
                 );
             } else {
                 witness.update_functions[variable.0] = Some(to_fn_update(
                     self.symbolic_context
-                        .implicit_parameter_instantiation(
+                        .instantiate_implicit_function(
                             &witness_valuation,
                             variable,
                             &self.network.graph.regulators(variable),
                         )
                         .to_boolean_expression(&self.symbolic_context.bdd),
-                    self.network.graph(),
+                    self.network.as_graph(),
                 ));
             }
         }
@@ -287,7 +283,7 @@ pub fn to_fn_update(e: BooleanExpression, graph: &RegulatoryGraph) -> FnUpdate {
         ),
     }
 }
-
+/*
 /// Symbolic graph exploration operations.
 impl SymbolicAsyncGraph {
     /// Compute direct successors of `frontier` within the `universe` set under the given `VariableId`.
@@ -413,7 +409,7 @@ impl SymbolicAsyncGraph {
             self.symbolic_context.p_var_count,
         );
     }
-}
+}*/
 
 #[cfg(test)]
 mod tests {
