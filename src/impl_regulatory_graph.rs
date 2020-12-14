@@ -1,6 +1,9 @@
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
 use crate::{Monotonicity, VariableIdIterator};
 use biodivine_lib_std::util::build_index_map;
+use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::ops::Index;
 
 /// Methods for safely constructing new instances of `RegulatoryGraph`s.
 impl RegulatoryGraph {
@@ -91,6 +94,11 @@ impl RegulatoryGraph {
         return &self.variables[id.0];
     }
 
+    /// Shorthand for `self.get_variable(id).get_name()`.
+    pub fn get_variable_name(&self, id: VariableId) -> &String {
+        return &self.variables[id.0].name;
+    }
+
     /// Find a `Regulation` between two variables if it exists, `None` otherwise.
     pub fn find_regulation(
         &self,
@@ -117,8 +125,170 @@ impl RegulatoryGraph {
         return regulators;
     }
 
-    /// Return an iterator over all ids of this graph.
-    pub fn variable_ids(&self) -> VariableIdIterator {
+    /// Return the set of direct as well as transitive regulators of `target`.
+    pub fn transitive_regulators(&self, target: VariableId) -> HashSet<VariableId> {
+        let mut regulators = HashSet::new();
+        fn r_regulators(
+            rg: &RegulatoryGraph,
+            target: VariableId,
+            regulators: &mut HashSet<VariableId>,
+        ) {
+            for regulator in rg.regulators(target) {
+                if regulators.insert(regulator) {
+                    r_regulators(rg, regulator, regulators);
+                }
+            }
+        }
+        r_regulators(self, target, &mut regulators);
+        return regulators;
+    }
+
+    /// Return a sorted list of variables that are regulated by the given `regulator` variable.
+    pub fn targets(&self, regulator: VariableId) -> Vec<VariableId> {
+        let mut targets: Vec<VariableId> = self
+            .regulations
+            .iter()
+            .filter(|r| r.regulator == regulator)
+            .map(|r| r.target)
+            .collect();
+        targets.sort();
+        return targets;
+    }
+
+    /// Return a set of direct as well as transitive targets of `regulator`.
+    pub fn transitive_targets(&self, regulator: VariableId) -> HashSet<VariableId> {
+        let mut targets = HashSet::new();
+        fn r_targets(
+            rg: &RegulatoryGraph,
+            regulator: VariableId,
+            targets: &mut HashSet<VariableId>,
+        ) {
+            for target in rg.targets(regulator) {
+                if targets.insert(target) {
+                    r_targets(rg, target, targets);
+                }
+            }
+        }
+        r_targets(self, regulator, &mut targets);
+        return targets;
+    }
+
+    /// Compute the strongly connected components of this regulatory graph. The components
+    /// are sorted topologically based on their position in the graph condensation.
+    ///
+    ///
+    /// When sorting topologically incomparable components, we use component size as
+    /// the secondary criterion. Also, note that the algorithm is not particularly efficient,
+    /// so it should be used with caution in large networks!
+    pub fn components(&self) -> Vec<HashSet<VariableId>> {
+        let mut components = Vec::new();
+        let mut remaining: HashSet<VariableId> = self.variables().collect();
+        while let Some(pivot) = remaining.iter().cloned().next() {
+            let regulators = self.transitive_regulators(pivot);
+            let targets = self.transitive_targets(pivot);
+            let mut component = HashSet::new();
+            // Compute component as (regulators and targets) + pivot.
+            component.extend(&regulators);
+            component.retain(|v| targets.contains(v));
+            component.insert(pivot);
+            // Remove component from remaining.
+            remaining.retain(|v| !component.contains(v));
+            // And add it to result.
+            components.push(component);
+        }
+        components.sort_by(|a, b| {
+            let pivot_a = *a.iter().next().unwrap();
+            let pivot_b = *b.iter().next().unwrap();
+            return if a.contains(&pivot_b) || b.contains(&pivot_a) {
+                Ordering::Equal
+            } else {
+                let targets_a = self.transitive_targets(pivot_a);
+                if targets_a.contains(&pivot_b) {
+                    // There is a path from a to b, a < b, a is "smaller".
+                    return Ordering::Less;
+                }
+                let targets_b = self.transitive_targets(pivot_b);
+                if targets_b.contains(&pivot_a) {
+                    // There is a path from b to a, b < a, a is "greater".
+                    return Ordering::Greater;
+                }
+                // The components are not comparable - compare them based on size.
+                a.len().cmp(&b.len())
+            };
+        });
+        return components;
+    }
+
+    /// Return an iterator over all variable ids of this graph.
+    pub fn variables(&self) -> VariableIdIterator {
         return (0..self.variables.len()).map(|i| VariableId(i));
+    }
+}
+
+/// Allow indexing `RegulatoryGraph` using `VariableId` objects.
+impl Index<VariableId> for RegulatoryGraph {
+    type Output = Variable;
+
+    fn index(&self, index: VariableId) -> &Self::Output {
+        return &self.get_variable(index);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{RegulatoryGraph, Variable, VariableId};
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_regulatory_graph() {
+        // First, lets build a simple graph with 8 variables and 5 SCCs.
+        let names = vec!["a", "b_1", "b_2", "c", "d_1", "d_2", "d_3", "e"];
+        let mut rg = RegulatoryGraph::new(names.into_iter().map(|s| s.to_string()).collect());
+        rg.add_regulation("a", "c", true, None).unwrap();
+        rg.add_regulation("b_1", "b_2", true, None).unwrap();
+        rg.add_regulation("b_2", "b_1", true, None).unwrap();
+        rg.add_regulation("b_2", "c", true, None).unwrap();
+        rg.add_regulation("c", "d_2", true, None).unwrap();
+        rg.add_regulation("c", "e", true, None).unwrap();
+        rg.add_regulation("d_1", "d_3", true, None).unwrap();
+        rg.add_regulation("d_3", "d_2", true, None).unwrap();
+        rg.add_regulation("d_2", "d_1", true, None).unwrap();
+        rg.add_regulation("d_1", "d_2", true, None).unwrap();
+        rg.add_regulation("e", "e", true, None).unwrap();
+
+        assert!(rg.add_regulation("a", "c", false, None).is_err());
+        assert!(rg.add_regulation("a", "b", true, None).is_err());
+        assert!(rg.add_regulation("b_1", "a_1", true, None).is_err());
+
+        assert_eq!(rg.num_vars(), 8);
+        assert_eq!(rg.find_variable("b_1").unwrap(), VariableId(1));
+        assert_eq!(
+            rg.get_variable(VariableId(2)),
+            &Variable {
+                name: "b_2".to_string()
+            }
+        );
+        assert_eq!(rg.get_variable_name(VariableId(2)), "b_2");
+        assert!(rg.find_regulation(VariableId(0), VariableId(3)).is_some());
+        assert_eq!(
+            rg.regulators(VariableId(3)),
+            vec![VariableId(0), VariableId(2)]
+        );
+        assert_eq!(
+            rg.targets(VariableId(3)),
+            vec![VariableId(5), VariableId(7)]
+        );
+
+        let components = rg.components();
+        let expected_components: Vec<HashSet<VariableId>> = vec![
+            vec![VariableId(0)].into_iter().collect(),
+            vec![VariableId(1), VariableId(2)].into_iter().collect(),
+            vec![VariableId(3)].into_iter().collect(),
+            vec![VariableId(7)].into_iter().collect(),
+            vec![VariableId(4), VariableId(5), VariableId(6)]
+                .into_iter()
+                .collect(),
+        ];
+        assert_eq!(components, expected_components);
     }
 }
