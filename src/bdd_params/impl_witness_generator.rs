@@ -26,7 +26,7 @@ impl BooleanNetwork {
         for i_p in 0..self.parameters.len() {
             let parameter = &self.parameters[i_p];
             let parameter_input_table = &encoder.explicit_function_tables[i_p];
-            let num_inputs = parameter.cardinality as u16;
+            let num_inputs = parameter.arity as u16;
             if num_inputs == 0 {
                 assert_eq!(parameter_input_table.len(), 1);
                 explicit_parameter_expressions.push(BooleanExpression::Const(

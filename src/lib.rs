@@ -25,7 +25,7 @@ pub mod symbolic_async_graph;
 pub struct VariableId(usize);
 
 /// A type-safe index of a `Parameter` inside a `BooleanNetwork`.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ParameterId(usize);
 
 /// Possible monotonous effects of a `Regulation` in a `BooleanNetwork`.
@@ -52,7 +52,7 @@ pub struct Variable {
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Parameter {
     name: String,
-    cardinality: usize,
+    arity: u32,
 }
 
 /// Describes an interaction relationship between two `Variable`s in a `BooleanNetwork`

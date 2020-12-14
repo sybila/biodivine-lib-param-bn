@@ -43,12 +43,12 @@ impl BddParameterEncoder {
         bdd: &mut BddVariableSetBuilder,
     ) -> Vec<Vec<BddVariable>> {
         let mut table = Vec::new();
-        for pid in network.parameter_ids() {
+        for pid in network.parameters() {
             let p = network.get_parameter(pid);
             // Here, we abuse BddValuationIterator to go over all possible valuations
             // of function inputs.
 
-            let p_vars = BddValuationIterator::new(p.cardinality as u16)
+            let p_vars = BddValuationIterator::new(p.arity as u16)
                 .map(|valuation| {
                     let bdd_name = format!("{}{}", p.name, valuation);
                     bdd.make_variable(&bdd_name)
@@ -65,7 +65,7 @@ impl BddParameterEncoder {
         bdd: &mut BddVariableSetBuilder,
     ) -> Vec<Vec<BddVariable>> {
         let mut table = Vec::new();
-        for vid in network.graph.variable_ids() {
+        for vid in network.graph.variables() {
             let v = network.graph.get_variable(vid);
 
             if let Some(_) = network.get_update_function(vid) {
@@ -91,7 +91,7 @@ impl BddParameterEncoder {
 
     pub(crate) fn build_regulators_table(network: &BooleanNetwork) -> Vec<Vec<VariableId>> {
         let mut table = Vec::new();
-        for vid in network.graph.variable_ids() {
+        for vid in network.graph.variables() {
             if let Some(_) = network.get_update_function(vid) {
                 table.push(Vec::new());
             } else {

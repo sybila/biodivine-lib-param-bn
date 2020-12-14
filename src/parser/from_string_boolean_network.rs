@@ -73,7 +73,7 @@ impl TryFrom<&str> for BooleanNetwork {
 
         // Add the parameters (if there is a cardinality clash, here it will be thrown).
         for parameter in &parameters {
-            bn.add_parameter(&parameter.name, parameter.cardinality)?;
+            bn.add_parameter(&parameter.name, parameter.arity)?;
         }
 
         // Actually build and add the functions
@@ -160,15 +160,15 @@ mod tests {
         let parameters = vec![
             Parameter {
                 name: "k".to_string(),
-                cardinality: 0,
+                arity: 0,
             },
             Parameter {
                 name: "p".to_string(),
-                cardinality: 1,
+                arity: 1,
             },
             Parameter {
                 name: "q".to_string(),
-                cardinality: 2,
+                arity: 2,
             },
         ];
 

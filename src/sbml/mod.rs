@@ -147,7 +147,7 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
 
                     // Add the parameters (if there is a cardinality clash, here it will be thrown).
                     for parameter in &parameters {
-                        bn.add_parameter(&parameter.name, parameter.cardinality)?;
+                        bn.add_parameter(&parameter.name, parameter.arity)?;
                     }
 
                     // Actually build and add the functions

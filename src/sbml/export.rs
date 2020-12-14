@@ -42,33 +42,32 @@ impl BooleanNetwork {
 
     fn write_transitions(&self, out: &mut dyn Write) -> Result<(), Error> {
         write!(out, "<qual:listOfTransitions xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
-        for id in self.graph.variable_ids() {
-            let var = self.graph.get_variable(id);
-            write!(out, "<qual:transition qual:id=\"tr_{}\">", var.name)?;
-            let regulators = self.graph.regulators(id);
+        for id in self.variables() {
+            let var_name = self[id].get_name();
+            write!(out, "<qual:transition qual:id=\"tr_{}\">", var_name)?;
 
             // output inputs (regulators)
             write!(out, "<qual:listOfInputs>")?;
-            for r in &regulators {
-                let r_var = self.graph.get_variable(*r);
+            for r in self.regulators(id) {
+                let r_var_name = self[r].get_name();
                 let monotonicity = self
                     .graph
-                    .find_regulation(*r, id)
+                    .find_regulation(r, id)
                     .and_then(|r| r.monotonicity);
                 let sign = match monotonicity {
                     None => "unknown",
                     Some(Monotonicity::Activation) => "positive",
                     Some(Monotonicity::Inhibition) => "negative",
                 };
-                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\"/>", r_var.name, sign, var.name, r_var.name)?;
+                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\"/>", r_var_name, sign, var_name, r_var_name)?;
             }
             write!(out, "</qual:listOfInputs>")?;
 
             // output outputs (self)
             write!(out, "<qual:listOfOutputs>")?;
-            write!(out, "<qual:output qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{}_out\"/>", var.name, var.name)?;
+            write!(out, "<qual:output qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{}_out\"/>", var_name, var_name)?;
             write!(out, "</qual:listOfOutputs>")?;
-            if let Some(update_function) = &self.get_update_function(id) {
+            if let Some(update_function) = self.get_update_function(id) {
                 write!(out, "<qual:listOfFunctionTerms>")?;
                 // set default value to 0
                 write!(
@@ -93,11 +92,10 @@ impl BooleanNetwork {
             FnUpdate::Const(true) => write!(out, "<true/>")?,
             FnUpdate::Const(false) => write!(out, "<false/>")?,
             FnUpdate::Var(id) => {
-                let v = self.graph.get_variable(*id);
                 write!(
                     out,
                     "<apply><eq/><ci>{}</ci><cn type=\"integer\">1</cn></apply>",
-                    v.name
+                    self.get_variable_name(*id)
                 )?;
             }
             FnUpdate::Not(inner) => {

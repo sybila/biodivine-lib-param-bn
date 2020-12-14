@@ -23,7 +23,7 @@ impl BooleanNetwork {
         variable: &str,
         update_function: FnUpdateTemp,
     ) -> Result<(), String> {
-        let variable = self.get_variable(variable)?;
+        let variable = self.get_variable_for_name(variable)?;
         let update_function = *update_function.into_fn_update(self)?;
         self.add_update_function(variable, update_function)?;
         return Ok(());
@@ -31,7 +31,7 @@ impl BooleanNetwork {
 
     /// **(internal)** Utility method to safely obtain variable for the update function
     /// with appropriate error message.
-    fn get_variable(&self, name: &str) -> Result<VariableId, String> {
+    fn get_variable_for_name(&self, name: &str) -> Result<VariableId, String> {
         return self.graph.find_variable(name).ok_or(format!(
             "Can't add update function for '{}'. '{}' is not a variable.",
             name, name

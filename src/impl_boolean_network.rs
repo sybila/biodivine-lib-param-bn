@@ -1,8 +1,9 @@
 use crate::{
     BooleanNetwork, FnUpdate, Parameter, ParameterId, ParameterIdIterator, RegulatoryGraph,
-    VariableId,
+    Variable, VariableId, VariableIdIterator,
 };
 use std::collections::HashMap;
+use std::ops::Index;
 
 /// Basic methods for safely building `BooleanNetwork`s.
 impl BooleanNetwork {
@@ -19,14 +20,14 @@ impl BooleanNetwork {
     /// Add a new `Parameter` to the `BooleanNetwork`.
     ///
     /// The parameter name must be different from other parameters and variables.
-    pub fn add_parameter(&mut self, name: &str, cardinality: usize) -> Result<ParameterId, String> {
+    pub fn add_parameter(&mut self, name: &str, arity: u32) -> Result<ParameterId, String> {
         self.assert_no_such_variable(name)?;
         self.assert_no_such_parameter(name)?;
         let id = ParameterId(self.parameters.len());
         self.parameter_to_index.insert(name.to_string(), id);
         self.parameters.push(Parameter {
             name: name.to_string(),
-            cardinality,
+            arity,
         });
         return Ok(id);
     }
@@ -117,11 +118,48 @@ impl BooleanNetwork {
     }
 }
 
-/// Some utility methods for accessing the structure of a `BooleanNetwork`.
+/// Some utility methods for accessing the structure of a `BooleanNetwork`. Some of them are just
+/// delegating to the internal `RegulatoryGraph`, but we have a copy here as well because they
+/// are used very often.
 impl BooleanNetwork {
     /// Obtain a reference to the underlying `RegulatoryGraph` of the `BooleanNetwork`.
-    pub fn graph(&self) -> &RegulatoryGraph {
+    pub fn as_graph(&self) -> &RegulatoryGraph {
         return &self.graph;
+    }
+
+    /// The number of variables in this `BooleanNetwork`.
+    pub fn num_vars(&self) -> usize {
+        return self.graph.num_vars();
+    }
+
+    /// The number of parameters in this `BooleanNetwork`.
+    pub fn num_parameters(&self) -> usize {
+        return self.parameters.len();
+    }
+
+    /// Return an iterator over all variable ids of this network.
+    pub fn variables(&self) -> VariableIdIterator {
+        return self.graph.variables();
+    }
+
+    /// Return the variable object based on the given `VariableId`.
+    pub fn get_variable(&self, id: VariableId) -> &Variable {
+        return self.graph.get_variable(id);
+    }
+
+    /// Shorthand for `self.as_graph().get_variable(id).get_name()`.
+    pub fn get_variable_name(&self, id: VariableId) -> &String {
+        return self.graph.get_variable_name(id);
+    }
+
+    /// Return a sorted list of variables that regulate the given `target` variable.
+    pub fn regulators(&self, target: VariableId) -> Vec<VariableId> {
+        return self.graph.regulators(target);
+    }
+
+    /// Return a sorted list of variables that are regulated by the given `regulator` variable.
+    pub fn targets(&self, regulator: VariableId) -> Vec<VariableId> {
+        return self.graph.targets(regulator);
     }
 
     /// Find a `ParameterId` corresponding to the given parameter `name`.
@@ -140,7 +178,25 @@ impl BooleanNetwork {
     }
 
     /// Return an iterator over all parameter ids of this network.
-    pub fn parameter_ids(&self) -> ParameterIdIterator {
+    pub fn parameters(&self) -> ParameterIdIterator {
         return (0..self.parameters.len()).map(|i| ParameterId(i));
+    }
+}
+
+/// Allow indexing `BooleanNetwork` using `VariableId` objects.
+impl Index<VariableId> for BooleanNetwork {
+    type Output = Variable;
+
+    fn index(&self, index: VariableId) -> &Self::Output {
+        return &self.graph.get_variable(index);
+    }
+}
+
+/// Allow indexing `BooleanNetwork` using `ParameterId` objects.
+impl Index<ParameterId> for BooleanNetwork {
+    type Output = Parameter;
+
+    fn index(&self, index: ParameterId) -> &Self::Output {
+        return &self.parameters[index.0];
     }
 }

@@ -10,7 +10,7 @@ impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Fwd<'a, Params> {
     fn step(&self, current: IdState) -> Self::Iterator {
         return FwdIterator {
             graph: self.graph,
-            variables: self.graph.network().graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
         };
     }
@@ -46,7 +46,7 @@ impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Bwd<'a, Params> {
     fn step(&self, current: IdState) -> Self::Iterator {
         return BwdIterator {
             graph: self.graph,
-            variables: self.graph.network().graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
         };
     }

@@ -2,6 +2,7 @@ use crate::parser::FnUpdateTemp;
 use crate::parser::FnUpdateTemp::*;
 use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
 impl FnUpdateTemp {
     /// Replace all variables that are not valid in the given `RegulatoryGraph` with
@@ -42,7 +43,7 @@ impl FnUpdateTemp {
             Param(name, args) => {
                 result.insert(Parameter {
                     name: name.clone(),
-                    cardinality: args.len(),
+                    arity: u32::try_from(args.len()).unwrap(),
                 });
             }
         }
@@ -61,11 +62,11 @@ impl FnUpdateTemp {
             Param(name, args) => {
                 let parameter_id = Self::get_parameter(bn, &name)?;
                 let parameter = bn.get_parameter(parameter_id);
-                if parameter.cardinality != args.len() {
+                if parameter.arity != u32::try_from(args.len()).unwrap() {
                     return Err(format!(
                         "'{}' has cardinality {} but is used with {} arguments.",
                         name,
-                        parameter.cardinality,
+                        parameter.arity,
                         args.len()
                     ));
                 }
@@ -133,15 +134,15 @@ mod tests {
         let mut expected = HashSet::new();
         expected.insert(Parameter {
             name: "f".to_string(),
-            cardinality: 0,
+            arity: 0,
         });
         expected.insert(Parameter {
             name: "par".to_string(),
-            cardinality: 3,
+            arity: 3,
         });
         expected.insert(Parameter {
             name: "q".to_string(),
-            cardinality: 1,
+            arity: 1,
         });
 
         assert_eq!(expected, params);
