@@ -112,7 +112,7 @@ impl GraphColoredVertices {
     }
 
     /// Set of all vertices which are in this set for at least one colour.
-    pub fn states(&self) -> GraphVertices {
+    pub fn vertices(&self) -> GraphVertices {
         return GraphVertices {
             bdd: self.bdd.projection(&self.parameter_variables),
             state_variables: self.state_variables.clone(),
