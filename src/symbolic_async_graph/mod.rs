@@ -19,22 +19,24 @@ use biodivine_lib_bdd::{
 };
 use std::iter::Enumerate;
 
-mod _impl_graph_colored_vertices;
-mod _impl_graph_colors;
-mod _impl_graph_vertices;
-mod _impl_symbolic_async_graph;
-
 /// **(internal)** Implementing conversion between `FnUpdate` and `BooleanExpression`.
 mod _impl_fn_update_from_boolean_expression;
-
-/// **(internal)** Utility methods for validation of static constraints on network regulations.
-mod _impl_regulation_constraint;
-
-/// **(internal)** Implementation of the `SymbolicContext`.
-mod _impl_symbolic_context;
-
 /// **(internal)** Implementation for `FunctionTable` and `FunctionTableIterator`.
 mod _impl_function_table;
+/// **(internal)** Implement set operations for `GraphColoredVertices`.
+mod _impl_graph_colored_vertices;
+/// **(internal)** Implement set operations for `GraphColors`.
+mod _impl_graph_colors;
+/// **(internal)** Implement set operations for `GraphVertices`.
+mod _impl_graph_vertices;
+/// **(internal)** Utility methods for validation of static constraints on network regulations.
+mod _impl_regulation_constraint;
+/// **(internal)** Utility methods for `SymbolicAsyncGraph`.
+mod _impl_symbolic_async_graph;
+/// **(internal)** Implement symbolic graph operators (pre/post/...).
+mod _impl_symbolic_async_graph_operators;
+/// **(internal)** Implementation of the `SymbolicContext`.
+mod _impl_symbolic_context;
 
 /// Symbolic representation of a color set.
 ///
