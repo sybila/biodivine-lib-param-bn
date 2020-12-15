@@ -36,33 +36,28 @@ impl SymbolicContext {
         let mut explicit_function_tables: Vec<Option<FunctionTable>> =
             vec![None; network.num_parameters()];
 
-        for scc in network.graph.components().into_iter().rev() {
-            for variable in scc {
-                let variable_name = network[variable].get_name();
-                let state_variable = builder.make_variable(&variable_name);
-                state_variables.push(state_variable);
-                if let Some(update_function) = network.get_update_function(variable) {
-                    // For explicit function, go through all parameters used in the function.
-                    for parameter in update_function.parameters() {
-                        if explicit_function_tables[parameter.0].is_none() {
-                            // Only compute if not already handled...
-                            let parameter_function = &network[parameter];
-                            let arity: u16 = parameter_function.get_arity().try_into().unwrap();
-                            let function_table = FunctionTable::new(
-                                parameter_function.get_name(),
-                                arity,
-                                &mut builder,
-                            );
-                            explicit_function_tables[parameter.0] = Some(function_table);
-                        }
+        for variable in network.variables() {
+            let variable_name = network[variable].get_name();
+            let state_variable = builder.make_variable(&variable_name);
+            state_variables.push(state_variable);
+            if let Some(update_function) = network.get_update_function(variable) {
+                // For explicit function, go through all parameters used in the function.
+                for parameter in update_function.parameters() {
+                    if explicit_function_tables[parameter.0].is_none() {
+                        // Only compute if not already handled...
+                        let parameter_function = &network[parameter];
+                        let arity: u16 = parameter_function.get_arity().try_into().unwrap();
+                        let function_table =
+                            FunctionTable::new(parameter_function.get_name(), arity, &mut builder);
+                        explicit_function_tables[parameter.0] = Some(function_table);
                     }
-                } else {
-                    // Implicit update function.
-                    let arity: u16 = network.regulators(variable).len().try_into().unwrap();
-                    let function_name = format!("f_{}", variable_name);
-                    let function_table = FunctionTable::new(&function_name, arity, &mut builder);
-                    implicit_function_tables[variable.0] = Some(function_table);
                 }
+            } else {
+                // Implicit update function.
+                let arity: u16 = network.regulators(variable).len().try_into().unwrap();
+                let function_name = format!("f_{}", variable_name);
+                let function_table = FunctionTable::new(&function_name, arity, &mut builder);
+                implicit_function_tables[variable.0] = Some(function_table);
             }
         }
 
