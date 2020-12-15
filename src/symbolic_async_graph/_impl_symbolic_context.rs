@@ -36,7 +36,7 @@ impl SymbolicContext {
         let mut explicit_function_tables: Vec<Option<FunctionTable>> =
             vec![None; network.num_parameters()];
 
-        for scc in network.graph.components() {
+        for scc in network.graph.components().into_iter().rev() {
             for variable in scc {
                 let variable_name = network[variable].get_name();
                 let state_variable = builder.make_variable(&variable_name);
