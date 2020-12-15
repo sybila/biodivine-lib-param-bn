@@ -22,12 +22,12 @@ impl GraphColors {
 
     /// Convert this set to a raw `Bdd`.
     pub fn into_bdd(self) -> Bdd {
-        return self.bdd;
+        self.bdd
     }
 
     /// View this set as a raw `Bdd`.
     pub fn as_bdd(&self) -> &Bdd {
-        return &self.bdd;
+        &self.bdd
     }
 
     /// Pick one color from this set and return it as a singleton.
@@ -53,7 +53,7 @@ impl GraphColors {
         let state_variable_count =
             self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
         let state_count = (2.0f64).powi(state_variable_count.into());
-        return self.bdd.cardinality() / state_count;
+        self.bdd.cardinality() / state_count
     }
 }
 

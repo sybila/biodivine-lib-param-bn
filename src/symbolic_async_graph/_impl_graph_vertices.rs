@@ -24,12 +24,12 @@ impl GraphVertices {
 
     /// Convert this vertex set into a raw `Bdd`.
     pub fn into_bdd(self) -> Bdd {
-        return self.bdd;
+        self.bdd
     }
 
     /// View this vertex set as a raw `Bdd`.
     pub fn as_bdd(&self) -> &Bdd {
-        return &self.bdd;
+        &self.bdd
     }
 
     /// Approximate size of this set (error grows for large sets).
@@ -37,7 +37,7 @@ impl GraphVertices {
         let parameter_variable_count =
             self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
         let parameter_count = 2.0f64.powi(parameter_variable_count.into());
-        return self.bdd.cardinality() / parameter_count;
+        self.bdd.cardinality() / parameter_count
     }
 
     /// Create an iterable view of this vertex set.

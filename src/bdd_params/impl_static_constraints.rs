@@ -65,7 +65,7 @@ pub fn build_static_constraints(bn: &BooleanNetwork, encoder: &BddParameterEncod
             }
         }
     }
-    return condition;
+    condition
 }
 
 struct Ctx<'a> {
@@ -75,7 +75,7 @@ struct Ctx<'a> {
 
 impl<'a> Ctx<'a> {
     pub fn new(bn: &'a BooleanNetwork, encoder: &'a BddParameterEncoder) -> Ctx<'a> {
-        return Ctx { bn, encoder };
+        Ctx { bn, encoder }
     }
 
     /// Transform a table pair into pair of `Bdd`s assuming an update function is known.
@@ -83,7 +83,7 @@ impl<'a> Ctx<'a> {
         let (inactive, active) = states;
         let inactive = fun._symbolic_eval(inactive, self.encoder);
         let active = fun._symbolic_eval(active, self.encoder);
-        return (inactive, active);
+        (inactive, active)
     }
 
     /// Transform a table pair into a pair of `Bdd`s assuming an implicit update function.
@@ -93,7 +93,7 @@ impl<'a> Ctx<'a> {
         let active = self.encoder.get_implicit(active, variable);
         let inactive = self.encoder.bdd_variables.mk_var(inactive);
         let active = self.encoder.bdd_variables.mk_var(active);
-        return (inactive, active);
+        (inactive, active)
     }
 }
 
@@ -105,7 +105,7 @@ fn build_monotonicity_implicit<'a>(ctx: &Ctx<'a>, regulation: &'a Regulation) ->
             build_monotonicity_pair(&inactive, &active, regulation.monotonicity.unwrap());
         condition = bdd!(condition & monotonous);
     }
-    return condition;
+    condition
 }
 
 fn build_observability_implicit<'a>(ctx: &Ctx<'a>, regulation: &'a Regulation) -> Bdd {
@@ -114,7 +114,7 @@ fn build_observability_implicit<'a>(ctx: &Ctx<'a>, regulation: &'a Regulation) -
         let (inactive, active) = ctx.pair_implicit(states, regulation.target);
         condition = bdd!(condition | (!(inactive <=> active)));
     }
-    return condition;
+    condition
 }
 
 fn build_monotonicity_explicit<'a>(
@@ -129,7 +129,7 @@ fn build_monotonicity_explicit<'a>(
             build_monotonicity_pair(&inactive, &active, regulation.monotonicity.unwrap());
         condition = bdd!(condition & monotonous);
     }
-    return condition;
+    condition
 }
 
 fn build_observability_explicit<'a>(
@@ -142,7 +142,7 @@ fn build_observability_explicit<'a>(
         let (inactive, active) = ctx.pair_explicit(states, update_function);
         condition = bdd!(condition | (!(inactive <=> active)));
     }
-    return condition;
+    condition
 }
 
 /// **(internal)** Iterates over pairs of states where the first state has a particular regulator
@@ -170,7 +170,7 @@ impl Iterator for InputStatesPairIterator {
                 return Some((state, state.flip_bit(self.variable.0)));
             }
         }
-        return None;
+        None
     }
 }
 
@@ -183,12 +183,12 @@ impl InputStatesPairIterator {
             .unwrap();
         let table_size = 1 << regulators.len();
         let mask = 1 << regulator_index; // select the regulator bit of the table index
-        return InputStatesPairIterator {
+        InputStatesPairIterator {
             regulators,
             variable: regulation.regulator,
             mask,
             range: (0..table_size),
-        };
+        }
     }
 }
 
@@ -197,10 +197,9 @@ impl InputStatesPairIterator {
 ///
 /// index: 0110, args: (0, 3, 5, 6) -> 0101000
 /// index: abcd, args: (0, 3, 5, 6) -> dc0b00a
-fn extend_table_index_to_state(table_index: usize, args: &Vec<VariableId>) -> IdState {
+fn extend_table_index_to_state(table_index: usize, args: &[VariableId]) -> IdState {
     let mut state: usize = 0;
-    for i in 0..args.len() {
-        let regulator = args[i];
+    for (i, regulator) in args.iter().enumerate() {
         if (table_index >> i) & 1 == 1 {
             // If we have one in the table index
             // then we also put one in the state,
@@ -208,16 +207,16 @@ fn extend_table_index_to_state(table_index: usize, args: &Vec<VariableId>) -> Id
             state |= 1 << regulator.0;
         }
     }
-    return IdState::from(state);
+    IdState::from(state)
 }
 
 /// **(internal)** Builds a `Bdd` of parameters corresponding to valuations where the given
 /// pair of function entries behaves monotonously.
 fn build_monotonicity_pair(inactive: &Bdd, active: &Bdd, monotonicity: Monotonicity) -> Bdd {
-    return match monotonicity {
+    match monotonicity {
         // increasing: [f(0) = 1] => [f(1) = 1]
         Monotonicity::Activation => bdd!(inactive => active),
         // decreasing: [f(0) = 0] => [f(1) = 0] which is equivalent to [f(0) = 1] => [f(1) = 1]
         Monotonicity::Inhibition => bdd!(active => inactive),
-    };
+    }
 }

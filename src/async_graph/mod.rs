@@ -89,15 +89,15 @@ impl<'a, Edges: AsyncGraphEdgeParams> Graph for &'a AsyncGraph<Edges> {
     type BwdEdges = Bwd<'a, Edges>;
 
     fn states(&self) -> Self::States {
-        return IdStateRange::new(self.num_states());
+        IdStateRange::new(self.num_states())
     }
 
     fn fwd(&self) -> Self::FwdEdges {
-        return Fwd { graph: self };
+        Fwd { graph: self }
     }
 
     fn bwd(&self) -> Self::BwdEdges {
-        return Bwd { graph: self };
+        Bwd { graph: self }
     }
 }
 

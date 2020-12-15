@@ -13,45 +13,42 @@ impl BooleanNetwork {
         let mut parser = EventReader::new(model_file.as_bytes());
         // First tag should be sbml - read it and verify that it has necessary properties, then read model
         while let Ok(event) = parser.next() {
-            match event {
-                XmlEvent::StartElement {
-                    name, attributes, ..
-                } => {
-                    if name.local_name.as_str() == "sbml" {
-                        for attr in attributes {
-                            if attr.name.local_name.as_str() == "xmlns" {
-                                if attr.value.as_str()
-                                    != "http://www.sbml.org/sbml/level3/version1/core"
-                                {
-                                    return Err(format!("Expected xmlns=\"http://www.sbml.org/sbml/level3/version1/core\", found {}", attr.value));
-                                }
-                            }
-                            if attr.name.local_name.as_str() == "qual" {
-                                if attr.value.as_str()
-                                    != "http://www.sbml.org/sbml/level3/version1/qual/version1"
-                                {
-                                    return Err(format!("Expected qual:xmlns=\"http://www.sbml.org/sbml/level3/version1/qual/version1\", found {}", attr.value));
-                                }
-                            }
+            if let XmlEvent::StartElement {
+                name, attributes, ..
+            } = event
+            {
+                return if name.local_name.as_str() == "sbml" {
+                    for attr in attributes {
+                        if attr.name.local_name.as_str() == "xmlns"
+                            && attr.value.as_str()
+                                != "http://www.sbml.org/sbml/level3/version1/core"
+                        {
+                            return Err(format!("Expected xmlns=\"http://www.sbml.org/sbml/level3/version1/core\", found {}", attr.value));
                         }
-                        return read_model(&mut parser);
-                    } else {
-                        return Err(format!("Expected sbml, found {}", name.local_name));
+                        if attr.name.local_name.as_str() == "qual"
+                            && attr.value.as_str()
+                                != "http://www.sbml.org/sbml/level3/version1/qual/version1"
+                        {
+                            return Err(format!("Expected qual:xmlns=\"http://www.sbml.org/sbml/level3/version1/qual/version1\", found {}", attr.value));
+                        }
                     }
-                }
-                _ => {}
+                    read_model(&mut parser)
+                } else {
+                    Err(format!("Expected sbml, found {}", name.local_name))
+                };
             }
         }
         if let Some(error) = parser.next().err() {
-            return Err(error.to_string());
+            Err(error.to_string())
+        } else {
+            Err("Expected </sbml>, but found end of XML document.".to_string())
         }
-        return Err("Expected </sbml>, but found end of XML document.".to_string());
     }
 }
 
 pub type Layout = HashMap<String, (f64, f64)>;
 
-fn resolve_specie<'a, 'b>(species: &'a Vec<(String, String)>, id: &'b str) -> &'a str {
+fn resolve_specie<'a, 'b>(species: &'a [(String, String)], id: &'b str) -> &'a str {
     for (existing_id, name) in species.iter() {
         if existing_id == id {
             return name.as_str();
@@ -60,13 +57,13 @@ fn resolve_specie<'a, 'b>(species: &'a Vec<(String, String)>, id: &'b str) -> &'
     panic!("Unknown specie: {}.", id);
 }
 
-fn rename_fn_variables(species: &Vec<(String, String)>, fun: FnUpdateTemp) -> FnUpdateTemp {
+fn rename_fn_variables(species: &[(String, String)], fun: FnUpdateTemp) -> FnUpdateTemp {
     return match fun {
         Const(_) => fun,
         Param(_, _) => fun,
         Var(name) => Var(resolve_specie(species, &name).to_string()),
         Binary(op, l, r) => Binary(
-            op.clone(),
+            op,
             Box::new(rename_fn_variables(species, *l)),
             Box::new(rename_fn_variables(species, *r)),
         ),
@@ -190,9 +187,10 @@ fn read_model(parser: &mut EventReader<&[u8]>) -> Result<(BooleanNetwork, Layout
         }
     }
     if let Some(error) = parser.next().err() {
-        return Err(error.to_string());
+        Err(error.to_string())
+    } else {
+        Err("Expected </model>, but found end of XML document.".to_string())
     }
-    return Err("Expected </model>, but found end of XML document.".to_string());
 }
 
 fn read_layout(
@@ -226,20 +224,14 @@ fn read_layout(
                                 y = Some(attr.value);
                             }
                         }
-                        match (x, y) {
-                            (Some(x), Some(y)) => {
-                                let x_num = x.parse::<f64>();
-                                let y_num = y.parse::<f64>();
-                                match (x_num, y_num) {
-                                    (Ok(x), Ok(y)) => {
-                                        layout.insert(id.clone(), (x, y));
-                                    }
-                                    // ignore errors - god knows what we can get in those attributes...
-                                    _ => {}
-                                }
+                        if let (Some(x), Some(y)) = (x, y) {
+                            let x_num = x.parse::<f64>();
+                            let y_num = y.parse::<f64>();
+                            if let (Ok(x), Ok(y)) = (x_num, y_num) {
+                                layout.insert(id.clone(), (x, y));
                             }
-                            _ => {}
                         }
+                        // ignore errors - god knows what we can get in those attributes...
                     }
                 }
             }
@@ -254,9 +246,10 @@ fn read_layout(
         }
     }
     if let Some(error) = parser.next().err() {
-        return Err(error.to_string());
+        Err(error.to_string())
+    } else {
+        Err("Expected </layout:layout>, but found end of XML document.".to_string())
     }
-    return Err("Expected </layout:layout>, but found end of XML document.".to_string());
 }
 
 fn normalize_name(name: String) -> String {
@@ -265,7 +258,7 @@ fn normalize_name(name: String) -> String {
     if normalized != name {
         println!("WARNING: Renaming invalid `{}` to `{}`.", name, normalized);
     }
-    return normalized;
+    normalized
 }
 
 /// Read the list of qualitative species from the XML document.
@@ -322,11 +315,10 @@ fn read_species(
         }
     }
     if let Some(error) = parser.next().err() {
-        return Err(error.to_string());
+        Err(error.to_string())
+    } else {
+        Err("Expected </qual:listOfQualitativeSpecies>, but found end of XML document.".to_string())
     }
-    return Err(
-        "Expected </qual:listOfQualitativeSpecies>, but found end of XML document.".to_string(),
-    );
 }
 
 fn read_transitions(
@@ -407,9 +399,10 @@ fn read_transitions(
         }
     }
     if let Some(error) = parser.next().err() {
-        return Err(error.to_string());
+        Err(error.to_string())
+    } else {
+        Err("Expected </qual:listOfTransitions>, but found end of XML document.".to_string())
     }
-    return Err("Expected </qual:listOfTransitions>, but found end of XML document.".to_string());
 }
 
 // TODO: Please please please find a nicer way to parse MathML or let the whole thing die...
@@ -566,178 +559,164 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
                                 Op::Operation(op) => {
                                     if op.is_empty() {
                                         Err("Apply used without any operation.".to_string())
-                                    } else {
-                                        if op.as_str() == "not" {
-                                            if args.len() != 1 {
-                                                Err(format!(
-                                                    "Not takes exactly one argument. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                Ok(FnUpdateTemp::Not(Box::new(args[0].clone())))
-                                            }
-                                        } else if op.as_str() == "eq" {
-                                            if args.len() != 2 {
-                                                Err(format!(
-                                                    "Eq takes exactly two arguments. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                let left = &args[0];
-                                                let right = &args[1];
-                                                match (left, right) {
-                                                    (Const(a), Const(b)) => Ok(Const(a == b)),
-                                                    (Const(true), Var(name)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (Var(name), Const(true)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (Const(false), Var(name)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (Var(name), Const(false)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (l, r) => Ok(Binary(
-                                                        BinaryOp::Iff,
-                                                        Box::new(l.clone()),
-                                                        Box::new(r.clone()),
-                                                    )),
-                                                }
-                                            }
-                                        } else if op.as_str() == "geq" {
-                                            // (A >= B) <=> (!B | A) <=> (B => A)
-                                            if args.len() != 2 {
-                                                Err(format!(
-                                                    "GEQ takes exactly two arguments. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                let left = &args[0];
-                                                let right = &args[1];
-                                                match (left, right) {
-                                                    (Const(a), Const(b)) => Ok(Const(!b | a)),
-                                                    (Const(true), Var(_)) => Ok(Const(true)),
-                                                    (Var(name), Const(true)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (Const(false), Var(name)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (Var(_), Const(false)) => Ok(Const(true)),
-                                                    (l, r) => Ok(Binary(
-                                                        BinaryOp::Imp,
-                                                        Box::new(r.clone()),
-                                                        Box::new(l.clone()),
-                                                    )),
-                                                }
-                                            }
-                                        } else if op.as_str() == "leq" {
-                                            // (A <= B) <=> (!A | B) <=> (A => B)
-                                            if args.len() != 2 {
-                                                Err(format!(
-                                                    "LEQ takes exactly two arguments. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                let left = &args[0];
-                                                let right = &args[1];
-                                                match (left, right) {
-                                                    (Const(a), Const(b)) => Ok(Const(!a | b)),
-                                                    (Const(true), Var(name)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (Var(_), Const(true)) => Ok(Const(true)),
-                                                    (Const(false), Var(_)) => Ok(Const(true)),
-                                                    (Var(name), Const(false)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (l, r) => Ok(Binary(
-                                                        BinaryOp::Imp,
-                                                        Box::new(l.clone()),
-                                                        Box::new(r.clone()),
-                                                    )),
-                                                }
-                                            }
-                                        } else if op.as_str() == "lt" {
-                                            // (A < B) <=> (!A & B)
-                                            if args.len() != 2 {
-                                                Err(format!(
-                                                    "LT takes exactly two arguments. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                let left = &args[0];
-                                                let right = &args[1];
-                                                match (left, right) {
-                                                    (Const(a), Const(b)) => Ok(Const(!a & b)),
-                                                    (Const(true), Var(_)) => Ok(Const(false)),
-                                                    (Var(name), Const(true)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (Const(false), Var(name)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (Var(_), Const(false)) => Ok(Const(false)),
-                                                    (l, r) => Ok(Binary(
-                                                        BinaryOp::And,
-                                                        Box::new(Not(Box::new(l.clone()))),
-                                                        Box::new(r.clone()),
-                                                    )),
-                                                }
-                                            }
-                                        } else if op.as_str() == "gt" {
-                                            // (A > B) <=> (A & !B)
-                                            if args.len() != 2 {
-                                                Err(format!(
-                                                    "GT takes exactly two arguments. {} given.",
-                                                    args.len()
-                                                ))
-                                            } else {
-                                                let left = &args[0];
-                                                let right = &args[1];
-                                                match (left, right) {
-                                                    (Const(a), Const(b)) => Ok(Const(a & !b)),
-                                                    (Const(true), Var(name)) => {
-                                                        Ok(Not(Box::new(Var(name.clone()))))
-                                                    }
-                                                    (Var(_), Const(true)) => Ok(Const(false)),
-                                                    (Const(false), Var(_)) => Ok(Const(false)),
-                                                    (Var(name), Const(false)) => {
-                                                        Ok(Var(name.clone()))
-                                                    }
-                                                    (l, r) => Ok(Binary(
-                                                        BinaryOp::And,
-                                                        Box::new(l.clone()),
-                                                        Box::new(Not(Box::new(r.clone()))),
-                                                    )),
-                                                }
-                                            }
+                                    } else if op.as_str() == "not" {
+                                        if args.len() != 1 {
+                                            Err(format!(
+                                                "Not takes exactly one argument. {} given.",
+                                                args.len()
+                                            ))
                                         } else {
-                                            // a binary op remains then...
-                                            let op = match op.as_str() {
-                                                "and" => Ok(BinaryOp::And),
-                                                "or" => Ok(BinaryOp::Or),
-                                                "xor" => Ok(BinaryOp::Xor),
-                                                "implies" => Ok(BinaryOp::Imp),
-                                                op => Err(format!("Unknown operator {}", op)),
-                                            }?;
-                                            if (op == BinaryOp::And || op == BinaryOp::Or)
-                                                && args.len() == 1
-                                            {
-                                                // Sometimes, tools that work with DNF/CNF representations
-                                                // of boolean functions output an and/or with just one argument.
-                                                // We can ignore those...
-                                                Ok(args[0].clone())
-                                            } else if args.len() < 2 {
-                                                Err("Function argument list must have at least two entries.".to_string())
-                                            } else {
-                                                let one = args[0].clone();
-                                                Ok(args.iter().skip(1).fold(one, |a, b| {
-                                                    Binary(op, Box::new(a), Box::new(b.clone()))
-                                                }))
+                                            Ok(FnUpdateTemp::Not(Box::new(args[0].clone())))
+                                        }
+                                    } else if op.as_str() == "eq" {
+                                        if args.len() != 2 {
+                                            Err(format!(
+                                                "Eq takes exactly two arguments. {} given.",
+                                                args.len()
+                                            ))
+                                        } else {
+                                            let left = &args[0];
+                                            let right = &args[1];
+                                            match (left, right) {
+                                                (Const(a), Const(b)) => Ok(Const(a == b)),
+                                                (Const(true), Var(name)) => Ok(Var(name.clone())),
+                                                (Var(name), Const(true)) => Ok(Var(name.clone())),
+                                                (Const(false), Var(name)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (Var(name), Const(false)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (l, r) => Ok(Binary(
+                                                    BinaryOp::Iff,
+                                                    Box::new(l.clone()),
+                                                    Box::new(r.clone()),
+                                                )),
                                             }
+                                        }
+                                    } else if op.as_str() == "geq" {
+                                        // (A >= B) <=> (!B | A) <=> (B => A)
+                                        if args.len() != 2 {
+                                            Err(format!(
+                                                "GEQ takes exactly two arguments. {} given.",
+                                                args.len()
+                                            ))
+                                        } else {
+                                            let left = &args[0];
+                                            let right = &args[1];
+                                            match (left, right) {
+                                                (Const(a), Const(b)) => Ok(Const(!b | a)),
+                                                (Const(true), Var(_)) => Ok(Const(true)),
+                                                (Var(name), Const(true)) => Ok(Var(name.clone())),
+                                                (Const(false), Var(name)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (Var(_), Const(false)) => Ok(Const(true)),
+                                                (l, r) => Ok(Binary(
+                                                    BinaryOp::Imp,
+                                                    Box::new(r.clone()),
+                                                    Box::new(l.clone()),
+                                                )),
+                                            }
+                                        }
+                                    } else if op.as_str() == "leq" {
+                                        // (A <= B) <=> (!A | B) <=> (A => B)
+                                        if args.len() != 2 {
+                                            Err(format!(
+                                                "LEQ takes exactly two arguments. {} given.",
+                                                args.len()
+                                            ))
+                                        } else {
+                                            let left = &args[0];
+                                            let right = &args[1];
+                                            match (left, right) {
+                                                (Const(a), Const(b)) => Ok(Const(!a | b)),
+                                                (Const(true), Var(name)) => Ok(Var(name.clone())),
+                                                (Var(_), Const(true)) => Ok(Const(true)),
+                                                (Const(false), Var(_)) => Ok(Const(true)),
+                                                (Var(name), Const(false)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (l, r) => Ok(Binary(
+                                                    BinaryOp::Imp,
+                                                    Box::new(l.clone()),
+                                                    Box::new(r.clone()),
+                                                )),
+                                            }
+                                        }
+                                    } else if op.as_str() == "lt" {
+                                        // (A < B) <=> (!A & B)
+                                        if args.len() != 2 {
+                                            Err(format!(
+                                                "LT takes exactly two arguments. {} given.",
+                                                args.len()
+                                            ))
+                                        } else {
+                                            let left = &args[0];
+                                            let right = &args[1];
+                                            match (left, right) {
+                                                (Const(a), Const(b)) => Ok(Const(!a & b)),
+                                                (Const(true), Var(_)) => Ok(Const(false)),
+                                                (Var(name), Const(true)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (Const(false), Var(name)) => Ok(Var(name.clone())),
+                                                (Var(_), Const(false)) => Ok(Const(false)),
+                                                (l, r) => Ok(Binary(
+                                                    BinaryOp::And,
+                                                    Box::new(Not(Box::new(l.clone()))),
+                                                    Box::new(r.clone()),
+                                                )),
+                                            }
+                                        }
+                                    } else if op.as_str() == "gt" {
+                                        // (A > B) <=> (A & !B)
+                                        if args.len() != 2 {
+                                            Err(format!(
+                                                "GT takes exactly two arguments. {} given.",
+                                                args.len()
+                                            ))
+                                        } else {
+                                            let left = &args[0];
+                                            let right = &args[1];
+                                            match (left, right) {
+                                                (Const(a), Const(b)) => Ok(Const(a & !b)),
+                                                (Const(true), Var(name)) => {
+                                                    Ok(Not(Box::new(Var(name.clone()))))
+                                                }
+                                                (Var(_), Const(true)) => Ok(Const(false)),
+                                                (Const(false), Var(_)) => Ok(Const(false)),
+                                                (Var(name), Const(false)) => Ok(Var(name.clone())),
+                                                (l, r) => Ok(Binary(
+                                                    BinaryOp::And,
+                                                    Box::new(l.clone()),
+                                                    Box::new(Not(Box::new(r.clone()))),
+                                                )),
+                                            }
+                                        }
+                                    } else {
+                                        // a binary op remains then...
+                                        let op = match op.as_str() {
+                                            "and" => Ok(BinaryOp::And),
+                                            "or" => Ok(BinaryOp::Or),
+                                            "xor" => Ok(BinaryOp::Xor),
+                                            "implies" => Ok(BinaryOp::Imp),
+                                            op => Err(format!("Unknown operator {}", op)),
+                                        }?;
+                                        if (op == BinaryOp::And || op == BinaryOp::Or)
+                                            && args.len() == 1
+                                        {
+                                            // Sometimes, tools that work with DNF/CNF representations
+                                            // of boolean functions output an and/or with just one argument.
+                                            // We can ignore those...
+                                            Ok(args[0].clone())
+                                        } else if args.len() < 2 {
+                                            Err("Function argument list must have at least two entries.".to_string())
+                                        } else {
+                                            let one = args[0].clone();
+                                            Ok(args.iter().skip(1).fold(one, |a, b| {
+                                                Binary(op, Box::new(a), Box::new(b.clone()))
+                                            }))
                                         }
                                     }
                                 }
@@ -759,9 +738,10 @@ fn read_update_function(parser: &mut EventReader<&[u8]>) -> Result<FnUpdateTemp,
         }
     }
     if let Some(error) = parser.next().err() {
-        return Err(error.to_string());
+        Err(error.to_string())
+    } else {
+        Err("Expected </qual:listOfFunctionTerms> but found end of document.".to_string())
     }
-    return Err("Expected </qual:listOfFunctionTerms> but found end of document.".to_string());
 }
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -781,11 +761,11 @@ enum Op {
 
 impl SBMLTransition {
     fn new() -> SBMLTransition {
-        return SBMLTransition {
+        SBMLTransition {
             sources: Vec::new(),
             target: String::new(),
             function: None,
-        };
+        }
     }
 }
 

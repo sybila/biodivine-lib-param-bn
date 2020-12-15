@@ -7,30 +7,30 @@ use biodivine_lib_bdd::Bdd;
 impl GraphColoredVertices {
     /// Construct a new colored vertex set from a given `bdd` and symbolic `context`.
     pub fn new(bdd: Bdd, context: &SymbolicContext) -> GraphColoredVertices {
-        return GraphColoredVertices {
+        GraphColoredVertices {
             bdd,
             state_variables: context.state_variables.clone(),
             parameter_variables: context.parameter_variables.clone(),
-        };
+        }
     }
 
     /// Construct a new colored vertex set by copying the context of the current set.
     pub fn copy(&self, bdd: Bdd) -> GraphColoredVertices {
-        return GraphColoredVertices {
+        GraphColoredVertices {
             bdd,
             state_variables: self.state_variables.clone(),
             parameter_variables: self.parameter_variables.clone(),
-        };
+        }
     }
 
     /// Convert this set to a raw `Bdd`.
     pub fn into_bdd(self) -> Bdd {
-        return self.bdd;
+        self.bdd
     }
 
     /// View this set as a raw `Bdd`.
     pub fn as_bdd(&self) -> &Bdd {
-        return &self.bdd;
+        &self.bdd
     }
 
     /// Convert this set to a `.dot` graph.
@@ -40,12 +40,12 @@ impl GraphColoredVertices {
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        return self.bdd.size();
+        self.bdd.size()
     }
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        return self.bdd.cardinality();
+        self.bdd.cardinality()
     }
 }
 
@@ -105,17 +105,17 @@ impl GraphColoredVertices {
 
     /// Set of all colors which are in this set for at least one vertex.
     pub fn colors(&self) -> GraphColors {
-        return GraphColors {
+        GraphColors {
             bdd: self.bdd.project(&self.state_variables),
             parameter_variables: self.parameter_variables.clone(),
-        };
+        }
     }
 
     /// Set of all vertices which are in this set for at least one colour.
     pub fn vertices(&self) -> GraphVertices {
-        return GraphVertices {
+        GraphVertices {
             bdd: self.bdd.project(&self.parameter_variables),
             state_variables: self.state_variables.clone(),
-        };
+        }
     }
 }

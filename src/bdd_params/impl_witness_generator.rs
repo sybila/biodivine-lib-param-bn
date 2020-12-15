@@ -13,7 +13,7 @@ impl BooleanNetwork {
         if valuation.is_none() {
             panic!("Cannot create witness for empty parameter set.");
         }
-        return self.make_witness_for_valuation(valuation.unwrap(), encoder);
+        self.make_witness_for_valuation(valuation.unwrap(), encoder)
     }
 
     pub fn make_witness_for_valuation(
@@ -95,7 +95,7 @@ impl BooleanNetwork {
         result.parameters.clear();
         result.parameter_to_index.clear();
 
-        return result;
+        result
     }
 
     /// Make a Bdd that exactly describes given valuation.
@@ -110,14 +110,14 @@ impl BooleanNetwork {
                 vars.mk_not_var(var)
             });
         }
-        return bdd;
+        bdd
     }
 
     fn replace_parameters(
         update_function: &FnUpdate,
-        parameter_expressions: &Vec<BooleanExpression>,
+        parameter_expressions: &[BooleanExpression],
     ) -> Box<FnUpdate> {
-        return Box::new(match update_function {
+        Box::new(match update_function {
             FnUpdate::Const(value) => FnUpdate::Const(*value),
             FnUpdate::Var(id) => FnUpdate::Var(*id),
             FnUpdate::Not(a) => FnUpdate::Not(Self::replace_parameters(a, parameter_expressions)),
@@ -130,14 +130,14 @@ impl BooleanNetwork {
                 let parameter_expression = &parameter_expressions[id.0];
                 *Self::expression_to_fn_update(parameter_expression, args)
             }
-        });
+        })
     }
 
     fn expression_to_fn_update(
         expression: &BooleanExpression,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Box<FnUpdate> {
-        return Box::new(match expression {
+        Box::new(match expression {
             BooleanExpression::Const(value) => FnUpdate::Const(*value),
             BooleanExpression::Iff(a, b) => FnUpdate::Binary(
                 BinaryOp::Iff,
@@ -171,7 +171,7 @@ impl BooleanNetwork {
                 let arg_index: usize = name.parse().unwrap();
                 FnUpdate::Var(args[arg_index])
             }
-        });
+        })
     }
 }
 

@@ -9,12 +9,12 @@ use std::ops::Index;
 impl BooleanNetwork {
     /// Construct a new `BooleanNetwork` from a `RegulatoryGraph` without any parameters.
     pub fn new(graph: RegulatoryGraph) -> BooleanNetwork {
-        return BooleanNetwork {
+        BooleanNetwork {
             update_functions: vec![None; graph.num_vars()],
             graph,
             parameters: Vec::new(),
             parameter_to_index: HashMap::new(),
-        };
+        }
     }
 
     /// Add a new `Parameter` to the `BooleanNetwork`.
@@ -29,7 +29,7 @@ impl BooleanNetwork {
             name: name.to_string(),
             arity,
         });
-        return Ok(id);
+        Ok(id)
     }
 
     /// Add a new `UpdateFunction` to the `BooleanNetwork`.
@@ -46,28 +46,28 @@ impl BooleanNetwork {
         self.assert_no_update_function(variable)?;
         self.assert_arguments_are_valid(variable, function.arguments())?;
         self.update_functions[variable.0] = Some(function);
-        return Ok(());
+        Ok(())
     }
 
     /// **(internal)** Utility method to ensure that a parameter is also not a variable.
     fn assert_no_such_variable(&self, name: &str) -> Result<(), String> {
-        return if self.graph.find_variable(name) == None {
+        if self.graph.find_variable(name) == None {
             Ok(())
         } else {
             Err(format!(
                 "Cannot add parameter. '{}' is already a variable.",
                 name
             ))
-        };
+        }
     }
 
     /// **(internal)** Utility method to ensure that a parameter is not a duplicate.
     fn assert_no_such_parameter(&self, name: &str) -> Result<(), String> {
-        return if self.find_parameter(name) == None {
+        if self.find_parameter(name) == None {
             Ok(())
         } else {
             Err(format!("Cannot add parameter. '{}' already added.", name))
-        };
+        }
     }
 
     /// **(internal)** Utility method to ensure that an update function is not set yet.
@@ -124,62 +124,62 @@ impl BooleanNetwork {
 impl BooleanNetwork {
     /// Obtain a reference to the underlying `RegulatoryGraph` of the `BooleanNetwork`.
     pub fn as_graph(&self) -> &RegulatoryGraph {
-        return &self.graph;
+        &self.graph
     }
 
     /// The number of variables in this `BooleanNetwork`.
     pub fn num_vars(&self) -> usize {
-        return self.graph.num_vars();
+        self.graph.num_vars()
     }
 
     /// The number of parameters in this `BooleanNetwork`.
     pub fn num_parameters(&self) -> usize {
-        return self.parameters.len();
+        self.parameters.len()
     }
 
     /// Return an iterator over all variable ids of this network.
     pub fn variables(&self) -> VariableIdIterator {
-        return self.graph.variables();
+        self.graph.variables()
     }
 
     /// Return the variable object based on the given `VariableId`.
     pub fn get_variable(&self, id: VariableId) -> &Variable {
-        return self.graph.get_variable(id);
+        self.graph.get_variable(id)
     }
 
     /// Shorthand for `self.as_graph().get_variable(id).get_name()`.
     pub fn get_variable_name(&self, id: VariableId) -> &String {
-        return self.graph.get_variable_name(id);
+        self.graph.get_variable_name(id)
     }
 
     /// Return a sorted list of variables that regulate the given `target` variable.
     pub fn regulators(&self, target: VariableId) -> Vec<VariableId> {
-        return self.graph.regulators(target);
+        self.graph.regulators(target)
     }
 
     /// Return a sorted list of variables that are regulated by the given `regulator` variable.
     pub fn targets(&self, regulator: VariableId) -> Vec<VariableId> {
-        return self.graph.targets(regulator);
+        self.graph.targets(regulator)
     }
 
     /// Find a `ParameterId` corresponding to the given parameter `name`.
     pub fn find_parameter(&self, name: &str) -> Option<ParameterId> {
-        return self.parameter_to_index.get(name).map(|i| *i);
+        self.parameter_to_index.get(name).cloned()
     }
 
     /// Get a `Parameter` corresponding to the given `ParameterId`.
     pub fn get_parameter(&self, id: ParameterId) -> &Parameter {
-        return &self.parameters[id.0];
+        &self.parameters[id.0]
     }
 
     /// Get a `FnUpdate` corresponding to the given `VariableId`.
     pub fn get_update_function(&self, variable: VariableId) -> &Option<FnUpdate> {
-        return &self.update_functions[variable.0];
+        &self.update_functions[variable.0]
     }
 
     /// Return an iterator over all parameter ids of this network.
     pub fn parameters(&self) -> ParameterIdIterator {
-        return (0..self.parameters.len()).map(|i| ParameterId(i));
+        (0..self.parameters.len()).map(ParameterId)
     }
 }
 
@@ -197,6 +197,6 @@ impl Index<ParameterId> for BooleanNetwork {
     type Output = Parameter;
 
     fn index(&self, index: ParameterId) -> &Self::Output {
-        return &self.parameters[index.0];
+        &self.parameters[index.0]
     }
 }

@@ -8,7 +8,7 @@ impl FnUpdateTemp {
     /// Replace all variables that are not valid in the given `RegulatoryGraph` with
     /// unary parameters.
     pub fn unknown_variables_to_parameters(self, rg: &RegulatoryGraph) -> Box<FnUpdateTemp> {
-        return Box::new(match self {
+        Box::new(match self {
             Const(value) => Const(value),
             Binary(op, l, r) => Binary(
                 op,
@@ -24,7 +24,7 @@ impl FnUpdateTemp {
                     Param(name, Vec::new())
                 }
             }
-        });
+        })
     }
 
     /// Write all parameters that appear in this function into a given set.
@@ -82,25 +82,25 @@ impl FnUpdateTemp {
     /// **(internal)** Utility method to safely obtain a variable id from a
     /// network with an appropriate error.
     fn get_variable(bn: &BooleanNetwork, name: &str) -> Result<VariableId, String> {
-        return if let Some(var) = bn.graph.find_variable(name) {
+        if let Some(var) = bn.graph.find_variable(name) {
             Ok(var)
         } else {
             Err(format!(
                 "Can't create update function. Unknown variable '{}'.",
                 name
             ))
-        };
+        }
     }
 
     fn get_parameter(bn: &BooleanNetwork, name: &str) -> Result<ParameterId, String> {
-        return if let Some(par) = bn.find_parameter(name) {
+        if let Some(par) = bn.find_parameter(name) {
             Ok(par)
         } else {
             Err(format!(
                 "Can't create update function. Unknown parameter '{}'.",
                 name
             ))
-        };
+        }
     }
 }
 

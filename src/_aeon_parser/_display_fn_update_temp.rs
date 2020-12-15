@@ -11,15 +11,15 @@ impl Display for FnUpdateTemp {
             Binary(op, l, r) => write!(f, "({} {} {})", l, op, r)?,
             Param(name, args) => {
                 write!(f, "{}", name)?;
-                if args.len() > 0 {
+                if !args.is_empty() {
                     write!(f, "({}", args[0])?;
-                    for i in 1..args.len() {
-                        write!(f, ", {}", args[i])?;
+                    for arg in args.iter().skip(1) {
+                        write!(f, ", {}", arg)?;
                     }
                     write!(f, ")")?;
                 }
             }
         }
-        return Ok(());
+        Ok(())
     }
 }

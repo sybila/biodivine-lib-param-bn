@@ -8,7 +8,7 @@ impl DefaultEdgeParams {
     /// New default edge parametrisation for the given network. Warning: computes the unit set, which can be expensive.
     pub fn new(network: BooleanNetwork) -> Result<DefaultEdgeParams, String> {
         let encoder = BddParameterEncoder::new(&network);
-        return Self::new_with_custom_encoder(network, encoder);
+        Self::new_with_custom_encoder(network, encoder)
     }
 
     pub fn new_with_custom_encoder(
@@ -33,15 +33,15 @@ impl AsyncGraphEdgeParams for DefaultEdgeParams {
     type ParamSet = BddParams;
 
     fn network(&self) -> &BooleanNetwork {
-        return &self.network;
+        &self.network
     }
 
     fn empty_params(&self) -> &Self::ParamSet {
-        return &self.empty_set;
+        &self.empty_set
     }
 
     fn unit_params(&self) -> &Self::ParamSet {
-        return &self.unit_set;
+        &self.unit_set
     }
 
     /// Compute the parameter set which enables the value of `variable` to be flipped
@@ -59,14 +59,14 @@ impl AsyncGraphEdgeParams for DefaultEdgeParams {
         };
 
         // Now if we actually want to go to false, invert the set:
-        return if state.get_bit(variable.0) {
+        if state.get_bit(variable.0) {
             BddParams::from(edge_params.into_bdd().not())
         } else {
             edge_params
-        };
+        }
     }
 
     fn make_witness(&self, params: &Self::ParamSet) -> BooleanNetwork {
-        return self.network.make_witness(params, &self.encoder);
+        self.network.make_witness(params, &self.encoder)
     }
 }

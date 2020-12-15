@@ -16,7 +16,7 @@ impl BddParameterEncoder {
             );
         }
         let bdd = BddVariableSetBuilder::new();
-        return Self::new_with_custom_variables(bn, bdd);
+        Self::new_with_custom_variables(bn, bdd)
     }
 
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`
@@ -25,12 +25,12 @@ impl BddParameterEncoder {
         bn: &BooleanNetwork,
         mut bdd: BddVariableSetBuilder,
     ) -> BddParameterEncoder {
-        return BddParameterEncoder {
+        BddParameterEncoder {
             regulators: Self::build_regulators_table(bn),
             explicit_function_tables: Self::build_explicit_function_table(bn, &mut bdd),
             implicit_function_tables: Self::build_implicit_function_table(bn, &mut bdd),
             bdd_variables: bdd.build(),
-        };
+        }
     }
 
     /*
@@ -57,7 +57,7 @@ impl BddParameterEncoder {
 
             table.push(p_vars);
         }
-        return table;
+        table
     }
 
     pub(crate) fn build_implicit_function_table(
@@ -68,7 +68,7 @@ impl BddParameterEncoder {
         for vid in network.graph.variables() {
             let v = network.graph.get_variable(vid);
 
-            if let Some(_) = network.get_update_function(vid) {
+            if network.get_update_function(vid).is_some() {
                 table.push(Vec::new());
             } else {
                 let args = network.graph.regulators(vid);
@@ -86,43 +86,43 @@ impl BddParameterEncoder {
                 table.push(p_vars);
             }
         }
-        return table;
+        table
     }
 
     pub(crate) fn build_regulators_table(network: &BooleanNetwork) -> Vec<Vec<VariableId>> {
         let mut table = Vec::new();
         for vid in network.graph.variables() {
-            if let Some(_) = network.get_update_function(vid) {
+            if network.get_update_function(vid).is_some() {
                 table.push(Vec::new());
             } else {
                 let args = network.graph.regulators(vid);
                 table.push(args);
             }
         }
-        return table;
+        table
     }
 
     /// A vector of entries in the table of a specific function.
     pub fn implicit_function_table(&self, target: VariableId) -> Vec<FunctionTableEntry> {
         let regulators = &self.regulators[target.0];
         let table = &self.implicit_function_tables[target.0];
-        return (0..table.len())
+        (0..table.len())
             .map(|i| FunctionTableEntry {
                 table: target.0,
                 entry_index: i,
                 regulators,
             })
-            .collect();
+            .collect()
     }
 
     /// Get teh parameters which correspond to a specific table entry being one.
     pub fn get_implicit_for_table(&self, entry: &FunctionTableEntry) -> BddParams {
         let var = self.implicit_function_tables[entry.table][entry.entry_index];
-        return BddParams(self.bdd_variables.mk_var(var));
+        BddParams(self.bdd_variables.mk_var(var))
     }
 
     pub fn get_implicit_var_for_table(&self, entry: &FunctionTableEntry) -> BddVariable {
-        return self.implicit_function_tables[entry.table][entry.entry_index];
+        self.implicit_function_tables[entry.table][entry.entry_index]
     }
 
     /// Find the `BddVariable` corresponding to the value of the `parameter` function
@@ -131,10 +131,10 @@ impl BddParameterEncoder {
         &self,
         state: IdState,
         parameter: ParameterId,
-        arguments: &Vec<VariableId>,
+        arguments: &[VariableId],
     ) -> BddVariable {
         let table_index = Self::compute_table_index(state, arguments);
-        return self.explicit_function_tables[parameter.0][table_index];
+        self.explicit_function_tables[parameter.0][table_index]
     }
 
     /// Make a `BddParams` set which corresponds to the valuations for which the value of
@@ -143,10 +143,10 @@ impl BddParameterEncoder {
         &self,
         state: IdState,
         parameter: ParameterId,
-        arguments: &Vec<VariableId>,
+        arguments: &[VariableId],
     ) -> BddParams {
         let var = self.get_explicit(state, parameter, arguments);
-        return BddParams(self.bdd_variables.mk_var(var));
+        BddParams(self.bdd_variables.mk_var(var))
     }
 
     /// Find the `BddVariable` corresponding to the value of the implicit update function
@@ -165,28 +165,28 @@ impl BddParameterEncoder {
             return table[0];
         }
         let table_index = Self::compute_table_index(state, regulators);
-        return self.implicit_function_tables[variable.0][table_index];
+        self.implicit_function_tables[variable.0][table_index]
     }
 
     /// Make a `BddParams` set which corresponds to the valuations for which the value of
     /// an implicit update function of `variable` is true in the given `state`.
     pub fn implicit_true_when(&self, state: IdState, variable: VariableId) -> BddParams {
         let var = self.get_implicit(state, variable);
-        return BddParams(self.bdd_variables.mk_var(var));
+        BddParams(self.bdd_variables.mk_var(var))
     }
 
     // Compute which function table entry does the arguments correspond to in the given `state`.
-    fn compute_table_index(state: IdState, args: &Vec<VariableId>) -> usize {
+    fn compute_table_index(state: IdState, args: &[VariableId]) -> usize {
         let mut table_index: usize = 0;
         for i in 0..args.len() {
             if state.get_bit(args[args.len() - 1 - i].0) {
                 table_index += 1;
             }
             if i < args.len() - 1 {
-                table_index = table_index << 1;
+                table_index <<= 1;
             }
         }
-        return table_index;
+        table_index
     }
 }
 

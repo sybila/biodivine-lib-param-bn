@@ -27,7 +27,7 @@ impl FnUpdate {
         r_arguments(self, &mut args);
         let mut result: Vec<VariableId> = args.into_iter().collect();
         result.sort();
-        return result;
+        result
     }
 
     /// Return a sorted vector of all parameters (or uninterpreted functions) that are used
@@ -51,6 +51,6 @@ impl FnUpdate {
         r_parameters(self, &mut params);
         let mut result: Vec<ParameterId> = params.into_iter().collect();
         result.sort();
-        return result;
+        result
     }
 }

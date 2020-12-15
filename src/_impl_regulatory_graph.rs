@@ -12,14 +12,14 @@ impl RegulatoryGraph {
     ///
     /// The ordering of the variables is preserved.
     pub fn new(variables: Vec<String>) -> RegulatoryGraph {
-        return RegulatoryGraph {
+        RegulatoryGraph {
             regulations: Vec::new(),
             variable_to_index: build_index_map(&variables, |_, i| VariableId(i)),
             variables: variables
                 .into_iter()
                 .map(|name| Variable { name })
                 .collect(),
-        };
+        }
     }
 
     /// Add a new `Regulation` to this `RegulatoryGraph`.
@@ -42,21 +42,19 @@ impl RegulatoryGraph {
             observable,
             monotonicity,
         });
-        return Ok(());
+        Ok(())
     }
 
     /// **(internal)** Utility method to safely obtain a regulator variable (using an appropriate error message).
     fn get_regulator(&self, name: &str) -> Result<VariableId, String> {
-        return self
-            .find_variable(name)
-            .ok_or(format!("Invalid regulation: Unknown regulator {}.", name));
+        self.find_variable(name)
+            .ok_or(format!("Invalid regulation: Unknown regulator {}.", name))
     }
 
     /// **(internal)** Utility method to safely obtain a target variable (using an appropriate error message).
     fn get_target(&self, name: &str) -> Result<VariableId, String> {
-        return self
-            .find_variable(name)
-            .ok_or(format!("Invalid regulation: Unknown target {}.", name));
+        self.find_variable(name)
+            .ok_or(format!("Invalid regulation: Unknown target {}.", name))
     }
 
     /// **(internal)** Utility method to ensure there is no regulation between the two variables yet.
@@ -65,7 +63,7 @@ impl RegulatoryGraph {
         regulator: VariableId,
         target: VariableId,
     ) -> Result<(), String> {
-        return if self.find_regulation(regulator, target) == None {
+        if self.find_regulation(regulator, target) == None {
             Ok(())
         } else {
             Err(format!(
@@ -73,7 +71,7 @@ impl RegulatoryGraph {
                 self.get_variable(regulator),
                 self.get_variable(target)
             ))
-        };
+        }
     }
 }
 
@@ -81,22 +79,22 @@ impl RegulatoryGraph {
 impl RegulatoryGraph {
     /// The number of variables in this `RegulatoryGraph`.
     pub fn num_vars(&self) -> usize {
-        return self.variables.len();
+        self.variables.len()
     }
 
     /// Find a `VariableId` for the given name, or `None` if the variable does not exist.
     pub fn find_variable(&self, name: &str) -> Option<VariableId> {
-        return self.variable_to_index.get(name).map(|id| *id);
+        self.variable_to_index.get(name).cloned()
     }
 
     /// Return a `Variable` corresponding to the given `VariableId`.
     pub fn get_variable(&self, id: VariableId) -> &Variable {
-        return &self.variables[id.0];
+        &self.variables[id.0]
     }
 
     /// Shorthand for `self.get_variable(id).get_name()`.
     pub fn get_variable_name(&self, id: VariableId) -> &String {
-        return &self.variables[id.0].name;
+        &self.variables[id.0].name
     }
 
     /// Find a `Regulation` between two variables if it exists, `None` otherwise.
@@ -110,7 +108,7 @@ impl RegulatoryGraph {
                 return Some(r);
             }
         }
-        return None;
+        None
     }
 
     /// Return a sorted list of variables that regulate the given `target` variable.
@@ -122,7 +120,7 @@ impl RegulatoryGraph {
             .map(|r| r.regulator)
             .collect();
         regulators.sort();
-        return regulators;
+        regulators
     }
 
     /// Return the set of direct as well as transitive regulators of `target`.
@@ -140,7 +138,7 @@ impl RegulatoryGraph {
             }
         }
         r_regulators(self, target, &mut regulators);
-        return regulators;
+        regulators
     }
 
     /// Return a sorted list of variables that are regulated by the given `regulator` variable.
@@ -152,7 +150,7 @@ impl RegulatoryGraph {
             .map(|r| r.target)
             .collect();
         targets.sort();
-        return targets;
+        targets
     }
 
     /// Return a set of direct as well as transitive targets of `regulator`.
@@ -170,7 +168,7 @@ impl RegulatoryGraph {
             }
         }
         r_targets(self, regulator, &mut targets);
-        return targets;
+        targets
     }
 
     /// Compute the strongly connected components of this regulatory graph. The components
@@ -199,7 +197,7 @@ impl RegulatoryGraph {
         components.sort_by(|a, b| {
             let pivot_a = *a.iter().next().unwrap();
             let pivot_b = *b.iter().next().unwrap();
-            return if a.contains(&pivot_b) || b.contains(&pivot_a) {
+            if a.contains(&pivot_b) || b.contains(&pivot_a) {
                 Ordering::Equal
             } else {
                 let targets_a = self.transitive_targets(pivot_a);
@@ -214,14 +212,14 @@ impl RegulatoryGraph {
                 }
                 // The components are not comparable - compare them based on size.
                 a.len().cmp(&b.len())
-            };
+            }
         });
-        return components;
+        components
     }
 
     /// Return an iterator over all variable ids of this graph.
     pub fn variables(&self) -> VariableIdIterator {
-        return (0..self.variables.len()).map(|i| VariableId(i));
+        (0..self.variables.len()).map(VariableId)
     }
 }
 

@@ -5,9 +5,9 @@ use std::fmt::{Display, Error, Formatter};
 impl Display for RegulatoryGraph {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         for r in &self.regulations {
-            write!(
+            writeln!(
                 f,
-                "{} {} {}\n",
+                "{} {} {}",
                 self.get_variable(r.regulator),
                 relationship_string(&r),
                 self.get_variable(r.target)
@@ -18,15 +18,14 @@ impl Display for RegulatoryGraph {
 }
 
 fn relationship_string(regulation: &Regulation) -> &str {
-    let s = match (regulation.observable, regulation.monotonicity) {
+    match (regulation.observable, regulation.monotonicity) {
         (true, Some(Activation)) => "->",
         (true, Some(Inhibition)) => "-|",
         (true, None) => "-?",
         (false, Some(Activation)) => "->?",
         (false, Some(Inhibition)) => "-|?",
         (false, None) => "-??",
-    };
-    return s;
+    }
 }
 
 #[cfg(test)]

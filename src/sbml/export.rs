@@ -7,7 +7,7 @@ impl BooleanNetwork {
         let mut buffer: Vec<u8> = Vec::new();
         self.write_as_sbml(&mut buffer, layout)
             .expect("Cannot write model to SBML.");
-        return String::from_utf8(buffer).expect("Invalid UTF formatting in string.");
+        String::from_utf8(buffer).expect("Invalid UTF formatting in string.")
     }
 
     pub fn write_as_sbml(
@@ -28,7 +28,7 @@ impl BooleanNetwork {
         self.write_transitions(out)?;
         write!(out, "</model>")?;
         write!(out, "</sbml>")?;
-        return Ok(());
+        Ok(())
     }
 
     fn write_species(&self, out: &mut dyn Write) -> Result<(), Error> {
@@ -37,7 +37,7 @@ impl BooleanNetwork {
             write!(out, "<qual:qualitativeSpecies qual:maxLevel=\"1\" qual:constant=\"false\" qual:name=\"{}\" qual:id=\"{}\"/>", v.name, v.name)?;
         }
         write!(out, "</qual:listOfQualitativeSpecies>")?;
-        return Ok(());
+        Ok(())
     }
 
     fn write_transitions(&self, out: &mut dyn Write) -> Result<(), Error> {
@@ -84,7 +84,7 @@ impl BooleanNetwork {
             write!(out, "</qual:transition>")?;
         }
         write!(out, "</qual:listOfTransitions>")?;
-        return Ok(());
+        Ok(())
     }
 
     fn write_update_function(&self, out: &mut dyn Write, function: &FnUpdate) -> Result<(), Error> {
@@ -126,7 +126,7 @@ impl BooleanNetwork {
                 write!(out, "</apply>")?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -156,7 +156,7 @@ fn write_layout(out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Re
     write!(out, "</layout:listOfAdditionalGraphicalObjects>")?;
     write!(out, "</layout:layout>")?;
     write!(out, "</layout:listOfLayouts>")?;
-    return Ok(());
+    Ok(())
 }
 
 #[cfg(test)]

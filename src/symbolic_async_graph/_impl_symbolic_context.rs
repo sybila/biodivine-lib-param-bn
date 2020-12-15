@@ -103,17 +103,17 @@ impl SymbolicContext {
 
     /// Provides access to the raw `Bdd` context.
     pub fn bdd_variable_set(&self) -> &BddVariableSet {
-        return &self.bdd;
+        &self.bdd
     }
 
     /// Getter for variables encoding the state variables of the network.
     pub fn state_variables(&self) -> &Vec<BddVariable> {
-        return &self.state_variables;
+        &self.state_variables
     }
 
     /// Getter for variables encoding the parameter variables of the network.
     pub fn parameter_variables(&self) -> &Vec<BddVariable> {
-        return &self.parameter_variables;
+        &self.parameter_variables
     }
 
     /// Create a constant true/false `Bdd`.
@@ -135,7 +135,7 @@ impl SymbolicContext {
     pub fn mk_uninterpreted_function_is_true(
         &self,
         parameter: ParameterId,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.mk_function_table_true(table, &self.prepare_args(args))
@@ -145,11 +145,7 @@ impl SymbolicContext {
     /// given arguments.
     ///
     /// Panic: Variable must have an implicit uninterpreted function.
-    pub fn mk_implicit_function_is_true(
-        &self,
-        variable: VariableId,
-        args: &Vec<VariableId>,
-    ) -> Bdd {
+    pub fn mk_implicit_function_is_true(&self, variable: VariableId, args: &[VariableId]) -> Bdd {
         let table = &self.implicit_function_tables[variable.0];
         let table = table.as_ref().unwrap_or_else(|| {
             panic!(
@@ -186,7 +182,7 @@ impl SymbolicContext {
     ///
     /// Note that this actually allows functions which do not have just variables as arguments.
     //  In the future we can use this to build truly universal uninterpreted functions.
-    fn mk_function_table_true(&self, function_table: &FunctionTable, args: &Vec<Bdd>) -> Bdd {
+    fn mk_function_table_true(&self, function_table: &FunctionTable, args: &[Bdd]) -> Bdd {
         let mut result = self.bdd.mk_true();
         for (input_row, output) in function_table {
             let row_true = input_row
@@ -210,7 +206,7 @@ impl SymbolicContext {
         &self,
         valuation: &BddValuation,
         function_table: &FunctionTable,
-        args: &Vec<Bdd>,
+        args: &[Bdd],
     ) -> Bdd {
         let mut result = self.bdd.mk_false();
         for (input_row, output) in function_table {
@@ -232,7 +228,7 @@ impl SymbolicContext {
         &self,
         valuation: &BddValuation,
         variable: VariableId,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Bdd {
         let table = &self.implicit_function_tables[variable.0];
         let table = table.as_ref().unwrap_or_else(|| {
@@ -249,7 +245,7 @@ impl SymbolicContext {
         &self,
         valuation: &BddValuation,
         parameter: ParameterId,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.instantiate_function_table(valuation, table, &self.prepare_args(args))
@@ -279,7 +275,7 @@ impl SymbolicContext {
     }
 
     /// **(internal)** Utility method for converting `VariableId` arguments to `Bdd` arguments.
-    fn prepare_args(&self, args: &Vec<VariableId>) -> Vec<Bdd> {
+    fn prepare_args(&self, args: &[VariableId]) -> Vec<Bdd> {
         return args
             .iter()
             .map(|v| self.mk_state_variable_is_true(*v))
@@ -301,9 +297,7 @@ fn network_symbolic_size(network: &BooleanNetwork) -> u32 {
     let mut size: u32 = 0;
     for parameter_id in network.parameters() {
         let arity = network.get_parameter(parameter_id).arity;
-        size = size
-            .checked_add(arity_to_row_count(arity))
-            .unwrap_or(u32::MAX);
+        size = size.saturating_add(arity_to_row_count(arity))
     }
     for variable_id in network.variables() {
         if network.get_update_function(variable_id).is_none() {
@@ -312,9 +306,7 @@ fn network_symbolic_size(network: &BooleanNetwork) -> u32 {
                 .len()
                 .try_into()
                 .unwrap_or(u32::MAX);
-            size = size
-                .checked_add(arity_to_row_count(arity))
-                .unwrap_or(u32::MAX);
+            size = size.saturating_add(arity_to_row_count(arity))
         }
     }
     size

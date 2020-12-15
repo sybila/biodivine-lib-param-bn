@@ -11,7 +11,7 @@ impl TryFrom<&str> for BooleanNetwork {
         // trim lines and remove comments
         let lines = value.lines().filter_map(|l| {
             let line = l.trim();
-            if line.is_empty() || line.chars().next() == Some('#') {
+            if line.is_empty() || line.starts_with('#') {
                 None
             } else {
                 Some(line)
@@ -81,7 +81,7 @@ impl TryFrom<&str> for BooleanNetwork {
             bn.add_update_function_template(&name, function)?;
         }
 
-        return Ok(bn);
+        Ok(bn)
     }
 }
 

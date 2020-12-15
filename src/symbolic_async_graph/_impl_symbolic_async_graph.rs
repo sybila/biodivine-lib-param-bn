@@ -29,7 +29,7 @@ impl SymbolicAsyncGraph {
             })
             .collect();
 
-        return Ok(SymbolicAsyncGraph {
+        Ok(SymbolicAsyncGraph {
             vertex_space: (
                 GraphColoredVertices::new(context.bdd.mk_false(), &context),
                 GraphColoredVertices::new(unit_bdd.clone(), &context),
@@ -42,7 +42,7 @@ impl SymbolicAsyncGraph {
             unit_bdd,
             network,
             update_functions,
-        });
+        })
     }
 }
 
@@ -50,12 +50,12 @@ impl SymbolicAsyncGraph {
 impl SymbolicAsyncGraph {
     /// Return a reference to the original Boolean network.
     pub fn network(&self) -> &BooleanNetwork {
-        return &self.network;
+        &self.network
     }
 
     /// Return a reference to the symbolic context of this graph.
     pub fn symbolic_context(&self) -> &SymbolicContext {
-        return &self.symbolic_context;
+        &self.symbolic_context
     }
 
     /// Create a colored vertex set with a fixed value of the given variable.
@@ -97,47 +97,47 @@ impl SymbolicAsyncGraph {
                 witness.update_functions[variable.0] = Some(instantiated_fn_update);
             }
         }
-        return witness;
+        witness
     }
 
     /// Reference to an empty color set.
     pub fn empty_colors(&self) -> &GraphColors {
-        return &self.color_space.0;
+        &self.color_space.0
     }
 
     /// Make a new copy of empty color set.
     pub fn mk_empty_colors(&self) -> GraphColors {
-        return self.color_space.0.clone();
+        self.color_space.0.clone()
     }
 
     /// Reference to a unit color set.
     pub fn unit_colors(&self) -> &GraphColors {
-        return &self.color_space.1;
+        &self.color_space.1
     }
 
     /// Make a new copy of unit color set.
     pub fn mk_unit_colors(&self) -> GraphColors {
-        return self.color_space.1.clone();
+        self.color_space.1.clone()
     }
 
     /// Reference to an empty colored vertex set.
     pub fn empty_vertices(&self) -> &GraphColoredVertices {
-        return &self.vertex_space.0;
+        &self.vertex_space.0
     }
 
     /// Make a new copy of empty vertex set.
     pub fn mk_empty_vertices(&self) -> GraphColoredVertices {
-        return self.vertex_space.0.clone();
+        self.vertex_space.0.clone()
     }
 
     /// Reference to a unit colored vertex set.
     pub fn unit_vertices(&self) -> &GraphColoredVertices {
-        return &self.vertex_space.1;
+        &self.vertex_space.1
     }
 
     /// Make a new copy of unit vertex set.
     pub fn mk_unit_vertices(&self) -> GraphColoredVertices {
-        return self.vertex_space.1.clone();
+        self.vertex_space.1.clone()
     }
 
     /// Construct a vertex set that only contains one vertex, but all colors

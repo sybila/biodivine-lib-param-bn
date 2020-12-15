@@ -7,10 +7,10 @@ impl Display for BooleanNetwork {
         for var in self.variables() {
             // print all update functions
             if let Some(fun) = self.get_update_function(var) {
-                write!(f, "${}: {}\n", self[var], Fun(self, fun))?;
+                writeln!(f, "${}: {}", self[var], Fun(self, fun))?;
             }
         }
-        return Ok(());
+        Ok(())
     }
 }
 
@@ -26,7 +26,7 @@ impl Display for Fun<'_> {
             FnUpdate::Var(id) => write!(f, "{}", bn[*id])?,
             FnUpdate::Param(id, args) => {
                 write!(f, "{}", bn[*id].get_name())?;
-                if args.len() > 0 {
+                if !args.is_empty() {
                     write!(f, "({}", bn[args[0]])?;
                     for i in 1..args.len() {
                         write!(f, ", {}", bn[args[i]])?;
@@ -35,6 +35,6 @@ impl Display for Fun<'_> {
                 }
             }
         };
-        return Ok(());
+        Ok(())
     }
 }

@@ -14,8 +14,8 @@ fn main() {
 
     let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
 
-    let ref encoder = BddParameterEncoder::new(&model);
-    let ref graph = AsyncGraph::new(model).unwrap();
+    let encoder = &BddParameterEncoder::new(&model);
+    let graph = &AsyncGraph::new(model).unwrap();
     let all_colors = graph.unit_params().clone().into_bdd();
 
     // Compute all actually valid valuations
@@ -36,8 +36,8 @@ fn main() {
             if !p.is_false() {
                 println!("{} -> {}", s, t);
                 let mut first = true;
-                for i in 0..valid_valuations.len() {
-                    if p.eval_in(&valid_valuations[i]) {
+                for (i, valuation) in valid_valuations.iter().enumerate() {
+                    if p.eval_in(valuation) {
                         if !first {
                             print!("|");
                         }
