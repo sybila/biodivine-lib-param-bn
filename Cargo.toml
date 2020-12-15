@@ -3,6 +3,18 @@ name = "biodivine-lib-param-bn"
 version = "0.1.0-beta.1"
 authors = ["Samuel Pastva <daemontus@gmail.com>"]
 edition = "2018"
+description = "Library for working with parametrized Boolean networks."
+homepage = "https://github.com/sybila/biodivine-lib-param-bn"
+repository = "https://github.com/sybila/biodivine-lib-param-bn"
+readme = "README.md"
+keywords = ["boolean network", "asynchronous", "symbolic graph", "systems biology"]
+categories = ["science", "simulation"]
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "sybila/biodivine-lib-param-bn" }
+codecov = { repository = "sybila/biodivine-lib-param-bn" }
+maintenance = { status = "actively-developed" }
 
 [lib]
 name = "biodivine_lib_param_bn"
