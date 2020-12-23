@@ -97,6 +97,9 @@ impl SymbolicAsyncGraph {
                 witness.update_functions[variable.0] = Some(instantiated_fn_update);
             }
         }
+        // Remove all explicit parameters since they have been eliminated.
+        witness.parameters.clear();
+        witness.parameter_to_index.clear();
         witness
     }
 
