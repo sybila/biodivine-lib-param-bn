@@ -221,6 +221,10 @@ impl RegulatoryGraph {
     pub fn variables(&self) -> VariableIdIterator {
         (0..self.variables.len()).map(VariableId)
     }
+
+    pub fn regulations(&self) -> std::slice::Iter<Regulation> {
+        self.regulations.iter()
+    }
 }
 
 /// Allow indexing `RegulatoryGraph` using `VariableId` objects.
