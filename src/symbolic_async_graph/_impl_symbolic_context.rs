@@ -111,6 +111,23 @@ impl SymbolicContext {
         &self.state_variables
     }
 
+    /// Getter for the entire function table of an implicit update function.
+    pub fn get_implicit_function_table(&self, variable: VariableId) -> &FunctionTable {
+        let table = &self.implicit_function_tables[variable.0];
+        let table = table.as_ref().unwrap_or_else(|| {
+            panic!(
+                "Variable {:?} does not have an implicit uninterpreted function.",
+                variable
+            );
+        });
+        table
+    }
+
+    /// Getter for the entire function table of an explicit parameter.
+    pub fn get_explicit_function_table(&self, parameter: ParameterId) -> &FunctionTable {
+        &self.explicit_function_tables[parameter.0]
+    }
+
     /// Getter for variables encoding the parameter variables of the network.
     pub fn parameter_variables(&self) -> &Vec<BddVariable> {
         &self.parameter_variables

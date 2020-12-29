@@ -112,20 +112,19 @@ pub struct SymbolicContext {
     implicit_function_tables: Vec<Option<FunctionTable>>,
 }
 
-/// **(internal)** Function table maps one the table of an uninterpreted function to corresponding
-/// `Bdd`  variables.
+/// Function table maps one the table of an uninterpreted function to corresponding `Bdd` variables.
 ///
 /// The main functionality of a `FunctionTable` is that it provides an iterator over
 /// pairs of `Vec<bool>` (function input assignment) and `BddVariable`
 /// (corresponding symbolic variable).
 #[derive(Debug, Clone)]
-struct FunctionTable {
+pub struct FunctionTable {
     pub arity: u16,
     rows: Vec<BddVariable>,
 }
 
-/// **(internal)** Iterator over elements of the `FunctionTable`.
-struct FunctionTableIterator<'a> {
+/// Iterator over elements of the `FunctionTable`.
+pub struct FunctionTableIterator<'a> {
     inner_iterator: Enumerate<BddValuationIterator>,
     table: &'a FunctionTable,
 }
