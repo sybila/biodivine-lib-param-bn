@@ -1,0 +1,220 @@
+shp2 -| il6rc_p
+jak1 -> il6rc_p
+il6rc -> il6rc_p
+shp2_a -| il6rc_p
+nfkb -| a2m_gfbg
+stat3_ta -> a2m_gfbg
+il6rc_p -> mek6
+cam_ca -> camk24
+stat3_ta -> cebpd
+dum_il6rc_p_or_grb2_vav -> vav
+socs1 -| vav
+mek4 -> pkcd
+akt -| bad
+p38 -> cebpb
+stat3_ta -> cebpb
+stat3_py -> stat3_ta
+dum_mtorc1_or_pkcd_stat3_ta -> stat3_ta
+slim -| stat3_ta
+pias3 -| stat3_ta
+socs1 -| ir
+socs3 -| ir
+gab1_mem_p -> plcg
+pi3k -> pip3
+pten -| pip3
+shp2 -| irs1_py
+irs1_ps -| irs1_py
+shp2_a -| irs1_py
+ras -> raf1
+pdk1 -> akt
+pip3 -> akt
+mtorc2 -> akt
+ship -| akt
+phlpp -| akt
+rac1 -> mekk1
+cebpb -> var_app
+cebpd -> var_app
+akt -| gsk3
+mekk1 -> mek4
+stat3_ta -> cfos
+il6 -> gp80s_a
+gp130s -| gp80s_a
+shp2 -> tdum_shp2_il6rc_p
+shp2_a -> tdum_shp2_il6rc_p
+stat3_ta -> cmyc
+shp2 -| stat3_py
+jak1 -> stat3_py
+il6rc_p -> stat3_py
+cyt_ptpe -| stat3_py
+shp2_a -| stat3_py
+camk24 -> dum_pkcd_camk24_stat1_ta
+pkcd -> dum_pkcd_camk24_stat1_ta
+mek1 -> erk12
+stat3_ta -> socs1
+dum_gp80_a_il6rc -> il6rc
+gp130m -> il6rc
+socs1 -> tdum_socs1_vav
+shp2 -> grb2_sos
+il6rc_p -> grb2_sos
+mtorc1 -> dum_mtorc1_or_pkcd_stat3_ta
+pkcd -> dum_mtorc1_or_pkcd_stat3_ta
+akt -| casp9
+sirp1a -| shp2_a
+shp2 -> shp2_a
+ros -| shp2_a
+gab1_mem_p -> shp2_a
+p38 -> mk2
+erk12 -> irs1_ps
+pkcd -> irs1_ps
+grb2_sos -> ras
+ras_gap -| ras
+cebpb -> pro_hgf
+cebpd -> pro_hgf
+pias1 -| stat1_ta
+dum_pkcd_camk24_stat1_ta -> stat1_ta
+stat1_py -> stat1_ta
+slim -| stat1_ta
+ca -> cam_ca
+cebpb -> dum_cebp_saa
+cebpd -> dum_cebp_saa
+akt -| fkhr
+gab1_mem_p -> ras_gap
+shp2_a -| ras_gap
+sirp1a -| shp2
+ros -| shp2
+jak1 -> shp2
+il6rc_p -> shp2
+socs3 -| shp2
+nfkb -> saa
+stat3_ta -> saa
+dum_cebp_saa -> saa
+ip3 -> ca
+p70s6k -> pro_proliferative
+erk12 -> pro_proliferative
+camk24 -> pro_proliferative
+cebpb -| pro_proliferative
+stat3_ta -> pro_proliferative
+fkhr -| pro_proliferative
+shp2 -> tdum_shp2_stat3_py
+shp2_a -> tdum_shp2_stat3_py
+plcg -> ip3
+il6rc_p -> dum_il6rc_p_or_grb2_vav
+grb2_sos -> dum_il6rc_p_or_grb2_vav
+cfos -> crp
+nfkb -| crp
+stat3_ta -> crp
+ras -> pi3k
+gab1_mem_p -> pi3k
+shp2_a -> pi3k
+jak1 -> dum_gab1_kin_or_jak1_gab1_mem_p
+gab1_kin -> dum_gab1_kin_or_jak1_gab1_mem_p
+mtor -> mtorc2
+shp2 -| stat1_py
+jak1 -> stat1_py
+il6rc_p -> stat1_py
+cyt_ptpe -| stat1_py
+shp2_a -| stat1_py
+mtor -> mtorc1
+camk24 -| gp130s
+mk2 -| gp130s
+il6 -> gp80m_a
+stat3_ta -> anti_apoptotic
+gsk3 -| anti_apoptotic
+bad -| anti_apoptotic
+casp9 -| anti_apoptotic
+raf1 -> mek1
+gp80s_a -> dum_gp80_a_il6rc
+gp80m_a -> dum_gp80_a_il6rc
+shp2 -> tdum_shp2_stat1_py
+shp2_a -> tdum_shp2_stat1_py
+erk12 -> socs3
+p38 -> socs3
+nfkb -> socs3
+stat3_ta -> socs3
+erk12 -> gab1_mem
+pip3 -> gab1_mem
+grb2_sos -> gab1_mem
+erk12 -> p70s6k
+mtorc1 -> p70s6k
+akt -> p70s6k
+vav -> rac1
+mek6 -> p38
+shp2 -| jak1
+shp2_a -| jak1
+socs1 -| jak1
+socs3 -| jak1
+gab1_mem -> gab1_mem_p
+dum_gab1_kin_or_jak1_gab1_mem_p -> gab1_mem_p
+socs3 -> tdum_socs3_shp2
+stat3_ta -> junb
+$a2m_gfbg: (stat3_ta & !nfkb)
+$akt: ((pdk1 & (pip3 & mtorc2)) & !(phlpp | ship))
+$anti_apoptotic: (stat3_ta & !((gsk3 | casp9) | bad))
+$bad: (!akt | !akt)
+$ca: ip3
+$cam_ca: ca
+$camk24: cam_ca
+$casp9: (!akt | !akt)
+$cebpb: (stat3_ta | p38)
+$cebpd: stat3_ta
+$cfos: stat3_ta
+$cmyc: stat3_ta
+$crp: ((cfos & stat3_ta) & !nfkb)
+$dum_cebp_saa: (cebpd | cebpb)
+$dum_gab1_kin_or_jak1_gab1_mem_p: (jak1 | gab1_kin)
+$dum_gp80_a_il6rc: (gp80m_a | gp80s_a)
+$dum_il6rc_p_or_grb2_vav: (grb2_sos | il6rc_p)
+$dum_mtorc1_or_pkcd_stat3_ta: (mtorc1 | pkcd)
+$dum_pkcd_camk24_stat1_ta: (pkcd | camk24)
+$erk12: mek1
+$fkhr: (!akt | !akt)
+$gab1_mem: (grb2_sos | (erk12 & pip3))
+$gab1_mem_p: (gab1_mem & dum_gab1_kin_or_jak1_gab1_mem_p)
+$gp130s: (!(camk24 | mk2) | !(camk24 | mk2))
+$gp80m_a: il6
+$gp80s_a: (il6 & !gp130s)
+$grb2_sos: (il6rc_p | shp2)
+$gsk3: (!akt | !akt)
+$il6rc: (gp130m & dum_gp80_a_il6rc)
+$il6rc_p: ((il6rc & jak1) & !(shp2 | shp2_a))
+$ip3: plcg
+$ir: (!(socs1 | socs3) | !(socs1 | socs3))
+$irs1_ps: (erk12 | pkcd)
+$irs1_py: (!((shp2_a | irs1_ps) | shp2) | !((shp2 | irs1_ps) | shp2_a))
+$jak1: (!(((shp2 | shp2_a) | socs1) | socs3) | !(((shp2 | shp2_a) | socs1) | socs3))
+$junb: stat3_ta
+$mek1: raf1
+$mek4: mekk1
+$mek6: il6rc_p
+$mekk1: rac1
+$mk2: p38
+$mtorc1: mtor
+$mtorc2: mtor
+$p38: mek6
+$p70s6k: ((erk12 | mtorc1) | akt)
+$pi3k: (ras | (gab1_mem_p & !shp2_a))
+$pip3: (pi3k & !pten)
+$pkcd: mek4
+$plcg: gab1_mem_p
+$pro_hgf: (cebpb | cebpd)
+$pro_proliferative: ((((p70s6k | camk24) | stat3_ta) | erk12) | !(((((p70s6k | erk12) | camk24) | cebpb) | stat3_ta) | fkhr))
+$rac1: vav
+$raf1: ras
+$ras: (grb2_sos & !ras_gap)
+$ras_gap: (gab1_mem_p & !shp2_a)
+$saa: (dum_cebp_saa & (nfkb & stat3_ta))
+$shp2: ((il6rc_p & jak1) & !((ros | sirp1a) | socs3))
+$shp2_a: ((gab1_mem_p & shp2) & !(ros | sirp1a))
+$socs1: stat3_ta
+$socs3: (((nfkb | p38) | erk12) | stat3_ta)
+$stat1_py: ((il6rc_p & jak1) & !((cyt_ptpe | shp2_a) | shp2))
+$stat1_ta: ((dum_pkcd_camk24_stat1_ta & stat1_py) & !(slim | pias1))
+$stat3_py: ((il6rc_p & jak1) & !((cyt_ptpe | shp2_a) | shp2))
+$stat3_ta: ((dum_mtorc1_or_pkcd_stat3_ta & stat3_py) & !(slim | pias3))
+$tdum_shp2_il6rc_p: (shp2 | shp2_a)
+$tdum_shp2_stat1_py: (shp2 | shp2_a)
+$tdum_shp2_stat3_py: (shp2_a | shp2)
+$tdum_socs1_vav: socs1
+$tdum_socs3_shp2: socs3
+$var_app: (cebpb | cebpd)
+$vav: (dum_il6rc_p_or_grb2_vav & !socs1)

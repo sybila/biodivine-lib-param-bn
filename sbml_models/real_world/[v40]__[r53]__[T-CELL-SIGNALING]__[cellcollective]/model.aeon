@@ -1,0 +1,90 @@
+TCRbind -| PAGCsk
+Fyn -> PAGCsk
+Jun -> AP1
+Fos -> AP1
+DAG -> PKCth
+IKKbeta -| IkB
+TCRlig -> TCRbind
+cCbl -| TCRbind
+IP3 -> Ca
+ZAP70 -> cCbl
+PLCg_act -> DAG
+LAT -> PLCg_bind
+Ras -> Raf
+Raf -> MEK
+Fyn -> TCRphos
+PKCth -> SEK
+Ca -> Calcin
+SEK -> JNK
+TCRbind -> Fyn
+CD45 -> Fyn
+Lck -> Fyn
+ERK -> Fos
+LAT -> Gads
+PKCth -> IKKbeta
+JNK -> Jun
+IkB -| Nfkb
+Gads -> SLP76
+CD8 -> Lck
+PAGCsk -| Lck
+CD45 -> Lck
+CREB -> CRE
+LAT -> Grb2Sos
+Rsk -> CREB
+Rlk -> PLCg_act
+Itk -> PLCg_act
+PLCg_bind -> PLCg_act
+ZAP70 -> PLCg_act
+SLP76 -> PLCg_act
+TCRphos -> ZAP70
+cCbl -| ZAP70
+Lck -> ZAP70
+Lck -> Rlk
+ERK -> Rsk
+Grb2Sos -> Ras
+RasGRP1 -> Ras
+ZAP70 -> LAT
+DAG -> RasGRP1
+PKCth -> RasGRP1
+PLCg_act -> IP3
+MEK -> ERK
+Calcin -> NFAT
+ZAP70 -> Itk
+SLP76 -> Itk
+$AP1: (Fos & Jun)
+$CRE: CREB
+$CREB: Rsk
+$Ca: IP3
+$Calcin: Ca
+$DAG: PLCg_act
+$ERK: MEK
+$Fos: ERK
+$Fyn: ((CD45 & Lck) | (TCRbind & CD45))
+$Gads: LAT
+$Grb2Sos: LAT
+$IKKbeta: PKCth
+$IP3: PLCg_act
+$IkB: !IKKbeta
+$Itk: (ZAP70 & SLP76)
+$JNK: SEK
+$Jun: JNK
+$LAT: ZAP70
+$Lck: ((CD45 & CD8) & !PAGCsk)
+$MEK: Raf
+$NFAT: Calcin
+$Nfkb: !IkB
+$PAGCsk: Fyn
+$PKCth: DAG
+$PLCg_act: ((ZAP70 & ((Rlk & PLCg_bind) & SLP76)) | (Itk & ((PLCg_bind & ZAP70) & SLP76)))
+$PLCg_bind: LAT
+$Raf: Ras
+$Ras: (RasGRP1 | Grb2Sos)
+$RasGRP1: (PKCth & DAG)
+$Rlk: Lck
+$Rsk: ERK
+$SEK: PKCth
+$SLP76: Gads
+$TCRbind: (TCRlig & !cCbl)
+$TCRphos: Fyn
+$ZAP70: ((TCRphos & Lck) & !cCbl)
+$cCbl: ZAP70

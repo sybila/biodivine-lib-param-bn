@@ -1,0 +1,165 @@
+PTGS2 -> CellMigration
+CCL20 -> CellMigration
+IL8 -> CellMigration
+CTGF -> CellMigration
+DAG -> PKC
+AKAP12 -| PKC
+Ca -> PKC
+Erk -> RSK
+HBEGF -> EGFR
+EGF -> EGFR
+PLC_g -> DAG
+Erk -> cMYC
+Erk -> EGR1
+PAK2 -> JNK
+Mkk4 -> JNK
+Mekk7 -> JNK
+Cdc42_Rac1 -> MLK3
+CyclinD -> Proliferation
+CDK2 -> Proliferation
+SOS -> Ras
+ECM -> Integrins
+Mek -> Erk
+DOCK180 -> Cdc42_Rac1
+Akt -> Cdc42_Rac1
+Ras -> Cdc42_Rac1
+p38 -> cJUN
+JNK -> cJUN
+CyclinD -> CDK2
+CDKN1A -| CDK2
+CDKN2A -| CDK2
+uPA -> Plasmin
+PAI_1 -> Plasmin
+Erk -> IL8
+p38 -> IL8
+EGFR -> Shc
+Fak -> Shc
+MET -> Shc
+EGFR -> PLC_g
+MET -> PLC_g
+Erk -> CTGF
+p38 -> CTGF
+Cdc42_Rac1 -> Mekk4
+Cdc42_Rac1 -> PAK2
+STAT3 -> CDKN1A
+Elk1 -> CDKN2A
+ETS -> CDKN2A
+CRKL -> C3G
+Grb2 -> CRKL
+Erk -> STAT3
+Mekk1 -> Mekk7
+Cdc42_Rac1 -> PAK1
+MLK3 -> Mkk6
+PKC -> Raf
+Ras -> Raf
+PAK3 -> Raf
+Plasmin -> MMP1_10
+CRKL -> DOCK180
+Elk1 -> CyclinD
+ATF2 -> CyclinD
+C3G -> Rap1
+Cdc42_Rac1 -> PAK3
+Erk -> ETS
+uPAR -> uPA
+RSK -> CREB
+EGFR -> PI3K
+Fak -> PI3K
+MET -> PI3K
+Grb2 -> SOS
+Mekk4 -> Mkk4
+Mekk1 -> Mkk4
+MLK3 -> Mkk4
+Erk -> cFOS
+Rap1 -> Fak
+PTEN -| Fak
+Integrins -> Fak
+Shc -> Grb2
+MLK3 -> Mkk3
+AP1 -> uPAR
+Raf -> Mek
+Mekk1 -> Mek
+Erk -> CCL20
+p38 -> ATF2
+JNK -> ATF2
+cJUN -> PTGS2
+cFOS -> PTGS2
+ATF2 -> PTGS2
+MMP1_10 -> ECM
+PAK1 -> p38
+DUSP1 -| p38
+Mkk3 -> p38
+Mkk6 -> p38
+Cdc42_Rac1 -> Mekk1
+PLC_g -> IP3
+IP3 -> Ca
+Erk -> Elk1
+JNK -> Elk1
+HGF -> MET
+cJUN -> AP1
+cFOS -> AP1
+Erk -> HBEGF
+p38 -> HBEGF
+PI3K -> Akt
+PTEN -| Akt
+$AP1: (cFOS & cJUN)
+$ATF2: (JNK & p38)
+$Akt: (PI3K & !PTEN)
+$C3G: CRKL
+$CCL20: Erk
+$CDK2: (CyclinD & (!CDKN2A | !CDKN1A))
+$CDKN1A: STAT3
+$CDKN2A: (Elk1 | ETS)
+$CREB: RSK
+$CRKL: Grb2
+$CTGF: (Erk | p38)
+$Ca: IP3
+$Cdc42_Rac1: (Akt & (DOCK180 & Ras))
+$CellMigration: (IL8 & ((PTGS2 & CCL20) & CTGF))
+$CyclinD: (Elk1 | ATF2)
+$DAG: PLC_g
+$DOCK180: CRKL
+$ECM: MMP1_10
+$EGFR: (HBEGF | EGF)
+$EGR1: Erk
+$ETS: Erk
+$Elk1: (JNK | Erk)
+$Erk: Mek
+$Fak: ((Integrins & Rap1) & !PTEN)
+$Grb2: Shc
+$HBEGF: (Erk | p38)
+$IL8: (Erk | p38)
+$IP3: PLC_g
+$Integrins: ECM
+$JNK: ((Mekk7 & Mkk4) | PAK2)
+$MET: HGF
+$MLK3: Cdc42_Rac1
+$MMP1_10: Plasmin
+$Mek: (Mekk1 | Raf)
+$Mekk1: Cdc42_Rac1
+$Mekk4: Cdc42_Rac1
+$Mekk7: Mekk1
+$Mkk3: MLK3
+$Mkk4: ((Mekk4 | Mekk1) | MLK3)
+$Mkk6: MLK3
+$PAK1: Cdc42_Rac1
+$PAK2: Cdc42_Rac1
+$PAK3: Cdc42_Rac1
+$PI3K: ((EGFR & Fak) | MET)
+$PKC: ((DAG & Ca) & !AKAP12)
+$PLC_g: (EGFR | MET)
+$PTGS2: ((cFOS & cJUN) | ATF2)
+$Plasmin: (uPA & PAI_1)
+$Proliferation: (CDK2 & CyclinD)
+$RSK: Erk
+$Raf: (Ras & (PKC & PAK3))
+$Rap1: C3G
+$Ras: SOS
+$SOS: Grb2
+$STAT3: Erk
+$Shc: ((MET | Fak) | EGFR)
+$cFOS: Erk
+$cJUN: (JNK & p38)
+$cMYC: Erk
+$p38: (PAK1 | ((Mkk3 & Mkk6) & !DUSP1))
+$uPA: uPAR
+$uPAR: AP1
