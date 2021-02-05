@@ -277,9 +277,6 @@ $AP_1_phosphorylated_phosphorylated: ((MAPK8_phosphorylated | path_0_sa629_DDIT3
 $ATF4: ATF4_rna
 $ATF4_rna: (ATF4_gene & EIF2_P_GDP_complex)
 $ATF6_Endoplasmic_Reticulum: (ATF6_HSPA5_complex & path_0_sa618_Unfolded_space_protein_Endoplasmic_Reticulum)
-$path_0_sa57_ATF6_Golgi: ((ATF6_Endoplasmic_Reticulum & ER_space_Stress_phenotype) & !retrograde_space_transport_space_from_space_ER_space_to_space_cytosol_phenotype)
-$path_0_sa64_ATF6_Golgi: (path_0_sa62_ATF6_Golgi & MBTPS2)
-$path_0_sa62_ATF6_Golgi: (path_0_sa57_ATF6_Golgi & MBTPS1)
 $ATF6_Nucleus: path_0_sa64_ATF6_Golgi
 $Apoptosis_phenotype_Cytoplasm: (((((((((cleaved_CASP9 | cleaved_CASP3) | CASP8_FADD_MAP1LC3A_SQSTM1_ATG5_complex) | sa257_TRIB3_Cytoplasm) | Cell_space_survival_phenotype) | path_0_sa630_DDIT3_phosphorylated_Cytoplasm) | BCL2L11_phosphorylated) | BAX_phosphorylated) | path_0_sa43_MAPK14_phosphorylated_Cytoplasm) | BID_phosphorylated)
 $Apoptosis_phenotype_Endoplasmic_Reticulum: ((MFN2_Endoplasmic_Reticulum | ER_space_stress_phenotype) | !SIGMAR1_MAM__mito_associated_ER_membrane_)
@@ -290,20 +287,13 @@ $BCL2_rna: (BCL2_gene & !path_0_sa46_DDIT3_phosphorylated_Cytoplasm)
 $BID_phosphorylated: (BID & MAPK8_phosphorylated)
 $CAPN1_Ca2__complex: ((CAPN1 & Ca2__ion_Cytoplasm) & high_space_Ca2_space_cytosolic_space_concentration_phenotype)
 $CASP8_FADD_MAP1LC3A_SQSTM1_ATG5_complex: (((((TRIM13 | Persistant_space_ER_space_Stress_phenotype_Endoplasmic_Reticulum) & CASP8_CASP8_ubq_FADD_complex) & SQSTM1_space_) & MAP1LC3A) & ATG5)
-$path_0_sa146_CDK5_Cytoplasm: (path_0_sa147_CDK5_Cytoplasm & ER_space_Stress_phenotype)
 $Ca2__ion_Cytoplasm: (((TMBIM6 | RYR1) | path_0_sa583_ITPR_Endoplasmic_Reticulum) & path_0_sa163_Ca2__ion_Endoplasmic_Reticulum)
 $Ca2__ion_mitochondrion_inner_space_membrane: (path_1_sa63_Ca2__ion_mitochondrion_outer_space_membrane & Mitochondrial_space_calcium_space_uniporter_space_complex_complex)
-$path_1_sa55_Ca2__ion_mitochondrion_outer_space_membrane: (((ITPR3_HSPA9_VDAC1_complex | ITPR3_HSPA9_VDAC1_complex) | SIGMAR1_ITPR3_complex) & path_1_sa54_Ca2__ion_Endoplasmic_Reticulum)
 $Ca2_space_cytosolic_space_concentration_phenotype: (!VAPB | !RMDN3)
 $Ca2_space_mitochondrial_space_concentration_phenotype: ((FIS1 | VAPB) | RMDN3)
 $Cell_space_survival_phenotype: Apoptosis_phenotype_Cytoplasm
-$path_0_sa69_DDIT3_Cytoplasm: DDIT3_rna
-$path_0_sa630_DDIT3_phosphorylated_Cytoplasm: (path_0_sa629_DDIT3_Cytoplasm & path_0_sa43_MAPK14_phosphorylated_Cytoplasm)
-$path_0_sa46_DDIT3_phosphorylated_Cytoplasm: (path_0_sa69_DDIT3_Cytoplasm & path_0_sa620_MAPK14_phosphorylated_Cytoplasm)
 $DDIT3_rna: ((((ATF6_Nucleus | path_0_sa26_XBP1_Cytoplasm) & DDIT3_gene) & ATF4) & Persistant_space_ER_space_Stress_phenotype_Cytoplasm)
-$path_0_sa515_DNAJC3_Cytoplasm: DNAJC3_rna
 $DNAJC3_rna: (DNAJC3_gene & ATF6_Nucleus)
-$path_0_sa210_EIF2AK2_Cytoplasm: ((path_0_sa287_EIF2AK2_Cytoplasm & presence_space_of_space_dsRNA_phenotype) & !path_0_sa624_DNAJC3_Cytoplasm)
 $EIF2AK3_EIF2AK3_complex: ((path_0_sa5_Unfolded_space_protein_Endoplasmic_Reticulum | Persistant_space_ER_space_Stress_phenotype_Endoplasmic_Reticulum) & EIF2AK3)
 $EIF2S1: ((PPP1R15A | EIF2AK1) & EIF2S1_phosphorylated)
 $EIF2S1_phosphorylated: ((((EIF2AK3_EIF2AK3_complex | GCN2_ATP_complex) | path_0_sa210_EIF2AK2_Cytoplasm) & EIF2S1) & !path_0_sa515_DNAJC3_Cytoplasm)
@@ -315,23 +305,16 @@ $ERN1_BBC3_complex: ((path_0_sa617_ERN1_Endoplasmic_Reticulum & BBC3) & !Persist
 $ERN1_BCL2L11_complex: ((path_0_sa617_ERN1_Endoplasmic_Reticulum & BCL2L11_Endoplasmic_Reticulum) & !Persistant_space_ER_space_Stress_phenotype_Cytoplasm)
 $ERN1_Unfolded_space_protein_complex: (path_0_sa1_ERN1_Endoplasmic_Reticulum & path_0_sa203_Unfolded_space_protein_Endoplasmic_Reticulum)
 $ERO1A_Cytoplasm: ERO1A_rna
-$path_0_sa212_ERO1A_Endoplasmic_Reticulum: ERO1A_Cytoplasm
 $ERO1A_rna: ((path_0_sa69_DDIT3_Cytoplasm | ATF6_Nucleus) & ERO1A_gene)
 $ER_space_Stress_phenotype: accumulation_space_of_space_misfolded_space_protein_space_in_space_ER_phenotype
 $ER_space_stress_phenotype: ((MFN2_Endoplasmic_Reticulum | !ACE2) | !SIGMAR1_MAM__mito_associated_ER_membrane_)
 $FIS1_BCAP31_complex: (BCAP31 & FIS1)
-$path_0_sa100_GDP_simple_molecule_Cytoplasm: ((EIF2_GDP_Met_tRNA_complex & path_0_sa102_GTP_simple_molecule_Cytoplasm) & EIF2B_complex)
-$path_0_sa95_GTP_simple_molecule_Cytoplasm: (Ternary_space_Complex_complex & path_0_sa103_GDP_simple_molecule_Cytoplasm)
-$path_0_sa4_HSPA5_Endoplasmic_Reticulum: (ATF6_HSPA5_complex & path_0_sa618_Unfolded_space_protein_Endoplasmic_Reticulum)
-$path_1_sa87_HSPA5_Endoplasmic_Reticulum: (((ER_space_stress_phenotype | Ca2_space_ER_space_depletion_phenotype) & SIGMAR1_HSPA5_complex) | ((HSPA5_rna & ER_space_stress_phenotype) & !ACE2))
 $HSPA5_Spike_interaction_complex: (sa258_S_default_compartment & HSPA5_default_compartment)
 $HSPA5_rna: ((HSPA5_gene & sa275_S_default_compartment) & !ACE2)
 $HYOU1: HYOU1_rna
 $HYOU1_rna: (HYOU1_gene & ATF6_Nucleus)
-$path_0_sa583_ITPR_Endoplasmic_Reticulum: ((TMBIM6 | path_0_sa625_ERO1A_Endoplasmic_Reticulum) & path_0_sa582_ITPR_Endoplasmic_Reticulum)
 $MAP3K4_phosphorylated: (MAP3K4 & path_0_sa146_CDK5_Cytoplasm)
 $MAP3K5_phosphorylated: ((path_0_sa118_TRAF2_Cytoplasm | TRAF2_ERN1_complex) & MAP3K5)
-$path_0_sa43_MAPK14_phosphorylated_Cytoplasm: (MAPK14 & MAP3K5_phosphorylated)
 $MAPK8_phosphorylated: ((MAP3K4_phosphorylated | MAP3K5_phosphorylated) & MAPK8)
 $MCU_MICU1_MICU2_SMDT1_complex: ((MCU & SMDT1) | (MCU2 & MCU1))
 $MFN1_MFN2_complex: (MFN2_Endoplasmic_Reticulum & MFN1)
@@ -346,15 +329,12 @@ $Persistant_space_ER_space_Stress_phenotype_Endoplasmic_Reticulum: ER_space_Stre
 $SIGMAR1_HSPA5_complex: (path_1_sa87_HSPA5_Endoplasmic_Reticulum & SIGMAR1_Endoplasmic_Reticulum)
 $SIGMAR1_ITPR3_complex: (((ER_space_stress_phenotype | Ca2_space_ER_space_depletion_phenotype) & SIGMAR1_MAM__mito_associated_ER_membrane_) & ITPR3)
 $SIGMAR1_MAM__mito_associated_ER_membrane_: ((ER_space_stress_phenotype | Ca2_space_ER_space_depletion_phenotype) & SIGMAR1_HSPA5_complex)
-$path_0_sa118_TRAF2_Cytoplasm: (path_0_sa119_TRAF2_Cytoplasm & TRAF2_ERN1_complex)
 $TRAF2_ERN1_complex: ((((((((BAK1_ERN1_complex | BAX_ERN1_complex) | BAX_Endoplasmic_Reticulum) | BAK1) & ERN1_Unfolded_space_protein_complex) & path_0_sa204_TRAF2_Cytoplasm) & !BCL2) & !BCL2L1) & !Persistant_space_ER_space_Stress_phenotype_Endoplasmic_Reticulum)
-$path_0_sa486_TRIB3_Cytoplasm: TRIB3_rna
 $TRIB3_rna: (TRIB3_gene & path_0_sa69_DDIT3_Cytoplasm)
 $Ternary_space_Complex_complex: ((EIF2_GDP_Met_tRNA_complex & path_0_sa102_GTP_simple_molecule_Cytoplasm) & EIF2B_complex)
 $Translation_space_initiation_phenotype: Ternary_space_Complex_complex
 $UPR_phenotype: ((((path_0_sa626_XBP1_Cytoplasm | TRAF2_ERN1_complex) | accumulation_space_of_space_misfolded_space_protein_space_in_space_ER_phenotype) | path_0_sa64_ATF6_Golgi) | EIF2AK3_EIF2AK3_complex)
 $VAPB_RMDN3_complex: (VAPB & RMDN3)
-$path_0_sa26_XBP1_Cytoplasm: XBP1_rna
 $XBP1_rna: ((((ATF6_Nucleus | TRAF2_ERN1_complex) | ERN1_BBC3_complex) | ERN1_BCL2L11_complex) & XBP1_gene)
 $accumulation_space_of_space_misfolded_space_protein_space_in_space_ER_phenotype: (path_0_sa5_Unfolded_space_protein_Endoplasmic_Reticulum | ERAD_phenotype)
 $autophagy_phenotype: (((!RMDN3 | !VAPB) | !ITPR3) | !mitochondrion_endoplasmic_space_reticulum_space_membrane_space_tethering_space__phenotype)
@@ -371,6 +351,26 @@ $mitochondrial_space_fission_phenotype: !PACS2_Endoplasmic_Reticulum
 $mitochondrial_space_outer_space_membrane_space_depolarization_phenotype: FIS1
 $mitochondrion_endoplasmic_space_reticulum_space_membrane_space_tethering_space__phenotype: ((((VAPB_RMDN3_complex | MFN2_MFN2_complex) | FIS1_BCAP31_complex) | MFN1_MFN2_complex) | PACS2_Endoplasmic_Reticulum)
 $p20: ((BCAP31 & Apoptosis_phenotype_Endoplasmic_Reticulum) & !PACS2_Endoplasmic_Reticulum)
+$path_0_sa100_GDP_simple_molecule_Cytoplasm: ((EIF2_GDP_Met_tRNA_complex & path_0_sa102_GTP_simple_molecule_Cytoplasm) & EIF2B_complex)
+$path_0_sa118_TRAF2_Cytoplasm: (path_0_sa119_TRAF2_Cytoplasm & TRAF2_ERN1_complex)
+$path_0_sa146_CDK5_Cytoplasm: (path_0_sa147_CDK5_Cytoplasm & ER_space_Stress_phenotype)
+$path_0_sa210_EIF2AK2_Cytoplasm: ((path_0_sa287_EIF2AK2_Cytoplasm & presence_space_of_space_dsRNA_phenotype) & !path_0_sa624_DNAJC3_Cytoplasm)
+$path_0_sa212_ERO1A_Endoplasmic_Reticulum: ERO1A_Cytoplasm
+$path_0_sa26_XBP1_Cytoplasm: XBP1_rna
+$path_0_sa43_MAPK14_phosphorylated_Cytoplasm: (MAPK14 & MAP3K5_phosphorylated)
+$path_0_sa46_DDIT3_phosphorylated_Cytoplasm: (path_0_sa69_DDIT3_Cytoplasm & path_0_sa620_MAPK14_phosphorylated_Cytoplasm)
+$path_0_sa486_TRIB3_Cytoplasm: TRIB3_rna
+$path_0_sa4_HSPA5_Endoplasmic_Reticulum: (ATF6_HSPA5_complex & path_0_sa618_Unfolded_space_protein_Endoplasmic_Reticulum)
+$path_0_sa515_DNAJC3_Cytoplasm: DNAJC3_rna
+$path_0_sa57_ATF6_Golgi: ((ATF6_Endoplasmic_Reticulum & ER_space_Stress_phenotype) & !retrograde_space_transport_space_from_space_ER_space_to_space_cytosol_phenotype)
+$path_0_sa583_ITPR_Endoplasmic_Reticulum: ((TMBIM6 | path_0_sa625_ERO1A_Endoplasmic_Reticulum) & path_0_sa582_ITPR_Endoplasmic_Reticulum)
+$path_0_sa62_ATF6_Golgi: (path_0_sa57_ATF6_Golgi & MBTPS1)
+$path_0_sa630_DDIT3_phosphorylated_Cytoplasm: (path_0_sa629_DDIT3_Cytoplasm & path_0_sa43_MAPK14_phosphorylated_Cytoplasm)
+$path_0_sa64_ATF6_Golgi: (path_0_sa62_ATF6_Golgi & MBTPS2)
+$path_0_sa69_DDIT3_Cytoplasm: DDIT3_rna
+$path_0_sa95_GTP_simple_molecule_Cytoplasm: (Ternary_space_Complex_complex & path_0_sa103_GDP_simple_molecule_Cytoplasm)
+$path_1_sa55_Ca2__ion_mitochondrion_outer_space_membrane: (((ITPR3_HSPA9_VDAC1_complex | ITPR3_HSPA9_VDAC1_complex) | SIGMAR1_ITPR3_complex) & path_1_sa54_Ca2__ion_Endoplasmic_Reticulum)
+$path_1_sa87_HSPA5_Endoplasmic_Reticulum: (((ER_space_stress_phenotype | Ca2_space_ER_space_depletion_phenotype) & SIGMAR1_HSPA5_complex) | ((HSPA5_rna & ER_space_stress_phenotype) & !ACE2))
 $protein_space_ubiquitination_space_and_space_destruction_phenotype: retrograde_space_transport_space_from_space_ER_space_to_space_cytosol_phenotype
 $pulmonary_fibrosis_phenotype: !ACE2
 $release_space_of_space_ER_space_Ca2__phenotype: BAX_phosphorylated

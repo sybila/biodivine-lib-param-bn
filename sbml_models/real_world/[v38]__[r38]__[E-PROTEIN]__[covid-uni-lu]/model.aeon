@@ -48,9 +48,9 @@ $E_PALS1_complex: (sa32_E_Cytoplasm & sa30_PALS1_Cytoplasm)
 $K__ion: ATP1A_ATP1B_FXYDs_complex
 $Maintenance_of_tight_junction_phenotype: (CRB3_PALS1_PATJ_complex_complex | E_PALS1_complex)
 $Na__ion: ATP1A_ATP1B_FXYDs_complex
-$sa35_PALS1_Cytoplasm: sa30_PALS1_Cytoplasm
 $P_TEFb_complex: ((CDK9 & BRD4) | (CCNT1 & BRD4))
 $RNA_Polymerase_II_dependent_Transcription__phenotype: P_TEFb_complex
 $TBP: BRD2
 $csa1_histone_complex_Nucleus: ((BRD4 | BRD2) & csa2_histone_complex_Nucleus)
 $csa2_histone_complex_Nucleus: (((((((H4C14 & H4_16) & H4C1) & H3C15) & H3C1) & H4C9) & H2BC21) & H2A)
+$sa35_PALS1_Cytoplasm: sa30_PALS1_Cytoplasm

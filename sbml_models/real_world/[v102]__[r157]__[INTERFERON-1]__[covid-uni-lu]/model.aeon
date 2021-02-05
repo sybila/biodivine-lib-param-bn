@@ -161,11 +161,9 @@ $DDX58_ubiquitinated: ((TRIM25 | RNF135) & !sa140_N_cytoplasm)
 $EIF2AK: (EIF2AK_rna | !sa129_Nsp15_cytoplasm)
 $EIF2AK_rna: (ISRE_complex & IRF3_nucleus)
 $IFIH1: !sa227_Nsp15_cytoplasm
-$sa31_IFNA1_Extracellular_Space: IFNA1_cytoplasm
 $IFNA1_IFNAR_complex: (IFNAR_complex & sa5_IFNA1_Extracellular_Space)
 $IFNA1_cytoplasm: IFNA1_rna
 $IFNA1_rna: ((AP_1_complex_nucleus & NFKB1_nucleus) & p50_p65_complex_nucleus)
-$sa27_IFNB1_Extracellular_Space: IFNB1_cytoplasm
 $IFNB1_IFNAR_complex: (IFNAR_complex & sa3_IFNB1_Extracellular_Space)
 $IFNB1_cytoplasm: IFNB1_rna
 $IFNB1_rna: ((AP_1_complex_nucleus & NFKB1_nucleus) & p50_p65_complex_nucleus)
@@ -184,21 +182,13 @@ $MAP3K7: TRAF6_ubiquitinated
 $MAPK8_14_complex: (((TBK1 | MAP3K7) & MAPK14) & MAPK8)
 $MAVS: ((RIG1_MDA5_complex & !Orf9b) & !ITCH)
 $MYD88_TCAM1_complex: (((TREML4 | TLR7) & MYD88) & TCAM1)
-$sa114_NFKB1_cytoplasm: NFKB_NFKBIA_complex
 $NFKB1_nucleus: (sa114_NFKB1_cytoplasm & !Azithromycin_drug)
-$sa109_NFKBIA_cytoplasm: NFKB_NFKBIA_complex
 $NFKB_NFKBIA_complex: ((((((((Nsp1 | S) | sa228_N_cytoplasm) | E) | Orf7a) | Orf3a) & sa113_NFKB1_cytoplasm) & sa111_NFKBIA_cytoplasm) & !IKK_complex)
 $NLRP3_inflammasome_complex: (E | p50_p65_complex_nucleus)
 $Nsp3: !GRL0617_drug
 $OAS1_EIF2AK_complex: (((sa50_OAS1_cytoplasm & sa80_OAS3_cytoplasm) & EIF2AK) & sa76_OAS2_cytoplasm)
-$sa50_OAS1_cytoplasm: (sa159_OAS1_cytoplasm & !sa129_Nsp15_cytoplasm)
-$sa159_OAS1_cytoplasm: OAS1_rna
 $OAS1_rna: (ISRE_complex & IRF3_nucleus)
-$sa76_OAS2_cytoplasm: (sa158_OAS2_cytoplasm & !sa129_Nsp15_cytoplasm)
-$sa158_OAS2_cytoplasm: OAS2_rna
 $OAS2_rna: (ISRE_complex & IRF3_nucleus)
-$sa80_OAS3_cytoplasm: (sa157_OAS3_cytoplasm & !sa129_Nsp15_cytoplasm)
-$sa157_OAS3_cytoplasm: OAS3_rna
 $OAS3_rna: (ISRE_complex & IRF3_nucleus)
 $RIG1_MDA5_complex: (((((DDX58_ubiquitinated & IFIH1) & Viral_dsRNA_rna) & !sa140_N_cytoplasm) & !sa227_Nsp15_cytoplasm) & !sa232_M_cytoplasm)
 $RIPK1: ((MYD88_TCAM1_complex | MAVS) | TCAM1)
@@ -209,9 +199,19 @@ $TBK1_IKBKE_complex: ((((((Nsp13 | TRAF3) | TRAF3_TANK_TBK1_IKKepsilon_complex) 
 $TLR7: PAMP_signalling_phenotype
 $TRAF3: (MYD88_TCAM1_complex & !Nsp3)
 $TRAF3_TANK_TBK1_IKKepsilon_complex: ((csa26_TRAF3_TBK1_IKBKE_complex_cytoplasm & TANK) & !sa226_M_cytoplasm)
-$csa25_TRAF3_TBK1_IKBKE_complex_cytoplasm: ((TBK1_IKBKE_complex & TRAF3) & !pp1ab)
-$csa26_TRAF3_TBK1_IKBKE_complex_cytoplasm: ((csa25_TRAF3_TBK1_IKBKE_complex_cytoplasm & STING1_ubiquitinated) & !pp1ab)
 $TRAF6_ubiquitinated: ((MYD88_TCAM1_complex & !Nsp3) & !ITCH)
 $Viral_dsRNA_rna: Viral_replication_phenotype
+$csa25_TRAF3_TBK1_IKBKE_complex_cytoplasm: ((TBK1_IKBKE_complex & TRAF3) & !pp1ab)
+$csa26_TRAF3_TBK1_IKBKE_complex_cytoplasm: ((csa25_TRAF3_TBK1_IKBKE_complex_cytoplasm & STING1_ubiquitinated) & !pp1ab)
 $p50_p65_complex_cytoplasm: ((((IKK_complex | TBK1) & RELA) & sa114_NFKB1_cytoplasm) & !sa228_N_cytoplasm)
 $p50_p65_complex_nucleus: (p50_p65_complex_cytoplasm & !Azithromycin_drug)
+$sa109_NFKBIA_cytoplasm: NFKB_NFKBIA_complex
+$sa114_NFKB1_cytoplasm: NFKB_NFKBIA_complex
+$sa157_OAS3_cytoplasm: OAS3_rna
+$sa158_OAS2_cytoplasm: OAS2_rna
+$sa159_OAS1_cytoplasm: OAS1_rna
+$sa27_IFNB1_Extracellular_Space: IFNB1_cytoplasm
+$sa31_IFNA1_Extracellular_Space: IFNA1_cytoplasm
+$sa50_OAS1_cytoplasm: (sa159_OAS1_cytoplasm & !sa129_Nsp15_cytoplasm)
+$sa76_OAS2_cytoplasm: (sa158_OAS2_cytoplasm & !sa129_Nsp15_cytoplasm)
+$sa80_OAS3_cytoplasm: (sa157_OAS3_cytoplasm & !sa129_Nsp15_cytoplasm)

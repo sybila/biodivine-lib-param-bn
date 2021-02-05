@@ -25,10 +25,10 @@ $Apoptosis_phenotype: !BCL2_phosphorylated
 $Autophagy_phenotype: BCL2_phosphorylated
 $BCL2_phosphorylated: csa1_JNK_complex_Cytoplasm
 $Innate_Immunity_phenotype: AP_1_complex
-$csa1_JNK_complex_Cytoplasm: (((((MAP2K4_phosphorylated | MAP2K7_phosphorylated) | 7a) | 3a) & csa12_JNK_complex_Cytoplasm) | (csa12_JNK_complex_Cytoplasm & S))
 $MAP2K4_phosphorylated: (MEKK1_4_complex | SARS_CoV_1_proteins_complex)
 $MAP2K7_phosphorylated: (MLK1_2_3_complex | SARS_CoV_1_proteins_complex)
 $MEKK1_4_complex: SARS_CoV_1_proteins_complex
 $MLK1_2_3_complex: SARS_CoV_1_proteins_complex
 $TP53_phosphorylated: csa1_JNK_complex_Cytoplasm
 $TP53_signalling_phenotype: TP53_phosphorylated
+$csa1_JNK_complex_Cytoplasm: (((((MAP2K4_phosphorylated | MAP2K7_phosphorylated) | 7a) | 3a) & csa12_JNK_complex_Cytoplasm) | (csa12_JNK_complex_Cytoplasm & S))

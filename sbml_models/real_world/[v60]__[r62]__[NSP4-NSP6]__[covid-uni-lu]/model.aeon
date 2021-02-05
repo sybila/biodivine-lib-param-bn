@@ -60,35 +60,23 @@ SIGMAR1_ER -> SIGMAR1_nucleus
 SIGMAR1_ER -> SIGMAR1_cytoplasm
 sa14_ALG11_ER -> sa230_ALG11_ER
 V_type_space_proton_space_ATPase_complex -> H__ion
-$sa230_ALG11_ER: sa14_ALG11_ER
 $ATP6AP1_Bafilomycin_A1_complex: (ATP6AP1 & Bafilomycin_A1_drug)
 $F_ATPase_Nsp6_complex: (Nsp6 & F_ATPase_complex)
 $H__ion: V_type_space_proton_space_ATPase_complex
-$sa225_IDE_cytoplasm: sa8_IDE_cytoplasm
 $IDE_default_compartment: sa8_IDE_cytoplasm
 $NUP210_Selinexor_complex: (NUP210_ER & Selinexor_drug)
 $NUP210_nucleus: NUP210_ER
 $Nsp3: sa160_Nsp3_____rna
 $Nsp3_Nsp4_Nsp6_complex: ((Nsp3 & Nsp6) & Nsp4)
-$sa160_Nsp3_____rna: sa219_Nsp3_____rna
-$sa219_Nsp3_____rna: sa160_Nsp3_____rna
 $Nsp4: sa3_Nsp4_____rna
-$csa15_Nsp4_ALG11_complex_ER: (Nsp4 & sa14_ALG11_ER)
-$csa93_Nsp4_ALG11_complex_ER: csa15_Nsp4_ALG11_complex_ER
 $Nsp4_DNAJC11_complex: (Nsp4 & DNAJC11)
 $Nsp4_IDE_complex: csa2_Nsp4_IDE_complex_cytoplasm
-$csa4_Nsp4_IDE_complex_cytoplasm: csa2_Nsp4_IDE_complex_cytoplasm
-$csa2_Nsp4_IDE_complex_cytoplasm: (Nsp4 & sa8_IDE_cytoplasm)
 $Nsp4_NUP210_complex_ER: (Nsp4 & NUP210_ER)
 $Nsp4_NUP210_complex_nucleus: Nsp4_NUP210_complex_ER
-$sa3_Nsp4_____rna: sa220_Nsp4_____rna
-$sa220_Nsp4_____rna: sa3_Nsp4_____rna
 $Nsp6: sa47_Nsp6_____rna
 $Nsp6_SIGMAR1_complex_ER: (Nsp6 & SIGMAR1_ER)
 $Nsp6_SIGMAR1_complex_cytoplasm: Nsp6_SIGMAR1_complex_ER
 $Nsp6_SIGMAR1_complex_nucleus: Nsp6_SIGMAR1_complex_ER
-$sa47_Nsp6_____rna: sa218_Nsp6_____rna
-$sa218_Nsp6_____rna: sa47_Nsp6_____rna
 $P_ATPase_Nsp6_complex: (Nsp6 & P_ATPase_complex)
 $Plasma_membrane_organization_phenotype: Nsp3_Nsp4_Nsp6_complex
 $SIGMAR1_Drugs_complex: (Several_drugs_drug & SIGMAR1_ER)
@@ -103,3 +91,15 @@ $V_ATPase_Nsp6_complex_ER: (Nsp6 & V_ATPase_complex_ER)
 $V_ATPase_Nsp6_complex_endosome: V_ATPase_Nsp6_complex_ER
 $V_ATPase_complex_ER: (V_type_space_proton_space_ATPase_complex & ATP6AP1)
 $V_ATPase_complex_endosome: V_ATPase_complex_ER
+$csa15_Nsp4_ALG11_complex_ER: (Nsp4 & sa14_ALG11_ER)
+$csa2_Nsp4_IDE_complex_cytoplasm: (Nsp4 & sa8_IDE_cytoplasm)
+$csa4_Nsp4_IDE_complex_cytoplasm: csa2_Nsp4_IDE_complex_cytoplasm
+$csa93_Nsp4_ALG11_complex_ER: csa15_Nsp4_ALG11_complex_ER
+$sa160_Nsp3_____rna: sa219_Nsp3_____rna
+$sa218_Nsp6_____rna: sa47_Nsp6_____rna
+$sa219_Nsp3_____rna: sa160_Nsp3_____rna
+$sa220_Nsp4_____rna: sa3_Nsp4_____rna
+$sa225_IDE_cytoplasm: sa8_IDE_cytoplasm
+$sa230_ALG11_ER: sa14_ALG11_ER
+$sa3_Nsp4_____rna: sa220_Nsp4_____rna
+$sa47_Nsp6_____rna: sa218_Nsp6_____rna

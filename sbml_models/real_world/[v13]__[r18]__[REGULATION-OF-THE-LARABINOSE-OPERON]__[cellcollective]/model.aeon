@@ -18,10 +18,10 @@ S_12_Ara_ -> MS
 L -| MS
 $A: (Ae & T)
 $Am: (Ae | (Aem & T))
-$S_12_Ara_: (S_4_Ara_ & (Am | A))
 $C: !Ge
 $E: MS
 $L: (S_4_Ara_ & !S_12_Ara_)
 $MS: (S_12_Ara_ & C)
 $MT: (S_12_Ara_ & C)
+$S_12_Ara_: (S_4_Ara_ & (Am | A))
 $T: MT

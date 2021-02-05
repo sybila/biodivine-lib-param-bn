@@ -53,11 +53,7 @@ $CASP1: (PYCARD_ubiquitinated_ubiquitinated_ubiquitinated & NLRP3)
 $Hops_Complex_complex: Orf3a
 $IFNB1: SERPINF2
 $IKBKG_IKBKB_CHUK_complex: LPS_TNF___IL_1_complex
-$sa92_IL1b_cytoplasm: (((CASP1 | sa90_E_cytoplasm) | P65_P015_complex) & sa127_IL1b_cytoplasm)
-$sa127_IL1b_cytoplasm: P65_P015_complex
 $LPS_TLR4_MYD88_complex: ((TLR4 & IRF6) & sa143_MYD88_cytoplasm)
-$sa49_MYD88_cytoplasm: TLR7_8_9_complex
-$sa143_MYD88_cytoplasm: !TRIM59
 $NEMO_IKKA_IKKB_complex: ((((TAB2_TAB3_TAK1_complex | TRIM14_TRIM23_complex) & !TRIM22) & !TRIM29) & !TRIM27_TRIM21_complex)
 $NFKB1_NFKNIA_complex: ((NFKB1 & NFKBIA_phosphorylated_ubiquitinated_ubiquitinated_ubiquitinated) & !CACTIN)
 $NFKBIA_phosphorylated_ubiquitinated_ubiquitinated_ubiquitinated: (BTRC | NEMO_IKKA_IKKB_complex)
@@ -71,6 +67,10 @@ $TICAM1: (TLR3 & !sa50_TRIM38_cytoplasm)
 $TLR3: double_stranded_RNA_rna
 $TLR7_8_9_complex: ssRNA_rna
 $TRAF3: TICAM1
-$sa38_TRAF6_cytoplasm: (((sa49_MYD88_cytoplasm | TRIM23) & sa101_TRAF6_cytoplasm) & !sa52_TRIM38_cytoplasm)
-$sa101_TRAF6_cytoplasm: LPS_TLR4_MYD88_complex
 $TRIM59: Orf3a
+$sa101_TRAF6_cytoplasm: LPS_TLR4_MYD88_complex
+$sa127_IL1b_cytoplasm: P65_P015_complex
+$sa143_MYD88_cytoplasm: !TRIM59
+$sa38_TRAF6_cytoplasm: (((sa49_MYD88_cytoplasm | TRIM23) & sa101_TRAF6_cytoplasm) & !sa52_TRIM38_cytoplasm)
+$sa49_MYD88_cytoplasm: TLR7_8_9_complex
+$sa92_IL1b_cytoplasm: (((CASP1 | sa90_E_cytoplasm) | P65_P015_complex) & sa127_IL1b_cytoplasm)

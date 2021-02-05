@@ -45,8 +45,8 @@ $BID: CASP8
 $CASP3: (CASP8 | sa19_CASP9_Cytoplasm)
 $CASP7: (sa19_CASP9_Cytoplasm | CASP8)
 $CASP8: (FADD | TRADD_FADD_complex)
-$sa19_CASP9_Cytoplasm: (Apoptosome_complex & !AKT1)
 $CYCS: MAPK14
 $FADD: FAS_FASL_complex
 $MAPK14: Orf3a
 $TRADD_FADD_complex: ((FADD & TRADD) & TNF_TNFRSF1A_complex)
+$sa19_CASP9_Cytoplasm: (Apoptosome_complex & !AKT1)

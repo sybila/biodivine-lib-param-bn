@@ -109,11 +109,6 @@ $DDX58_dsRNA_complex: (((sa26_dsRNA_rna_Cell & DDX58) & !sa353_M_Cell) & !sa354_
 $DDX58_ubiquitinated: (((RNF135 | TRIM25) | DDX58_dsRNA_complex) & !sa352_N_Cell)
 $EIF2AK2_dsRNA_complex: ((sa456_dsRNA_rna_Cell & EIF2AK2) & !sa416_Nsp15_Cell)
 $IFIH1_dsRNA_complex: ((((sa27_dsRNA_rna_Cell & IFIH1) & !sa353_M_Cell) & !sa354_Nsp3_Cell) & !sa415_Nsp15_Cell)
-$sa118_IKBKE_Cell: (csa83_TANK_TRAF3_IKBKE_complex_Cell & !sa349_Nsp3_Cell)
-$csa75_IKK_Complex_complex_Cell: ((IKBKG & CHUK) & IKBKB)
-$csa99_IKK_Complex_complex_Cell: ((((TRAF6_ubiquitinated | CASP8) | CASP10) & csa75_IKK_Complex_complex_Cell) & !sa359_M_Cell)
-$sa157_IRF3_phosphorylated_nucleus: sa154_TBK1_Cell
-$sa256_IRF3_phosphorylated_nucleus: (((sa117_TBK1_Cell | Orf3b) | Orf8) & !sa357_Nsp3_Cell)
 $IRF7_phosphorylated: (sa118_IKBKE_Cell | MYD88_IRAK_TRAF_complex)
 $ITCH: Orf9
 $JNK_complex: (MAP2K7_phosphorylated | MAP2K4_phosphorylated)
@@ -129,20 +124,25 @@ $MAVS_TRAF_complex: (((TRAF2 & TRAF5) & sa129_TRAF6_Cell) & MAVS)
 $MYD88: (TLR7_ssRNA_complex | TLR8_ssRNA_complex)
 $MYD88_IRAK_TRAF_complex: (((MYD88 & IRAK1) & IRAK4) & sa428_TRAF6_Cell)
 $NFKBIA_phosphorylated: (csa102_NFKB_NFKBIA_complex_Cell & sa381_N_Cell)
-$csa100_NFKB_NFKBIA_complex_Cell: ((NFKBIA & RELA) & NFKB1)
-$csa102_NFKB_NFKBIA_complex_Cell: (csa100_NFKB_NFKBIA_complex_Cell & csa99_IKK_Complex_complex_Cell)
 $NFKB_complex: (csa102_NFKB_NFKBIA_complex_Cell & sa381_N_Cell)
 $RIPK1_FADD_complex: MAVS_TRADD_complex
-$csa82_TANK_TRAF3_IKBKE_complex_Cell: ((MAVS_TRADD_complex & !sa361_Nsp3_Cell) & !sa408_M_Cell)
-$csa83_TANK_TRAF3_IKBKE_complex_Cell: ((csa89_TANK_TRAF3_IKBKE_complex_Cell & TICAM1_TRAF3_TRAF6_complex) & !sa403_M_Cell)
-$csa89_TANK_TRAF3_IKBKE_complex_Cell: ((TRAF3 & TANK) & sa491_IKBKE_Cell)
-$sa117_TBK1_Cell: csa83_TANK_TRAF3_IKBKE_complex_Cell
-$sa154_TBK1_Cell: csa82_TANK_TRAF3_IKBKE_complex_Cell
-$sa91_TICAM1_Cell: TLR3_dsRNA_complex
 $TICAM1_TRAF3_TRAF6_complex: ((sa91_TICAM1_Cell & sa422_TRAF6_Cell) & sa419_TICAM1_Cell)
 $TLR3_dsRNA_complex: dsRNA_rna_endosome
 $TLR7_ssRNA_complex: (TLR7 & ssRNA_rna)
 $TLR8_ssRNA_complex: (TLR8 & ssRNA_rna)
-$sa265_TRAF6_Cell: (TRAF6_ubiquitinated & sa363_Nsp3_Cell)
 $TRAF6_ubiquitinated: (((sa265_TRAF6_Cell & UBE2N) & MYD88_IRAK_TRAF_complex) & MAVS_TRAF_complex)
+$csa100_NFKB_NFKBIA_complex_Cell: ((NFKBIA & RELA) & NFKB1)
+$csa102_NFKB_NFKBIA_complex_Cell: (csa100_NFKB_NFKBIA_complex_Cell & csa99_IKK_Complex_complex_Cell)
+$csa75_IKK_Complex_complex_Cell: ((IKBKG & CHUK) & IKBKB)
+$csa82_TANK_TRAF3_IKBKE_complex_Cell: ((MAVS_TRADD_complex & !sa361_Nsp3_Cell) & !sa408_M_Cell)
+$csa83_TANK_TRAF3_IKBKE_complex_Cell: ((csa89_TANK_TRAF3_IKBKE_complex_Cell & TICAM1_TRAF3_TRAF6_complex) & !sa403_M_Cell)
+$csa89_TANK_TRAF3_IKBKE_complex_Cell: ((TRAF3 & TANK) & sa491_IKBKE_Cell)
+$csa99_IKK_Complex_complex_Cell: ((((TRAF6_ubiquitinated | CASP8) | CASP10) & csa75_IKK_Complex_complex_Cell) & !sa359_M_Cell)
+$sa117_TBK1_Cell: csa83_TANK_TRAF3_IKBKE_complex_Cell
+$sa118_IKBKE_Cell: (csa83_TANK_TRAF3_IKBKE_complex_Cell & !sa349_Nsp3_Cell)
+$sa154_TBK1_Cell: csa82_TANK_TRAF3_IKBKE_complex_Cell
+$sa157_IRF3_phosphorylated_nucleus: sa154_TBK1_Cell
+$sa256_IRF3_phosphorylated_nucleus: (((sa117_TBK1_Cell | Orf3b) | Orf8) & !sa357_Nsp3_Cell)
+$sa265_TRAF6_Cell: (TRAF6_ubiquitinated & sa363_Nsp3_Cell)
+$sa91_TICAM1_Cell: TLR3_dsRNA_complex
 $transcription_of_proinflammatory_proteins_phenotype: ((((AP1_complex | NFKB_complex) | sa157_IRF3_phosphorylated_nucleus) | IRF7_phosphorylated) | sa256_IRF3_phosphorylated_nucleus)

@@ -212,8 +212,6 @@ $C4b: (C4 & MASP2)
 $C4d: ((sa480_SARS_CoV_2_infection_phenotype_Blood | S) | (C4b & CFI))
 $C4d_deposition_phenotype: C4d
 $C5a: ((sa468_Plasmin_Blood | sa207_SARS_CoV_2_infection_phenotype_Blood) | ((C2a_C4b_complex | C3b_Bb_C3b_complex) & C5))
-$csa32_C5b_9_complex_Endothelium__vascular: (sa207_SARS_CoV_2_infection_phenotype_Blood | ((C2a_C4b_complex | C3b_Bb_C3b_complex) & C5))
-$csa43_C5b_9_complex_Endothelium__vascular: (csa32_C5b_9_complex_Endothelium__vascular & S)
 $C5b_9_deposition_phenotype: csa32_C5b_9_complex_Endothelium__vascular
 $CRP: sa207_SARS_CoV_2_infection_phenotype_Blood
 $D_dimer: (((sa212_Plasmin_Blood | TAFI) | sa499_SARS_CoV_2_infection_phenotype_Blood) & Fibrin_polymer)
@@ -245,25 +243,17 @@ $MASP1: MBL2
 $MASP2: sa480_SARS_CoV_2_infection_phenotype_Blood
 $MASP2_deposition_phenotype: MASP2
 $NR3C2: (aldosterone_simple_molecule_Endothelium__vascular | AGTR1_Endothelium__vascular)
-$sa213_PLAT_Blood: (Bradykinin | (((((Bradykinin | angiotensin_II_simple_molecule) & sa225_PLAT_Blood) & !SERPINE1) & !angiotensin_I_7_simple_molecule) & !PROC))
 $PLAT_SERPINE1_complex: ((SERPINE1 & sa225_PLAT_Blood) & sa499_SARS_CoV_2_infection_phenotype_Blood)
 $PLAU: !SERPINE1
 $PROC: sa207_SARS_CoV_2_infection_phenotype_Blood
-$sa212_Plasmin_Blood: ((((sa213_PLAT_Blood | PLAU) | F11a) | KLKB1) & Plasminogen)
 $Plasminogen: csa32_C5b_9_complex_Endothelium__vascular
 $REN: (Prorenin & Kallikrein)
 $SARS_CoV_2_viral_entry_phenotype: ACE2_Spike_complex
 $SERPINE1: ((((aldosterone_simple_molecule_Blood | angiotensin_II_simple_molecule) | IL6) | AGTR1_Endothelium__vascular) & !angiotensin_I_7_simple_molecule)
 $SERPINF2_Plasmin_complex: ((sa212_Plasmin_Blood & SERPINF2) & sa481_SARS_CoV_2_infection_phenotype_Blood)
-$sa171_Small_peptide_Blood: (F12 & KLKB1)
-$sa178_Small_peptide_Blood: ((F10 & F9a) & !Antithrombin)
-$sa183_Small_peptide_Blood: ((F8 & sa181_Thrombin_Blood) & !PROC)
-$sa397_Small_peptide_Blood: (Bradykinin & ACE)
 $TAFI: sa181_Thrombin_Blood
 $TAT_complex_complex: ((Antithrombin & sa181_Thrombin_Blood) & sa481_SARS_CoV_2_infection_phenotype_Blood)
 $TNF: (sa207_SARS_CoV_2_infection_phenotype_Blood | cytokine_storm_phenotype)
-$sa181_Thrombin_Blood: ((sa203_Thrombin_Blood & Heparin_simple_molecule) & !Antithrombin)
-$sa203_Thrombin_Blood: (Prothrombin & F5a_F10a_complex)
 $Thrombin_Thrombomodulin_complex: (sa181_Thrombin_Blood & Thrombomodulin)
 $Thrombomodulin: sa499_SARS_CoV_2_infection_phenotype_Blood
 $Thrombosis_phenotype_Blood: (((((((((angiotensin_II_simple_molecule | csa32_C5b_9_complex_Endothelium__vascular) | C4d) | VWF) | CRP) | IL2RA) | IL8) | TNF) | IL6) | IL1B)
@@ -275,8 +265,18 @@ $angiotensin_II_simple_molecule: ((sa480_SARS_CoV_2_infection_phenotype_Blood | 
 $angiotensin_I_7_simple_molecule: (angiotensin_II_simple_molecule & ACE2_Endothelium__vascular)
 $angiotensin_I_simple_molecule: (AGT & REN)
 $apoptosis_phenotype: C5b_9_deposition_phenotype
+$csa32_C5b_9_complex_Endothelium__vascular: (sa207_SARS_CoV_2_infection_phenotype_Blood | ((C2a_C4b_complex | C3b_Bb_C3b_complex) & C5))
+$csa43_C5b_9_complex_Endothelium__vascular: (csa32_C5b_9_complex_Endothelium__vascular & S)
 $platelet_activation_phenotype: (Fibrinogen_GP6_complex | GP6_alpha2beta1_VWF_complex)
 $platelet_aggregation_phenotype: C5b_9_deposition_phenotype
+$sa171_Small_peptide_Blood: (F12 & KLKB1)
+$sa178_Small_peptide_Blood: ((F10 & F9a) & !Antithrombin)
+$sa181_Thrombin_Blood: ((sa203_Thrombin_Blood & Heparin_simple_molecule) & !Antithrombin)
+$sa183_Small_peptide_Blood: ((F8 & sa181_Thrombin_Blood) & !PROC)
+$sa203_Thrombin_Blood: (Prothrombin & F5a_F10a_complex)
+$sa212_Plasmin_Blood: ((((sa213_PLAT_Blood | PLAU) | F11a) | KLKB1) & Plasminogen)
+$sa213_PLAT_Blood: (Bradykinin | (((((Bradykinin | angiotensin_II_simple_molecule) & sa225_PLAT_Blood) & !SERPINE1) & !angiotensin_I_7_simple_molecule) & !PROC))
+$sa397_Small_peptide_Blood: (Bradykinin & ACE)
 $septal_capillary_necrosis_phenotype: C4d_deposition_phenotype
 $thrombus_formation_phenotype: ((AGTR1_Platelet | MAS1) | platelet_activation_phenotype)
 $vascular_inflammation_phenotype: aldosterone_simple_molecule_Endothelium__vascular

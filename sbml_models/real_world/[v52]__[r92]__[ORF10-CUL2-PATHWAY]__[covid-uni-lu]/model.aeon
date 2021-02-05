@@ -104,8 +104,6 @@ $Cul2_ubiquitin_ligase_N8_substrate_Ub_complex: Cul2_ubiquitin_ligase_N8_E2_subs
 $Cul2_ubiquitin_ligase_Orf10_complex: ((Cul2_ubiquitin_ligase_Orf10_substrate_complex | (Cul2_ubiquitin_ligase_N8_Orf10_complex & CSN5_complex)) | (Cul2_ubiquitin_ligase_complex & Orf10))
 $Cul2_ubiquitin_ligase_Orf10_substrate_complex: (Cul2_ubiquitin_ligase_Orf10_complex & sa105_ubit_traget_cytosol)
 $Cul2_ubiquitin_ligase_complex: (((csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol | Cul2_ubiquitin_ligase_Orf10_complex) | (Cul2_ubiquitin_ligase_N8_complex & CSN5_complex)) | (Zyg11B_EloBC_complex & Rbx1_Cul2_complex))
-$csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol: (sa105_ubit_traget_cytosol & Cul2_ubiquitin_ligase_complex)
-$csa15_Cul2_ubiquitin_ligase_substrate_complex_cytosol: ((Cul2_ubiquitin_ligase_N8_E2_substrate_complex | Cul2_ubiquitin_ligase_N8_E2_Ub_substrate_complex) | (UBE2M_NEDD8_complex & csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol))
 $DUB: DUB_rna
 $E1: ((E2 & E1_ubiquitinated) | E1_rna)
 $E1_ubiquitinated: ((E1 & Ub_simple_molecule) & ATP_simple_molecule)
@@ -122,6 +120,8 @@ $Rbx1_Cul2_complex: ((((Cul2_ubiquitin_ligase_complex | RBX1_rna) | Rbx1_Cul2_co
 $UBE2M_NEDD8_complex: ((((NEDD8 & NAE_complex) | UBE2M_rna) | (UBE2M_NEDD8_complex & csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol)) | (Cul2_ubiquitin_ligase_Orf10_substrate_complex & UBE2M_NEDD8_complex))
 $ZYG11B: (ZYG11B_rna | Zyg11B_EloBC_complex)
 $Zyg11B_EloBC_complex: (Cul2_ubiquitin_ligase_complex | (ELOB_ELOC_complex & ZYG11B))
+$csa15_Cul2_ubiquitin_ligase_substrate_complex_cytosol: ((Cul2_ubiquitin_ligase_N8_E2_substrate_complex | Cul2_ubiquitin_ligase_N8_E2_Ub_substrate_complex) | (UBE2M_NEDD8_complex & csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol))
+$csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol: (sa105_ubit_traget_cytosol & Cul2_ubiquitin_ligase_complex)
 $sa105_ubit_traget_cytosol: (csa4_Cul2_ubiquitin_ligase_substrate_complex_cytosol | Cul2_ubiquitin_ligase_Orf10_substrate_complex)
 $sa171_ubit_traget_cytosol: (ubit_traget_ubiquitinated & DUB)
 $ubit_traget_ubiquitinated: (Cul2_ubiquitin_ligase_N8_substrate_Ub_complex | Cul2_ubiquitin_ligase_N8_Orf10_substrate_Ub_complex)

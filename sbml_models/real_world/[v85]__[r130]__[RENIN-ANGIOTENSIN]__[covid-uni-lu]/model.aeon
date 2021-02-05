@@ -131,22 +131,8 @@ sa102_AGTR1_cytoplasm -> platelet_aggregation_phenotype
 $ACE2_AGTR1_complex: (sa26_AGTR1_cytoplasm & !angiotensin_II_simple_molecule_cytoplasm)
 $ACE2_Spike_complex_complex: ((sa30_ACE2_cytoplasm & S) | ((S & TMPRSS2) & !Camostat_mesilate_drug))
 $ACE2__soluble: ((ADAM17 | sa167_AGTR1_cytoplasm) & sa30_ACE2_cytoplasm)
-$sa30_ACE2_cytoplasm: ((((((sa169_estradiol_simple_molecule_cytoplasm | Calcitriol_simple_molecule_cytoplasm) & ACE2_gene) & !S) | !SARS_CoV_2_infection_phenotype) | (ACE2_gene & aging_phenotype)) | ((ACE2_gene & !hypertension_phenotype) & !_Diabetes_mellitus__type_II_phenotype))
-$sa98_ACE2_cytoplasm: ((sa30_ACE2_cytoplasm & sa44_sex__male_phenotype_default_compartment) | ((aging_phenotype | hypertension_phenotype) & sa30_ACE2_cytoplasm))
-$sa29_ACE_cytoplasm: (sa200_estradiol_simple_molecule_cytoplasm & !Calcitriol_simple_molecule_cell)
-$sa100_ACE_cytoplasm: ((((sa28_ACE_cytoplasm & !aging_phenotype) & !sa44_sex__male_phenotype_default_compartment) | (sa28_ACE_cytoplasm & aldosterone_simple_molecule)) | (sa28_ACE_cytoplasm & hypertension_phenotype))
-$sa146_ACE_cytoplasm: ((sa29_ACE_cytoplasm & !Lisinopril_drug) | (sa29_ACE_cytoplasm & ABO_blood_group_system_phenotype))
 $AGT: ethynylestradiol_simple_molecule
-$sa102_AGTR1_cytoplasm: (((((angiotensin_II_simple_molecule_cytoplasm | angiotensin_IV_simple_molecule) | angiotensin_A_simple_molecule) & sa26_AGTR1_cytoplasm) | (sa26_AGTR1_cytoplasm & !Losartan_drug)) | (sa26_AGTR1_cytoplasm & !angiotensin_1_7_simple_molecule_cytoplasm))
-$sa140_AGTR1_cytoplasm: (angiotensin_II_simple_molecule_cytoplasm & !MAS1_AGTR1_complex)
-$sa25_AGTR2_cytoplasm: ((((sa79_AGTR2_cytoplasm & CGP42112A_drug) | ((angiotensin_II_simple_molecule_cytoplasm | angiotensin_A_simple_molecule) & sa79_AGTR2_cytoplasm)) | (sa79_AGTR2_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm)) | (sa79_AGTR2_cytoplasm & angiotensin_1_9_simple_molecule))
-$sa64_ENPEP_cytoplasm: ((sa162_ENPEP_cytoplasm & !QGC001_drug) | (sa162_ENPEP_cytoplasm & !sa193_sex__male_phenotype_default_compartment))
-$sa156_LNPEP_cytoplasm: ((sa152_LNPEP_cytoplasm & angiotensin_IV_simple_molecule) | (sa152_LNPEP_cytoplasm & angiotensin_3_7_simple_molecule))
 $MAS1_AGTR1_complex: sa140_AGTR1_cytoplasm
-$sa27_MAS1_cytoplasm: (((sa77_MAS1_cytoplasm & angiotensin_1_5_simple_molecule) | (sa77_MAS1_cytoplasm & AR234960_drug)) | (sa77_MAS1_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm))
-$sa77_MAS1_cytoplasm: !aldosterone_simple_molecule
-$sa194_MME_cytoplasm: (sa39_MME_cytoplasm & sa44_sex__male_phenotype_default_compartment)
-$sa50_MRGPRD_cytoplasm: ((sa94_MRGPRD_cytoplasm & alamandine_simple_molecule) | (sa94_MRGPRD_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm))
 $REN: !Calcitriol_simple_molecule_cell
 $TMPRSS2: androgen_simple_molecule
 $alamandine_simple_molecule: (angiotensin_1_7_simple_molecule_cytoplasm | (angiotensin_A_simple_molecule & sa30_ACE2_cytoplasm))
@@ -170,6 +156,20 @@ $neurodegeneration_phenotype: sa156_LNPEP_cytoplasm
 $oxidative_stress_phenotype: (sa27_MAS1_cytoplasm | sa102_AGTR1_cytoplasm)
 $platelet_aggregation_phenotype: sa102_AGTR1_cytoplasm
 $pulmonary_edema_phenotype: sa102_AGTR1_cytoplasm
+$sa100_ACE_cytoplasm: ((((sa28_ACE_cytoplasm & !aging_phenotype) & !sa44_sex__male_phenotype_default_compartment) | (sa28_ACE_cytoplasm & aldosterone_simple_molecule)) | (sa28_ACE_cytoplasm & hypertension_phenotype))
+$sa102_AGTR1_cytoplasm: (((((angiotensin_II_simple_molecule_cytoplasm | angiotensin_IV_simple_molecule) | angiotensin_A_simple_molecule) & sa26_AGTR1_cytoplasm) | (sa26_AGTR1_cytoplasm & !Losartan_drug)) | (sa26_AGTR1_cytoplasm & !angiotensin_1_7_simple_molecule_cytoplasm))
+$sa140_AGTR1_cytoplasm: (angiotensin_II_simple_molecule_cytoplasm & !MAS1_AGTR1_complex)
+$sa146_ACE_cytoplasm: ((sa29_ACE_cytoplasm & !Lisinopril_drug) | (sa29_ACE_cytoplasm & ABO_blood_group_system_phenotype))
+$sa156_LNPEP_cytoplasm: ((sa152_LNPEP_cytoplasm & angiotensin_IV_simple_molecule) | (sa152_LNPEP_cytoplasm & angiotensin_3_7_simple_molecule))
+$sa194_MME_cytoplasm: (sa39_MME_cytoplasm & sa44_sex__male_phenotype_default_compartment)
+$sa25_AGTR2_cytoplasm: ((((sa79_AGTR2_cytoplasm & CGP42112A_drug) | ((angiotensin_II_simple_molecule_cytoplasm | angiotensin_A_simple_molecule) & sa79_AGTR2_cytoplasm)) | (sa79_AGTR2_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm)) | (sa79_AGTR2_cytoplasm & angiotensin_1_9_simple_molecule))
+$sa27_MAS1_cytoplasm: (((sa77_MAS1_cytoplasm & angiotensin_1_5_simple_molecule) | (sa77_MAS1_cytoplasm & AR234960_drug)) | (sa77_MAS1_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm))
+$sa29_ACE_cytoplasm: (sa200_estradiol_simple_molecule_cytoplasm & !Calcitriol_simple_molecule_cell)
+$sa30_ACE2_cytoplasm: ((((((sa169_estradiol_simple_molecule_cytoplasm | Calcitriol_simple_molecule_cytoplasm) & ACE2_gene) & !S) | !SARS_CoV_2_infection_phenotype) | (ACE2_gene & aging_phenotype)) | ((ACE2_gene & !hypertension_phenotype) & !_Diabetes_mellitus__type_II_phenotype))
+$sa50_MRGPRD_cytoplasm: ((sa94_MRGPRD_cytoplasm & alamandine_simple_molecule) | (sa94_MRGPRD_cytoplasm & angiotensin_1_7_simple_molecule_cytoplasm))
+$sa64_ENPEP_cytoplasm: ((sa162_ENPEP_cytoplasm & !QGC001_drug) | (sa162_ENPEP_cytoplasm & !sa193_sex__male_phenotype_default_compartment))
+$sa77_MAS1_cytoplasm: !aldosterone_simple_molecule
+$sa98_ACE2_cytoplasm: ((sa30_ACE2_cytoplasm & sa44_sex__male_phenotype_default_compartment) | ((aging_phenotype | hypertension_phenotype) & sa30_ACE2_cytoplasm))
 $thrombosis_phenotype: (sa27_MAS1_cytoplasm | sa102_AGTR1_cytoplasm)
 $vasoconstriction_phenotype: ((((sa25_AGTR2_cytoplasm | sa27_MAS1_cytoplasm) | sa156_LNPEP_cytoplasm) | sa50_MRGPRD_cytoplasm) | sa102_AGTR1_cytoplasm)
 $viral_replication_cycle_phenotype: ACE2_Spike_complex_complex

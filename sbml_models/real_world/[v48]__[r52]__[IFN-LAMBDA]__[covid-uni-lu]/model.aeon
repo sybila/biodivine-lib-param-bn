@@ -65,16 +65,16 @@ $Inhibited_ISGF3_precursor__complex: (ISGF3_precursor_complex & STAT3)
 $RIG_1_M_Protein_complex: (M_protein__membrane_bound & sa99_RIG_I_mitochondria)
 $RIG_I_MAVS_complex_mitochondria: (RIG_I_ubiquitinated & mitoMAVS)
 $RIG_I_MAVS_complex_peroxisome: sa93_dsRNA_rna_innate_immune_cell
-$sa83_RIG_I_mitochondria: ((sa99_RIG_I_mitochondria & sa82_dsRNA_rna_innate_immune_cell) | (RIG_I_ubiquitinated & PLPro))
 $RIG_I_ubiquitinated: (sa83_RIG_I_mitochondria & Riplet___TRIM25)
 $antiviral_proteins: (ISGs_rna & 80S_ribosome_complex)
-$sa82_dsRNA_rna_innate_immune_cell: (dsRNA_vesicle_rna | RNA_rna)
+$csa10_receptor_complex_complex_cell: (csa9_receptor_complex_complex_cell & IFNL)
+$csa11_receptor_complex_complex_cell: (csa10_receptor_complex_complex_cell & SOCS3)
+$csa34_receptor_complex_complex_cell: (csa10_receptor_complex_complex_cell & SOCS1)
+$csa9_receptor_complex_complex_cell: csa10_receptor_complex_complex_cell
 $dsRNA_vesicle_rna: sa82_dsRNA_rna_innate_immune_cell
 $inhibited_80S_ribosome_complex: (80S_ribosome_complex & viral_nsp1)
 $inhibited_ribosomal_40S_SU_complex: (ribosomal_40S_subunit_complex & viral_nsp1)
 $p38_NFkB_IRF3_complex: IRF3_phosphorylated
-$csa10_receptor_complex_complex_cell: (csa9_receptor_complex_complex_cell & IFNL)
-$csa9_receptor_complex_complex_cell: csa10_receptor_complex_complex_cell
-$csa11_receptor_complex_complex_cell: (csa10_receptor_complex_complex_cell & SOCS3)
-$csa34_receptor_complex_complex_cell: (csa10_receptor_complex_complex_cell & SOCS1)
+$sa82_dsRNA_rna_innate_immune_cell: (dsRNA_vesicle_rna | RNA_rna)
+$sa83_RIG_I_mitochondria: ((sa99_RIG_I_mitochondria & sa82_dsRNA_rna_innate_immune_cell) | (RIG_I_ubiquitinated & PLPro))
 $viral_RNA_N_methyl_Guanine_rna: (viral_RNA_rna & nsp14)
