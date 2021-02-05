@@ -1,0 +1,27 @@
+C -> MT
+S_12_Ara_ -> MT
+MS -> E
+Ge -| C
+Aem -> Am
+T -> Am
+Ae -> Am
+S_4_Ara_ -> L
+S_12_Ara_ -| L
+MT -> T
+T -> A
+Ae -> A
+Am -> S_12_Ara_
+S_4_Ara_ -> S_12_Ara_
+A -> S_12_Ara_
+C -> MS
+S_12_Ara_ -> MS
+L -| MS
+$A: (Ae & T)
+$Am: (Ae | (Aem & T))
+$C: !Ge
+$E: MS
+$L: (S_4_Ara_ & !S_12_Ara_)
+$MS: (S_12_Ara_ & C)
+$MT: (S_12_Ara_ & C)
+$S_12_Ara_: (S_4_Ara_ & (Am | A))
+$T: MT

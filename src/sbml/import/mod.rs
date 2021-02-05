@@ -483,4 +483,40 @@ mod tests {
         assert_eq!(actual.graph.num_vars(), 41);
         assert_eq!(layout.len(), 0);
     }
+
+
+    #[test]
+    fn diff_test() {
+        let benchmarks = std::fs::read_dir("./sbml_models/real_world").unwrap();
+
+        for bench_dir in benchmarks {
+            let bench_dir = bench_dir.unwrap();
+            println!("Started {}", bench_dir.path().display());
+            if !bench_dir.file_type().unwrap().is_dir() {
+                eprintln!("SKIP: {} is not a directory.", bench_dir.path().display());
+                continue;
+            }
+
+            let sbml_model_path = bench_dir.path().join("model.sbml");
+            let model_string = std::fs::read_to_string(sbml_model_path).unwrap();
+            let model = BooleanNetwork::from_sbml(&model_string);
+            let sbml_model = match model {
+                Err(err) => {
+                    eprintln!(
+                        "ERROR: Invalid SBML model in {}.",
+                        bench_dir.path().display()
+                    );
+                    panic!(err);
+                }
+                Ok((model, _)) => model,
+            };
+
+            let aeon_model_path = bench_dir.path().join("model.aeon");
+            let model_string = std::fs::read_to_string(aeon_model_path).unwrap();
+            let aeon_model = BooleanNetwork::try_from(model_string.as_str()).unwrap();
+
+            assert_eq!(aeon_model, sbml_model);
+            println!("Finished {}", bench_dir.path().display());
+        }
+    }
 }
