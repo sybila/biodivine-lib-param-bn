@@ -12,7 +12,7 @@ Dl -> N2
 Ser -> N2
 Fng2 -? N2
 Ap2 -> Ser2
-$Ap: false
+$Ap: true
 $Ap2: false
 $Dl: (!Ap & N)
 $Dl2: (!Ap2 & N2)

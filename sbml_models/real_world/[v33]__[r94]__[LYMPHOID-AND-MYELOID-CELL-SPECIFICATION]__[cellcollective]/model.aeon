@@ -41,7 +41,7 @@ Spi1 -> Mef2c
 Cebpa -> Mef2c
 Cebpb -> Mef2c
 E2A -> Foxo1
-Cebpa -| Foxo1
+Cebpa -|? Foxo1
 E2A_protein_active -> Ets1
 Mef2c -> Ikzf1
 Pax5_protein_active -> Ikzf1

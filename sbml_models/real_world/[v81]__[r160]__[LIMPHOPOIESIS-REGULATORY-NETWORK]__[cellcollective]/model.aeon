@@ -4,8 +4,8 @@ STAT3 -> IFNg
 EOMES -> IFNg
 Tbet -> IFNg
 Irf4 -> PU1
-Gfi1 -| PU1
-Ikaros -| PU1
+Gfi1 -|? PU1
+Ikaros -|? PU1
 Foxp3 -> TGFb
 IL21 -> IL21R
 Notch1 -> Bcl11b

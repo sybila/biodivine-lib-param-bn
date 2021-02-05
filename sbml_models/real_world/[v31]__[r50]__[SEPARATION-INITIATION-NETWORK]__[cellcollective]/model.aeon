@@ -23,7 +23,7 @@ cdc11 -> sid2
 SIP -> sid2
 orb6 -> gef1
 cdc7 -> cdc14_sid1
-cdk_H -| cdc14_sid1
+cdk_H -|? cdc14_sid1
 byr4_cdc16 -| spg1
 cdc11 -> spg1
 etd1 -> spg1

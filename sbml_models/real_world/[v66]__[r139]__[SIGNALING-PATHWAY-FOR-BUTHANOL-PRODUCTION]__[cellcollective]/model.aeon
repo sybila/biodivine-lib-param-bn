@@ -27,7 +27,7 @@ sigH -> sporulation
 cell_membrane -| sporulation
 spo0A_p -> sporulation
 spo0A_p -> adc
-EtfAB -| ferredoxin
+EtfAB -|? ferredoxin
 Rnf -> ferredoxin
 ald -> butanal
 bdhAB -> butanal
@@ -39,7 +39,7 @@ acetone -| cell_membrane
 butanol -| cell_membrane
 sporulation -| hbd
 spo0A_p -| hbd
-butyryl_CoA -| thlA
+butyryl_CoA -|? thlA
 spo0A_p -> thlA
 spo0A_p -> sigE
 sigF -> sigE
@@ -117,7 +117,7 @@ pfk -> pyk
 sporulation -| crt
 spo0A_p -| crt
 sigA -> sigH
-AbrB -| sigH
+AbrB -|? sigH
 sporulation -| acetone
 adc -> acetone
 acetoacetate -> acetone
