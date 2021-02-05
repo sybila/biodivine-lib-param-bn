@@ -4,7 +4,7 @@ use roxmltree::{ExpandedName, Node};
 
 /// Maps almost directly to the SBML transition input tag.
 pub struct SBMLTransitionInput {
-    pub id: String,
+    pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
     pub transition_effect: Option<String>,
     pub sign: Option<String>,
@@ -12,7 +12,7 @@ pub struct SBMLTransitionInput {
 
 /// Maps almost directly to the SBML transition output tag.
 pub struct SBMLTransitionOutput {
-    pub id: Option<String>,
+    pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
     pub transition_effect: Option<String>,
 }
@@ -52,12 +52,17 @@ pub fn read_transition(transition: Node) -> Result<SBMLTransition, String> {
         .attribute((SBML_QUAL, "id"))
         .ok_or_else(|| format!("Transition with a missing id found."))?;
 
-    let inputs = read_unique_child(transition, (SBML_QUAL, "listOfInputs"))?;
+    // Inputs are optional when there aren't any.
+    let inputs = read_unique_child(transition, (SBML_QUAL, "listOfInputs")).ok();
     let outputs = read_unique_child(transition, (SBML_QUAL, "listOfOutputs"))?;
     // Terms are an optional element.
     let terms = read_unique_child(transition, (SBML_QUAL, "listOfFunctionTerms")).ok();
 
-    let inputs = child_tags(inputs, (SBML_QUAL, "input"));
+    let inputs = if let Some(inputs) = inputs {
+        child_tags(inputs, (SBML_QUAL, "input"))
+    } else {
+        Vec::new()
+    };
     let outputs = child_tags(outputs, (SBML_QUAL, "output"));
 
     let default_term = if let Some(terms) = terms {
@@ -112,21 +117,15 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SBMLTransit
     let effect = input.attribute((SBML_QUAL, "transitionEffect"));
     let sign = input.attribute((SBML_QUAL, "sign"));
     let id = input.attribute((SBML_QUAL, "id"));
-    if id.is_none() {
-        return Err(format!(
-            "Transition input in {} is missing an id.",
-            transition_id
-        ));
-    }
     if species.is_none() {
         return Err(format!(
-            "Transition input {} is missing an input species.",
-            id.unwrap()
+            "Transition {} is missing an input species.",
+            transition_id
         ));
     }
 
     Ok(SBMLTransitionInput {
-        id: id.unwrap().to_string(),
+        id: id.map(|s| s.to_string()),
         qual_species: species.unwrap().to_string(),
         transition_effect: effect.map(|s| s.to_string()),
         sign: sign.map(|s| s.to_string()),

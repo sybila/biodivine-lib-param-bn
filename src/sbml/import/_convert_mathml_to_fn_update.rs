@@ -33,7 +33,7 @@ pub fn sbml_transition_to_update_function(
                 let input = transition
                     .inputs
                     .iter()
-                    .find(|i| i.id == *name)
+                    .find(|i| i.id.as_ref().map(|id| id == name).unwrap_or(false))
                     .map(|i| i.qual_species.clone())
                     .or_else(|| id_to_var.get(name).cloned())
                     .and_then(|name| network.graph.find_variable(&name));

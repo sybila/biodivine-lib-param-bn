@@ -192,7 +192,6 @@ mod tests {
         expected_layout.insert("c".to_string(), (1542.123, -4.333));
         expected_layout.insert("d".to_string(), (121.776, 2.0));
         let sbml = model.to_sbml(&expected_layout);
-        println!("Sbml: {}", sbml);
         let (actual, layout) = BooleanNetwork::from_sbml(&sbml).unwrap();
         assert_eq!(model, actual);
         assert_eq!(expected_layout, layout);

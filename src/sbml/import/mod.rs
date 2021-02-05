@@ -274,7 +274,13 @@ fn create_regulations(
             let is_observable = transition.function_terms.iter().any(|t| {
                 t.math
                     .as_ref()
-                    .map(|m| m.contains_identifier(in_specie) || m.contains_identifier(in_id))
+                    .map(|m| {
+                        m.contains_identifier(in_specie)
+                            || in_id
+                                .as_ref()
+                                .map(|id| m.contains_identifier(id))
+                                .unwrap_or(false)
+                    })
                     .unwrap_or(false)
             }) || transition.function_terms.is_empty();
 
@@ -484,7 +490,7 @@ mod tests {
         assert_eq!(layout.len(), 0);
     }
 
-
+    // cargo test --package biodivine-lib-param-bn --lib sbml::import::tests::diff_test -- --nocapture
     #[test]
     fn diff_test() {
         let benchmarks = std::fs::read_dir("./sbml_models/real_world").unwrap();
@@ -515,7 +521,32 @@ mod tests {
             let model_string = std::fs::read_to_string(aeon_model_path).unwrap();
             let aeon_model = BooleanNetwork::try_from(model_string.as_str()).unwrap();
 
-            assert_eq!(aeon_model, sbml_model);
+            assert_eq!(aeon_model.graph.num_vars(), sbml_model.graph.num_vars());
+            for v in aeon_model.graph.variable_ids() {
+                print!("..{}..", aeon_model.graph.get_variable(v).name);
+                assert_eq!(
+                    aeon_model.graph.get_variable(v),
+                    sbml_model.graph.get_variable(v)
+                );
+                assert_eq!(
+                    aeon_model.graph.regulators(v),
+                    sbml_model.graph.regulators(v)
+                );
+                assert_eq!(
+                    aeon_model.get_update_function(v),
+                    sbml_model.get_update_function(v)
+                );
+
+                for reg in aeon_model.graph.regulators(v) {
+                    let r1 = aeon_model.graph.find_regulation(reg, v).unwrap();
+                    let r2 = sbml_model.graph.find_regulation(reg, v).unwrap();
+                    assert_eq!(r1, r2);
+                }
+            }
+            println!();
+            // In case this fails, it takes forever create a debug string for large models
+            // (several megabytes), we thus use the more granular approach above.
+            //assert_eq!(aeon_model, sbml_model);
             println!("Finished {}", bench_dir.path().display());
         }
     }
