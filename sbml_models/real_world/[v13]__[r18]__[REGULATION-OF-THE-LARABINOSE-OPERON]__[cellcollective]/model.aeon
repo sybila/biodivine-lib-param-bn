@@ -15,7 +15,7 @@ S_4_Ara_ -> S_12_Ara_
 A -> S_12_Ara_
 C -> MS
 S_12_Ara_ -> MS
-L -| MS
+L -|? MS
 $A: (Ae & T)
 $Am: (Ae | (Aem & T))
 $C: !Ge

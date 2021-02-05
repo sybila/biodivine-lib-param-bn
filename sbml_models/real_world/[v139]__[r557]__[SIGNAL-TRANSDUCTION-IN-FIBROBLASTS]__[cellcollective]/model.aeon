@@ -5,9 +5,9 @@ PI5K -> PIP2_45
 PTEN -> PIP2_45
 PIP3_345 -> PIP2_45
 PIP2_45 -> PIP2_45
-PLC_B -| PIP2_45
-PLC_g -| PIP2_45
-PI3K -| PIP2_45
+PLC_B -|? PIP2_45
+PLC_g -|? PIP2_45
+PI3K -|? PIP2_45
 alpha_sR -> Gbg_s
 Gbg_s -| Gbg_s
 Gas -? Gbg_s
@@ -31,7 +31,7 @@ B_Parvin -> Pix_Cool
 IL1_TNFR -> Trafs
 Cas -> AND_34
 CaM -> CaMK
-PP2A -| CaMK
+PP2A -|? CaMK
 CaMKK -> CaMK
 alpha_qL -? alpha_qR
 B_Arrestin -| alpha_qR
@@ -47,7 +47,7 @@ Palpha_1213R -? alpha_1213R
 alpha_1213R -? alpha_1213R
 B_Arrestin -| alpha_1213R
 CaM -> CaMKK
-PKA -| CaMKK
+PKA -|? CaMKK
 Cas -> DOCK180
 PIP3_345 -> DOCK180
 Crk -> DOCK180
@@ -325,7 +325,7 @@ Mekk1 -> MKK7
 Mekk4 -> MKK7
 MLK1 -> MKK7
 Mekk3 -> MKK7
-p120RasGAP -| Ras
+p120RasGAP -|? Ras
 RasGRF_GRP -> Ras
 Sos -> Ras
 SHP2 -> Ras
@@ -438,7 +438,7 @@ Grb2 -> Sos
 Nck -> Sos
 PIP3_345 -> Sos
 Erk -| Sos
-PIP2_45 -| Sos
+PIP2_45 -|? Sos
 Crk -> Sos
 Erk -> MKPs
 SAPK -> MKPs
@@ -464,7 +464,7 @@ p190RhoGAP -| Rac
 Pix_Cool -> Rac
 PAK -? Rac
 RhoGDI -| Rac
-Akt -| Rac
+Akt -|? Rac
 Integrins -> Rac
 DOCK180 -? Rac
 RalBP1 -| Rac
@@ -517,11 +517,11 @@ Ga_1213 -? Gbg_1213
 alpha_1213R -> Gbg_1213
 Cdc42 -> Mekk4
 Rac -> Mekk4
-p190RhoGAP -> Cdc42
+p190RhoGAP ->? Cdc42
 Pix_Cool -? Cdc42
 PAK -> Cdc42
-RalBP1 -> Cdc42
-Graf -> Cdc42
+RalBP1 ->? Cdc42
+Graf ->? Cdc42
 RhoGDI -| Cdc42
 Cdc42 -? Cdc42
 Src -> Cdc42

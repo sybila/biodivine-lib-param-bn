@@ -22,7 +22,7 @@ NFAT -> IL2RA
 FOXP3 -> IL2RA
 DAG -> RASgrp
 Profilin -> G_Actin
-STAT6 -| IL12RB2
+STAT6 -|? IL12RB2
 IL12_e -> IL12RB2
 IL2RA -> IL2R_HIGH
 IL2 -> IL2R_HIGH
@@ -39,7 +39,7 @@ FAK_Tyr397 -> FAK_576_577
 cAMP -> EPAC
 STAT1 -> IRF1
 IRAK1 -> TRAF6
-PAK -| MLC
+PAK -|? MLC
 ROCK -> MLC
 IL21R -> STAT3
 IL10R -> STAT3
@@ -84,7 +84,7 @@ PAK -> MEK1_2
 BRAF -> MEK1_2
 RAF1 -> MEK1_2
 Rap1 -> RIAM
-Cofilin -| F_Actin
+Cofilin -|? F_Actin
 Arp2_3 -> F_Actin
 G_Actin -> F_Actin
 STAT5_HIGH -> proliferation
@@ -136,7 +136,7 @@ TCR -> NFAT
 P38 -> NFAT
 GSK_3b -| NFAT
 Grb2 -> Sos
-Galpha_iR -| adenyl_cyclase
+Galpha_iR -|? adenyl_cyclase
 GalphaS_R -> adenyl_cyclase
 TGFB_e -> TGFBR
 TGFB -> TGFBR
@@ -228,7 +228,7 @@ TBET -> TBET
 STAT1 -> TBET
 GATA3 -| TBET
 MEK1_2 -> ERK
-SOCS3 -| JAK2
+SOCS3 -|? JAK2
 IL12RB2 -> JAK2
 IL12RB1 -> JAK2
 IKKcomplex -| IKB

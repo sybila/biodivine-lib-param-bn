@@ -52,7 +52,7 @@ $CDK4: ((!p21 & CyclinD1) & !p27)
 $CDK6: CyclinD1
 $CyclinD1: ((((!MEK1 & ERalpha) & AKT1) & MYC) | ((MEK1 & ERalpha) & MYC))
 $CyclinE1: MYC
-$EGF: false
+$EGF: true
 $ERBB1: EGF
 $ERBB1_2: (ERBB1 & ERBB2)
 $ERBB1_3: (ERBB1 & ERBB3)

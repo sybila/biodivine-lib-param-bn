@@ -1,7 +1,7 @@
 TLR9 -> TLR9_TLR9
 Viral_Bacterial_CpG -> TLR9_TLR9
 External_Activator -> NOS2Agene
-IRF2 -| NOS2Agene
+IRF2 -|? NOS2Agene
 External_Activator -> IFNGR1
 External_Activator -> LMNA
 External_Activator -> MAP3K7IP1
@@ -124,18 +124,18 @@ IFNGR1 -> IFNGR
 IFNG -> IFNGR
 JAK2 -> IFNGR
 IFNGR2 -> IFNGR
-SOCS3 -| IFNGR
-SOCS1 -| IFNGR
-PTPN2 -| IFNGR
+SOCS3 -|? IFNGR
+SOCS1 -|? IFNGR
+PTPN2 -|? IFNGR
 External_Activator -> TRADD
 External_Activator -> DNA
 IRF1_IRF1nucleus -> IL15gene
 Apoptosome -> CASP3cytoplasm
 ProCASP3 -> CASP3cytoplasm
 CASP4 -> CASP3cytoplasm
-BIRC4cytoplasm -| CASP3cytoplasm
+BIRC4cytoplasm -|? CASP3cytoplasm
 CASP8 -> CASP3cytoplasm
-BIRC2 -| CASP3cytoplasm
+BIRC2 -|? CASP3cytoplasm
 NFKB2p52_RELBcytoplasm -> NFKB2p52_RELBnucleus
 IPARP -> Inactive_DNA_Repair
 RELAp65_NFBK1p50nucleus -> IER3gene
@@ -235,7 +235,7 @@ IRF3_IRF7nucleus -> IFNAgene
 IRF7_IRF7nucleus -> IFNAgene
 STAT1_STAT1_IRF9nucleus -> IFNAgene
 IRF3_IRF5nucleus -> IFNAgene
-IRF2 -| IFNAgene
+IRF2 -|? IFNAgene
 Mitochondrial_Activator -> CYCSmytochondria
 Mitochondrial_Activator -> BCL2
 External_Activator -> MYD88
@@ -270,7 +270,7 @@ tBID -> DIABLOcytoplasm
 DIABLOmitochondria -> DIABLOcytoplasm
 BAX -> DIABLOcytoplasm
 IRF5_IRF5nucleus -> BAK1gene
-PTP -| STAT1_STAT1nucleus_p2
+PTP -|? STAT1_STAT1nucleus_p2
 STAT1_STAT1nucleus_p1 -> STAT1_STAT1nucleus_p2
 TLR9_MYD88_TRAF6_IRF5 -> IRF5
 Virus -> IRF5
@@ -331,7 +331,7 @@ External_Activator -> TNFRSF1B
 ProCASP7 -> CASP7cytoplasm
 Apoptosome -> CASP7cytoplasm
 CASP10 -> CASP7cytoplasm
-BIRC4cytoplasm -| CASP7cytoplasm
+BIRC4cytoplasm -|? CASP7cytoplasm
 CASP8 -> CASP7cytoplasm
 CD40_CD40LG -> CD40_CD40LG_TRAF3
 TRAF3 -> CD40_CD40LG_TRAF3
@@ -371,7 +371,7 @@ RELAp65_NFBK1p50nucleus -> TRAF2gene
 External_Activator -> PTPN2
 External_Activator -> CHUK
 TP53cytoplasm -> TP53nucleus
-Ub -| NFKBIA
+Ub -|? NFKBIA
 NFKBIA_RELAp65_NFKB1p50 -> NFKBIA
 RELA_NFKB1_Activator -> NFKBIA
 PDCD8mitochondria -> PDCD8cytoplasm
@@ -409,7 +409,7 @@ IRF3_IRF7nucleus -> IFNB1gene
 ATF2 -> IFNB1gene
 STAT1_STAT1nucleus_p2 -> IFNB1gene
 RELAp65_NFBK1p50nucleus -> IFNB1gene
-IRF2 -| IFNB1gene
+IRF2 -|? IFNB1gene
 TNFRSF10B -> TNFSF10_TNFSF10B
 TNFSF10 -> TNFSF10_TNFSF10B
 JAK1 -> IFNAR
@@ -426,7 +426,7 @@ HTRA2cytoplasm -| BIRC4cytoplasm
 tBID -> ENDOGcytoplasm
 ENDOGmitochondria -> ENDOGcytoplasm
 IRF8 -> HLA_Bgene
-IRF2 -| HLA_Bgene
+IRF2 -|? HLA_Bgene
 Mitochondrial_Activator -> BCL2L1mitochondria
 Bacteria -> Diacyl_Lipopeptides
 CYCSmytochondria -> CYCScytoplasm
