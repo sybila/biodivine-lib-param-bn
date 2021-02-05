@@ -4,6 +4,7 @@ use std::ops::Range;
 
 pub mod async_graph;
 pub mod bdd_params;
+pub mod biodivine_std;
 mod display_boolean_network;
 mod display_regulatory_graph;
 mod impl_binary_op;

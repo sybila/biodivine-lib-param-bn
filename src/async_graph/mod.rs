@@ -1,7 +1,7 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
+use crate::biodivine_std::structs::{IdState, IdStateRange};
+use crate::biodivine_std::traits::{Graph, InvertibleGraph, Params};
 use crate::{BooleanNetwork, VariableId, VariableIdIterator};
-use biodivine_lib_std::param_graph::{Graph, InvertibleGraph};
-use biodivine_lib_std::{IdState, IdStateRange};
 
 mod impl_async_graph;
 mod impl_default_edge_params;
@@ -41,7 +41,7 @@ pub struct DefaultEdgeParams {
 /// parameter encoders, where we simply do not want to re-implement the whole graph trait
 /// front scratch.
 pub trait AsyncGraphEdgeParams {
-    type ParamSet: biodivine_lib_std::param_graph::Params;
+    type ParamSet: Params;
     // A reference to the underlying Boolean network.
     fn network(&self) -> &BooleanNetwork;
     /// Create a new empty set of parameters.

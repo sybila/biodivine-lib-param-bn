@@ -1,6 +1,6 @@
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
+use crate::biodivine_std::structs::build_index_map;
 use crate::{Monotonicity, VariableIdIterator};
-use biodivine_lib_std::util::build_index_map;
 
 /// Methods for safely constructing new instances of `RegulatoryGraph`s.
 impl RegulatoryGraph {

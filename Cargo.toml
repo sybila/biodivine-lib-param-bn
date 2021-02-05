@@ -20,7 +20,6 @@ rustdoc-args = ["--html-in-header", "docs-head.html"]
 regex = "1.3.3"     # used when parsing text format
 roxmltree = "0.14.0"
 biodivine-lib-bdd = "0.1.0"
-biodivine-lib-std = { git = "https://github.com/sybila/biodivine-lib-std.git" }
 
 [features]
 # With shields_up you enable explicit assertions of pre/post conditions and invariants in critical
