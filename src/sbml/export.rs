@@ -162,24 +162,25 @@ fn write_layout(out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Re
 #[cfg(test)]
 mod tests {
     use crate::BooleanNetwork;
+    use pretty_assertions::assert_eq;
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
     #[test]
-    fn text_sbml_export() {
+    fn test_sbml_export() {
         let model = BooleanNetwork::try_from(
             "
             a -? a
             c -? a
             a -> b
-            a -> c
+            a ->? c
             b -| c
             # Also some comments are allowed
             c -| d
             $a: a & (p(c) => (c | c))
             $b: p(a) <=> q(a, a)
             # Notice that a regulates c but does not appear in the function!
-            $c: q(b, b) => !(b ^ k)
+            $c: q(b, b) => !(b ^ r)
         ",
         )
         .unwrap();
@@ -189,7 +190,6 @@ mod tests {
         expected_layout.insert("c".to_string(), (1542.123, -4.333));
         expected_layout.insert("d".to_string(), (121.776, 2.0));
         let sbml = model.to_sbml(&expected_layout);
-        println!("Sbml: {}", sbml);
         let (actual, layout) = BooleanNetwork::from_sbml(&sbml).unwrap();
         assert_eq!(model, actual);
         assert_eq!(expected_layout, layout);

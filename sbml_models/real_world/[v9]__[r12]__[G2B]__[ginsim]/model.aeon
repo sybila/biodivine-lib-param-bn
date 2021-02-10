@@ -1,0 +1,21 @@
+ChpT -> CtrAb
+ClpXP_RcdA -| CtrAb
+PleC -| DivK
+DivJ -> DivK
+DivK -| PleC
+DivK -> DivJ
+PleC -| DivJ
+DivK -| DivL
+DivL -> CckA
+CckA -> ChpT
+ChpT -> CpdR
+CpdR -| ClpXP_RcdA
+$CckA: DivL
+$ChpT: CckA
+$ClpXP_RcdA: !CpdR
+$CpdR: ChpT
+$CtrAb: (ChpT & !ClpXP_RcdA)
+$DivJ: (DivK & !PleC)
+$DivK: (!PleC & DivJ)
+$DivL: !DivK
+$PleC: !DivK

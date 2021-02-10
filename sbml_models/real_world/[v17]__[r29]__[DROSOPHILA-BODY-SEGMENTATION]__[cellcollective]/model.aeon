@@ -1,0 +1,43 @@
+SLP -> wg
+wg -> wg
+CIR -| wg
+CIA -> wg
+CIR -| hh
+EN_protein -> hh
+SLP -| en
+WG_external -> en
+PTC_protein -| CIA
+hh_external -> CIA
+CI_protein -> CIA
+ptc -> PTC_protein
+PTC_protein -> PTC_protein
+hh_external -| PTC_protein
+PTC_protein -> PH
+hh_external -> PH
+PTC_protein -| SMO
+hh_external -> SMO
+EN_protein -| ci
+en -> EN_protein
+CIR -| ptc
+EN_protein -| ptc
+CIA -> ptc
+PTC_protein -> CIR
+hh_external -| CIR
+CI_protein -> CIR
+wg -> WG_protein
+ci -> CI_protein
+hh -> HH_protein
+$CIA: ((CI_protein & !PTC_protein) | (hh_external & CI_protein))
+$CIR: ((CI_protein & PTC_protein) & !hh_external)
+$CI_protein: ci
+$EN_protein: en
+$HH_protein: hh
+$PH: (PTC_protein & hh_external)
+$PTC_protein: (ptc | (PTC_protein & !hh_external))
+$SMO: (hh_external | !(PTC_protein | hh_external))
+$WG_protein: wg
+$ci: !EN_protein
+$en: (WG_external & !SLP)
+$hh: (EN_protein & !CIR)
+$ptc: (CIA & !(EN_protein | CIR))
+$wg: (((CIA & SLP) & !CIR) | ((wg & (SLP | CIA)) & !CIR))

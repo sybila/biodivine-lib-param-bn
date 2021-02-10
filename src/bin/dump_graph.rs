@@ -1,8 +1,8 @@
 use biodivine_lib_bdd::{BddValuation, BddValuationIterator};
 use biodivine_lib_param_bn::async_graph::AsyncGraph;
 use biodivine_lib_param_bn::bdd_params::BddParameterEncoder;
+use biodivine_lib_param_bn::biodivine_std::traits::{EvolutionOperator, Graph};
 use biodivine_lib_param_bn::BooleanNetwork;
-use biodivine_lib_std::param_graph::{EvolutionOperator, Graph};
 use std::convert::TryFrom;
 use std::io::Read;
 

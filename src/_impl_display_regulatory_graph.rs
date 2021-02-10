@@ -17,7 +17,7 @@ impl Display for RegulatoryGraph {
     }
 }
 
-fn relationship_string(regulation: &Regulation) -> &str {
+pub(crate) fn relationship_string(regulation: &Regulation) -> &str {
     match (regulation.observable, regulation.monotonicity) {
         (true, Some(Activation)) => "->",
         (true, Some(Inhibition)) => "-|",

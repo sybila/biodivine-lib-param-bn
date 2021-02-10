@@ -1,6 +1,6 @@
+use crate::biodivine_std::traits::Params;
 use crate::symbolic_async_graph::{GraphColors, SymbolicContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use biodivine_lib_std::param_graph::Params;
 use std::convert::TryFrom;
 
 impl GraphColors {

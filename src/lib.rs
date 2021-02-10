@@ -4,6 +4,7 @@ use std::ops::Range;
 
 pub mod async_graph;
 pub mod bdd_params;
+pub mod biodivine_std;
 pub mod sbml;
 pub mod symbolic_async_graph;
 

@@ -1,6 +1,6 @@
 use crate::async_graph::{AsyncGraphEdgeParams, Bwd, BwdIterator, Fwd, FwdIterator};
-use biodivine_lib_std::param_graph::{EvolutionOperator, InvertibleEvolutionOperator};
-use biodivine_lib_std::IdState;
+use crate::biodivine_std::structs::IdState;
+use crate::biodivine_std::traits::{EvolutionOperator, InvertibleEvolutionOperator};
 
 impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Fwd<'a, Params> {
     type State = IdState;
@@ -78,9 +78,9 @@ impl<Params: AsyncGraphEdgeParams> Iterator for BwdIterator<'_, Params> {
 mod tests {
     use crate::async_graph::AsyncGraph;
     use crate::bdd_params::BddParams;
+    use crate::biodivine_std::structs::IdState;
+    use crate::biodivine_std::traits::{EvolutionOperator, Graph, Params};
     use crate::BooleanNetwork;
-    use biodivine_lib_std::param_graph::{EvolutionOperator, Graph, Params};
-    use biodivine_lib_std::IdState;
     use std::collections::HashSet;
     use std::convert::TryFrom;
 

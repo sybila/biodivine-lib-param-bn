@@ -1,8 +1,8 @@
 use super::BddParameterEncoder;
 use crate::bdd_params::{BddParams, FunctionTableEntry};
+use crate::biodivine_std::structs::IdState;
 use crate::{BooleanNetwork, ParameterId, VariableId};
 use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
-use biodivine_lib_std::IdState;
 
 const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
 
@@ -193,9 +193,9 @@ impl BddParameterEncoder {
 #[cfg(test)]
 mod tests {
     use crate::bdd_params::BddParameterEncoder;
+    use crate::biodivine_std::structs::IdState;
     use crate::BooleanNetwork;
     use crate::VariableId;
-    use biodivine_lib_std::IdState;
     use std::convert::TryFrom;
 
     #[test]

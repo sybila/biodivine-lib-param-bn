@@ -1,11 +1,11 @@
+use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
+use crate::biodivine_std::traits::Params;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, BddVariable};
-use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
-use biodivine_lib_std::param_graph::Params;
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {

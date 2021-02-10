@@ -1,6 +1,6 @@
 use super::BddParams;
+use crate::biodivine_std::traits::Params;
 use biodivine_lib_bdd::Bdd;
-use biodivine_lib_std::param_graph::Params;
 
 impl BddParams {
     /// Consume these `BddParams` and turn them into a raw `Bdd`.

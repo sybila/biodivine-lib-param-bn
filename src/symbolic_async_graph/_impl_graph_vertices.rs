@@ -1,8 +1,8 @@
+use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
 use biodivine_lib_bdd::{Bdd, BddValuation};
-use biodivine_lib_std::collections::bitvectors::{ArrayBitVector, BitVector};
 use std::convert::TryFrom;
 
 impl GraphVertices {
