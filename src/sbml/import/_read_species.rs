@@ -31,7 +31,7 @@ pub fn read_species(model: Node) -> Result<Vec<SBMLSpecie>, String> {
                 if value.is_err() {
                     return Err(format!("Invalid maxLevel value: {}", max_level));
                 } else {
-                    Some(value.unwrap())
+                    value.ok()
                 }
             } else {
                 None
@@ -47,7 +47,7 @@ pub fn read_species(model: Node) -> Result<Vec<SBMLSpecie>, String> {
                 max_level,
             });
         } else {
-            return Err(format!("Qualitative specie with a missing ID."));
+            return Err("Qualitative specie with a missing ID.".to_string());
         }
     }
 

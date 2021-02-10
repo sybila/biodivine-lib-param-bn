@@ -186,7 +186,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
                         Ok(Box::new(Var(name.clone())))
                     }
                 }
-                Token::Tokens(inner) => return Ok(parse_update_function(inner)?),
+                Token::Tokens(inner) => return parse_update_function(inner),
                 _ => {} // otherwise, fall through to the error at the end.
             }
         } else if data.len() == 2 {

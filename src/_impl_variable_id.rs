@@ -7,9 +7,9 @@ impl From<usize> for VariableId {
     }
 }
 
-impl Into<usize> for VariableId {
-    fn into(self) -> usize {
-        self.0
+impl From<VariableId> for usize {
+    fn from(value: VariableId) -> Self {
+        value.0
     }
 }
 

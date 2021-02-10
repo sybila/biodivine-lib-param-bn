@@ -58,7 +58,7 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
     /// If a `BitVector` implementation cannot handle arbitrary vector lengths, it can use this
     /// method to declare the largest bitvector it can handle.
     fn max_length() -> usize {
-        return usize::MAX;
+        usize::MAX
     }
 
     /// Create a new `BitVector` with the given length. Can panic if this implementation
@@ -71,7 +71,7 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
         for i in items {
             bits.set(i, true);
         }
-        return bits;
+        bits
     }
 
     /// The number of elements stored in this `BitVector`.
@@ -88,17 +88,17 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
 
     /// Return a vector of the values in this `BitVector`.
     fn values(&self) -> Vec<bool> {
-        return (0..self.len()).map(|i| self.get(i)).collect();
+        (0..self.len()).map(|i| self.get(i)).collect()
     }
 
     /// A vector of the indices of this `BitVector` which are set.
     fn ones(&self) -> Vec<usize> {
-        return (0..self.len()).filter(|i| self.get(*i)).collect();
+        (0..self.len()).filter(|i| self.get(*i)).collect()
     }
 
     /// A vector of the indices of this `BitVector` which are *not* set.
     fn zeros(&self) -> Vec<usize> {
-        return (0..self.len()).filter(|i| !self.get(*i)).collect();
+        (0..self.len()).filter(|i| !self.get(*i)).collect()
     }
 
     /// A helper method for `Display` trait implementations for all variants of `BitVector`. Please
@@ -124,7 +124,7 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
             }
         }
         write!(f, "]")?;
-        return Ok(());
+        Ok(())
     }
 
     /// A helper method for converting a vector of Booleans into a `BitVector`. Useful when
@@ -136,7 +136,11 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
                 bits.set(i, true);
             }
         }
-        return bits;
+        bits
+    }
+
+    fn is_empty(&self) -> bool {
+        self.len() == 0
     }
 }
 

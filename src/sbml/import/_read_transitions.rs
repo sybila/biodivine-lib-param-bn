@@ -50,7 +50,7 @@ pub fn read_transitions(model: Node) -> Result<Vec<SBMLTransition>, String> {
 pub fn read_transition(transition: Node) -> Result<SBMLTransition, String> {
     let id = transition
         .attribute((SBML_QUAL, "id"))
-        .ok_or_else(|| format!("Transition with a missing id found."))?;
+        .ok_or_else(|| "Transition with a missing id found.".to_string())?;
 
     // Inputs are optional when there aren't any.
     let inputs = read_unique_child(transition, (SBML_QUAL, "listOfInputs")).ok();

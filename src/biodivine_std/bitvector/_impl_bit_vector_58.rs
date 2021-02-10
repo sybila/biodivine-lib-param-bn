@@ -17,23 +17,23 @@ impl BitVector58 {
 
 impl BitVector for BitVector58 {
     fn max_length() -> usize {
-        return 58;
+        58
     }
 
     fn empty(len: usize) -> Self {
         if len > 58 {
             panic!("This implementation of BitVector supports only up-to 58 entries");
         }
-        return BitVector58((len << 58) as u64);
+        BitVector58((len << 58) as u64)
     }
 
     fn len(&self) -> usize {
-        return (self.0 >> 58) as usize;
+        (self.0 >> 58) as usize
     }
 
     fn get(&self, index: usize) -> bool {
         self.check_access(index);
-        return self.0 & ((1 << index) as u64) != 0;
+        self.0 & ((1 << index) as u64) != 0
     }
 
     fn set(&mut self, index: usize, value: bool) {
@@ -53,13 +53,13 @@ impl BitVector for BitVector58 {
 
 impl Display for BitVector58 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        return self.display(f);
+        self.display(f)
     }
 }
 
 impl From<Vec<bool>> for BitVector58 {
     fn from(data: Vec<bool>) -> Self {
-        return Self::from_bool_vector(data);
+        Self::from_bool_vector(data)
     }
 }
 
@@ -70,7 +70,7 @@ impl Debug for BitVector58 {
             write!(f, "{}", if self.get(i) { 1 } else { 0 })?;
         }
         write!(f, "]")?;
-        return Ok(());
+        Ok(())
     }
 }
 

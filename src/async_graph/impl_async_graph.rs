@@ -35,7 +35,7 @@ impl<Params: AsyncGraphEdgeParams> AsyncGraph<Params> {
 
     /// Expose the inner edge implementation.
     pub fn edges(&self) -> &Params {
-        return &self.edges;
+        &self.edges
     }
 
     /// Make a witness network for one parametrisation in the given set.

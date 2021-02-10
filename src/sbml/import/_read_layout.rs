@@ -20,7 +20,7 @@ pub fn read_sbml_layout(model: Node) -> Result<SBMLLayout, String> {
     let layouts = child_tags(layout_list, (SBML_LAYOUT, "layout"));
 
     if layouts.is_empty() {
-        return Err(format!("No layout found."));
+        return Err("No layout found.".to_string());
     }
 
     // If there are multiple layouts, just pick the first one.

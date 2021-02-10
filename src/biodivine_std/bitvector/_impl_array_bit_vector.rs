@@ -19,19 +19,19 @@ impl ArrayBitVector {
 
 impl BitVector for ArrayBitVector {
     fn empty(len: usize) -> Self {
-        return ArrayBitVector {
+        ArrayBitVector {
             len,
             values: bitvector::BitVector::new(len),
-        };
+        }
     }
 
     fn len(&self) -> usize {
-        return self.len;
+        self.len
     }
 
     fn get(&self, index: usize) -> bool {
         self.check_access(index);
-        return self.values.contains(index);
+        self.values.contains(index)
     }
 
     fn set(&mut self, index: usize, value: bool) {
@@ -54,19 +54,19 @@ impl BitVector for ArrayBitVector {
 
     fn ones(&self) -> Vec<usize> {
         // slightly more efficient than default implementation
-        return self.values.iter().collect();
+        self.values.iter().collect()
     }
 }
 
 impl Display for ArrayBitVector {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
-        return self.display(f);
+        self.display(f)
     }
 }
 
 impl From<Vec<bool>> for ArrayBitVector {
     fn from(data: Vec<bool>) -> Self {
-        return Self::from_bool_vector(data);
+        Self::from_bool_vector(data)
     }
 }
 
@@ -84,7 +84,7 @@ impl Debug for ArrayBitVector {
             }
         }
         write!(f, "]")?;
-        return Ok(());
+        Ok(())
     }
 }
 

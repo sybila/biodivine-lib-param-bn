@@ -175,7 +175,10 @@ mod tests {
         let bn = BooleanNetwork {
             graph: rg,
             parameter_to_index: build_index_map(
-                &parameters.iter().map(|p| p.name.clone()).collect(),
+                &parameters
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>(),
                 |_, i| ParameterId(i),
             ),
             parameters,

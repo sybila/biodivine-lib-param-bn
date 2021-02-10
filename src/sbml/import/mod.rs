@@ -10,10 +10,10 @@ use roxmltree::{ExpandedName, Node};
 use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
-const SBML: &'static str = "http://www.sbml.org/sbml/level3/version1/core";
-const SBML_QUAL: &'static str = "http://www.sbml.org/sbml/level3/version1/qual/version1";
-const SBML_LAYOUT: &'static str = "http://www.sbml.org/sbml/level3/version1/layout/version1";
-const MATHML: &'static str = "http://www.w3.org/1998/Math/MathML";
+const SBML: &str = "http://www.sbml.org/sbml/level3/version1/core";
+const SBML_QUAL: &str = "http://www.sbml.org/sbml/level3/version1/qual/version1";
+const SBML_LAYOUT: &str = "http://www.sbml.org/sbml/level3/version1/layout/version1";
+const MATHML: &str = "http://www.w3.org/1998/Math/MathML";
 
 mod _convert_mathml_to_fn_update;
 mod _read_layout;
@@ -34,29 +34,25 @@ impl BooleanNetwork {
             roxmltree::Document::parse(model_file).map_err(|e| format!("XML Error: {:?}", e))?;
         let root = document.root();
         if root.children().count() == 0 {
-            return Err(format!("Document is empty."));
+            return Err("Document is empty.".to_string());
         }
         if root.children().count() > 1 {
-            return Err(format!(
-                "Document contains multiple top-level tags. Only SBML expected."
-            ));
+            return Err(
+                "Document contains multiple top-level tags. Only SBML expected.".to_string(),
+            );
         }
         let sbml = root.children().next().unwrap();
         if sbml.tag_name().name() != "sbml" {
-            return Err(format!("Root element is not <sbml>."));
+            return Err("Root element is not <sbml>.".to_string());
         }
 
         if sbml.tag_name().namespace() != Some(SBML) {
-            return Err(format!(
-                "The document does not use the SBML Level3 namespace."
-            ));
+            return Err("The document does not use the SBML Level3 namespace.".to_string());
         }
 
         let requires_qual = sbml.attribute((SBML_QUAL, "required"));
         if requires_qual != Some("true") {
-            warnings.push(format!(
-                "This model does not declare SBML-qual as a requirement."
-            ));
+            warnings.push("This model does not declare SBML-qual as a requirement.".to_string());
         }
 
         let model = read_unique_child(sbml, (SBML, "model"))?;
@@ -121,7 +117,7 @@ impl BooleanNetwork {
         for (k, v) in &layout {
             let var_name = specie_to_name.get(k);
             if let Some(var) = var_name {
-                transformed_layout.insert(var.clone(), v.clone());
+                transformed_layout.insert(var.clone(), *v);
             } else {
                 warnings.push(format!("Unknown layout glyph `{}`.", k));
             }
@@ -185,7 +181,7 @@ fn create_normalized_names(
     // First, eliminate invalid characters and detect duplicates simultaneously.
     let name_regex = Regex::new(r"[^a-zA-Z0-9_]").unwrap();
     for specie in species {
-        let name = specie.name.clone().unwrap_or(specie.id.clone());
+        let name = specie.name.clone().unwrap_or_else(|| specie.id.clone());
         let normalized = name_regex.replace_all(&name, "_").to_string();
         if normalized != name {
             warnings.push(format!(

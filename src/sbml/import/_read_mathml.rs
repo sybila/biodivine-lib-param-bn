@@ -2,10 +2,10 @@ use crate::sbml::import::MATHML;
 use roxmltree::{ExpandedName, Node};
 use std::option::Option::Some;
 
-const APPLY_TAG: (&'static str, &'static str) = (MATHML, "apply");
-const NUMBER_TAG: (&'static str, &'static str) = (MATHML, "cn");
-const IDENTIFIER_TAG: (&'static str, &'static str) = (MATHML, "ci");
-const SYMBOL_TAG: (&'static str, &'static str) = (MATHML, "csymbol");
+const APPLY_TAG: (&str, &str) = (MATHML, "apply");
+const NUMBER_TAG: (&str, &str) = (MATHML, "cn");
+const IDENTIFIER_TAG: (&str, &str) = (MATHML, "ci");
+const SYMBOL_TAG: (&str, &str) = (MATHML, "csymbol");
 
 pub enum MathML {
     Integer(i64),
@@ -17,13 +17,13 @@ pub enum MathML {
 pub fn read_mathml(math: Node) -> Result<MathML, String> {
     let child_count = math.children().filter(|c| c.is_element()).count();
     if child_count == 0 {
-        return Err(format!("Tag <math> has no children."));
+        return Err("Tag <math> has no children.".to_string());
     }
     if child_count > 1 {
-        return Err(format!("More than one child in a <math> tag."));
+        return Err("More than one child in a <math> tag.".to_string());
     }
 
-    Ok(read_expression(math.first_element_child().unwrap())?)
+    read_expression(math.first_element_child().unwrap())
 }
 
 fn read_expression(math: Node) -> Result<MathML, String> {
@@ -31,9 +31,9 @@ fn read_expression(math: Node) -> Result<MathML, String> {
         let id = math
             .text()
             .map(|s| s.trim().to_string())
-            .unwrap_or(String::new());
+            .unwrap_or_default();
         if id.is_empty() {
-            return Err(format!("Empty math identifier."));
+            return Err("Empty math identifier.".to_string());
         }
         return Ok(MathML::Identifier(id));
     }
@@ -42,7 +42,7 @@ fn read_expression(math: Node) -> Result<MathML, String> {
         let value = math
             .text()
             .map(|s| s.trim().to_string())
-            .unwrap_or(String::new());
+            .unwrap_or_default();
         let num_type = math.attribute((MATHML, "type"));
         if num_type.is_some() && num_type.unwrap() != "integer" {
             return Err(format!(
@@ -69,9 +69,9 @@ fn read_expression(math: Node) -> Result<MathML, String> {
                 let symbol = op_tag
                     .text()
                     .map(|s| s.trim().to_string())
-                    .unwrap_or(String::new());
+                    .unwrap_or_default();
                 if symbol.is_empty() {
-                    Err(format!("Empty <csymbol> in MathML."))
+                    Err("Empty <csymbol> in MathML.".to_string())
                 } else {
                     Ok(MathML::SymbolApply(symbol, args))
                 }
@@ -79,7 +79,7 @@ fn read_expression(math: Node) -> Result<MathML, String> {
                 Ok(MathML::Apply(op_tag.tag_name().name().to_string(), args))
             }
         } else {
-            Err(format!("MathML <apply> with no child elements."))
+            Err("MathML <apply> with no child elements.".to_string())
         };
     }
 
