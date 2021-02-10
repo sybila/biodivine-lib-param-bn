@@ -1,17 +1,32 @@
-/*
-   HOW DOES THIS ALL WORK?
-
-   Warning: This is a prototype. We should definitely work on architectural updates to BDD lib
-   which will make this much nicer. Also something something FUTURES! However, that being said...
-
-   We consider the same encoding as in normal AsyncGraph, but we add extra BDD variables
-   to represent the variables of the network (we call these state variables). These are added
-   AFTER the parameter variables.
-
-   This means that if there are no constraints on the state variables, our BDDs look exactly as
-   normal `BddParams`, except their cardinality is higher (since the cardinality algorithm also
-   counts state variable valuations). However, we can normalize this...
-*/
+//! A fully symbolic coloured graph representation of the Asynchronous Boolean Network.
+//!
+//! Internally, this uses the same type of encoding as "normal" `AsyncGraph`, but it uses
+//! extra BDD variables to represent network state variables (note the distinction between
+//! state and BDD variables).
+//!
+//! To the end user, this representation is available via three data structures: `GraphVertices`,
+//! `GraphColors` and `GraphColoredVertices`. The first two represent just the subsets of $V$
+//! and $C$ respectively, while the last is a full subset of $V \times C$.
+//!
+//! There is a range of methods that enable (or simplify) the conversion between these three
+//! types of sets (mainly provided by `GraphColoredVertices` in the form of projections and
+//! vertex-wise operations). Additionally, a `VertexSet` can be iterated with `ArrayBitVectors`
+//! used to represent the set elements.
+//!
+//! The types of conversions and convenience methods are mainly motivated by SCC decomposition
+//! algorithms - if we need something else in the future, it will be implemented.
+//!
+//! `SymbolicAsyncGraph` does not implement the `Graph` trait because it was not useful
+//! in the fully symbolic context. It provides `post`, `pre`, and similar methods directly.
+//!
+//! Internally, the representation is maintained by the `SymbolicContext` which maps each
+//! BDD variable either to a state variable of the network, or to a parameter stored in some
+//! implicit or explicit `FunctionTable`. The BDD variables are ordered in such a way that
+//! the network parameters follow the variable which they are most closely related to, but
+//! please do not rely on this ordering, it probably will be changed in the future. Overall,
+//! by accessing the `SymbolicContext` (via `SymbolicAsyncGraph`) allows implementing almost
+//! any custom BDD operations, but it should be used with caution.
+//!
 
 use crate::BooleanNetwork;
 use biodivine_lib_bdd::{
@@ -96,14 +111,14 @@ pub struct SymbolicAsyncGraph {
     update_functions: Vec<Bdd>,
 }
 
-/// **(internal)** Symbolic context manages the mapping between entities of the Boolean network
+/// Symbolic context manages the mapping between entities of the Boolean network
 /// (variables, parameters, uninterpreted functions) and `BddVariables` used in `bdd-lib`.
 ///
 /// It also provides utility methods for creating `Bdd` objects that match different conditions
 /// imposed on the parameter space of the network.
 ///
 /// Note that while this is technically public, it should not be used unless absolutely necessary.
-/// Playing with raw `Bdds` is dangerous.
+/// Playing with raw `BDDs` is dangerous.
 pub struct SymbolicContext {
     bdd: BddVariableSet,
     state_variables: Vec<BddVariable>,
