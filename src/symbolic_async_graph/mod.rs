@@ -143,3 +143,72 @@ pub struct FunctionTableIterator<'a> {
     inner_iterator: Enumerate<BddValuationIterator>,
     table: &'a FunctionTable,
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+    use crate::BooleanNetwork;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn components() {
+        fn fwd(graph: &SymbolicAsyncGraph, initial: &GraphColoredVertices) -> GraphColoredVertices {
+            let mut result = initial.clone();
+            loop {
+                let post = graph.post(&result);
+                if post.is_subset(&result) {
+                    return result;
+                } else {
+                    result = result.union(&post);
+                }
+            }
+        }
+        fn bwd(graph: &SymbolicAsyncGraph, initial: &GraphColoredVertices) -> GraphColoredVertices {
+            let mut result = initial.clone();
+            loop {
+                let post = graph.pre(&result);
+                if post.is_subset(&result) {
+                    return result;
+                } else {
+                    result = result.union(&post);
+                }
+            }
+        }
+        fn scc(graph: &SymbolicAsyncGraph) -> Vec<GraphColoredVertices> {
+            let mut universe = graph.mk_unit_colored_vertices();
+            let mut components = Vec::new();
+            while !universe.is_empty() {
+                // Pick one vertex in universe for every color in universe
+                let pivots = universe.pick_vertex();
+                let fwd = fwd(graph, &pivots);
+                let bwd = bwd(graph, &pivots);
+                let scc = fwd.intersect(&bwd);
+                universe = universe.minus(&scc);
+                components.push(scc);
+            }
+            return components;
+        }
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let components = scc(&stg);
+        assert_eq!(7, components.len());
+        assert_eq!(2.0, components[0].vertices().approx_cardinality());
+        assert_eq!(1.0, components[1].vertices().approx_cardinality());
+        assert_eq!(2.0, components[2].vertices().approx_cardinality());
+        assert_eq!(1.0, components[3].vertices().approx_cardinality());
+        assert_eq!(2.0, components[4].vertices().approx_cardinality());
+        assert_eq!(2.0, components[5].vertices().approx_cardinality());
+        assert_eq!(1.0, components[6].vertices().approx_cardinality());
+    }
+}
