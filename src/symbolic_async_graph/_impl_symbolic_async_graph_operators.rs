@@ -112,3 +112,65 @@ impl SymbolicAsyncGraph {
             })
     }
 }
+
+#[cfg(test)]
+mod tests {
+
+    /* Basically a copy from of example from tutorial, but tutorials don't count towards coverage. */
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::BooleanNetwork;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn basic_graph_test() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let id_b = stg.as_network().as_graph().find_variable("B").unwrap();
+        let b_is_true = stg.fix_network_variable(id_b, true);
+        let b_is_false = stg.fix_network_variable(id_b, false);
+
+        assert_eq!(
+            stg.var_can_pre(id_b, &b_is_true),
+            stg.var_post(id_b, &b_is_false)
+        );
+        assert_eq!(
+            stg.var_can_post(id_b, &b_is_false),
+            stg.var_pre(id_b, &b_is_true)
+        );
+        assert_eq!(4.0, stg.can_pre(&b_is_true).vertices().approx_cardinality());
+        assert_eq!(
+            4.0,
+            stg.can_post(&b_is_false).vertices().approx_cardinality()
+        );
+
+        let some_color = stg.unit_colors().pick_singleton();
+        let b_is_true_with_color = b_is_true.intersect_colors(&some_color);
+        let b_is_false_with_color = b_is_false.intersect_colors(&some_color);
+        assert_eq!(
+            3.0,
+            stg.can_pre(&b_is_true_with_color)
+                .vertices()
+                .approx_cardinality()
+        );
+        assert_eq!(
+            4.0,
+            stg.can_post(&b_is_false_with_color)
+                .vertices()
+                .approx_cardinality()
+        );
+
+        assert_ne!(stg.can_pre(&b_is_true), stg.post(&b_is_false));
+        assert_ne!(stg.can_post(&b_is_false), stg.pre(&b_is_true));
+    }
+}

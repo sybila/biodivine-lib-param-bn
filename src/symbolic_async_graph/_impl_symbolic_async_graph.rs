@@ -160,6 +160,8 @@ impl SymbolicAsyncGraph {
 
 #[cfg(test)]
 mod tests {
+    use crate::biodivine_std::bitvector::BitVector;
+    use crate::biodivine_std::traits::Params;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::BooleanNetwork;
     use std::convert::TryFrom;
@@ -248,5 +250,71 @@ mod tests {
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network);
         assert!(graph.is_err());
+    }
+
+    /*
+        This is essentially a copy paste from the tutorial, but for some reason code coverage
+        does not count documentation tests, so let's make a copy here!
+    */
+    #[test]
+    fn basic_test() {
+        // Boolean network from the previous tutorial:
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        assert_eq!(32.0, stg.unit_colored_vertices().approx_cardinality());
+        assert_eq!(
+            8.0,
+            stg.unit_colored_vertices().vertices().approx_cardinality()
+        );
+        assert_eq!(
+            4.0,
+            stg.unit_colored_vertices().colors().approx_cardinality()
+        );
+        assert!(stg.empty_vertices().is_empty());
+        assert!(stg.mk_empty_colors().is_empty());
+        assert_eq!(stg.mk_unit_colors(), stg.unit_colored_vertices().colors());
+        assert_eq!(3, stg.as_network().num_vars());
+
+        let id_a = stg.as_network().as_graph().find_variable("A").unwrap();
+        stg.fix_network_variable(id_a, true);
+        let witness = stg.pick_witness(stg.unit_colors());
+        assert_eq!(0, witness.parameters().count());
+
+        for vertex in stg.unit_colored_vertices().vertices().materialize().iter() {
+            println!(
+                "Value of A in state {:?} is {}",
+                vertex,
+                vertex.get(id_a.into())
+            );
+            let singleton = stg.vertex(&vertex);
+            assert_eq!(4.0, singleton.approx_cardinality());
+            assert_eq!(1.0, singleton.vertices().approx_cardinality());
+        }
+
+        let one_color = stg.unit_colors().pick_singleton();
+        assert_eq!(1.0, one_color.approx_cardinality());
+        assert_eq!(
+            4.0,
+            stg.unit_colored_vertices()
+                .pick_vertex()
+                .approx_cardinality()
+        );
+        assert_eq!(
+            8.0,
+            stg.unit_colored_vertices()
+                .pick_color()
+                .approx_cardinality()
+        );
     }
 }
