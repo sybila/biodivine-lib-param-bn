@@ -340,6 +340,6 @@ mod tests {
         let model = std::fs::read_to_string("aeon_models/hmox_pathway.aeon").unwrap();
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
-        assert!(!graph.unit_vertices().is_empty());
+        assert!(!graph.unit_colored_vertices().is_empty());
     }
 }

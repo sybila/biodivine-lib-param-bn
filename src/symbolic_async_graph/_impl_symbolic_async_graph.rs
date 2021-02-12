@@ -49,7 +49,7 @@ impl SymbolicAsyncGraph {
 /// Examine the general properties of the graph.
 impl SymbolicAsyncGraph {
     /// Return a reference to the original Boolean network.
-    pub fn network(&self) -> &BooleanNetwork {
+    pub fn as_network(&self) -> &BooleanNetwork {
         &self.network
     }
 
@@ -134,12 +134,12 @@ impl SymbolicAsyncGraph {
     }
 
     /// Reference to a unit colored vertex set.
-    pub fn unit_vertices(&self) -> &GraphColoredVertices {
+    pub fn unit_colored_vertices(&self) -> &GraphColoredVertices {
         &self.vertex_space.1
     }
 
     /// Make a new copy of unit vertex set.
-    pub fn mk_unit_vertices(&self) -> GraphColoredVertices {
+    pub fn mk_unit_colored_vertices(&self) -> GraphColoredVertices {
         self.vertex_space.1.clone()
     }
 

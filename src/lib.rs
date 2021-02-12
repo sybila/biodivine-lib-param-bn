@@ -7,6 +7,7 @@ pub mod bdd_params;
 pub mod biodivine_std;
 pub mod sbml;
 pub mod symbolic_async_graph;
+pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
 mod _aeon_parser;

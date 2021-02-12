@@ -56,14 +56,14 @@ mod _impl_symbolic_context;
 /// Symbolic representation of a color set.
 ///
 /// Implementation contains all symbolic variables, but state variables are unconstrained.
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct GraphColors {
     bdd: Bdd,
     parameter_variables: Vec<BddVariable>,
 }
 
 /// Symbolic representation of a coloured set of graph vertices, i.e. a subset of $V \times C$.
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct GraphColoredVertices {
     bdd: Bdd,
     state_variables: Vec<BddVariable>,
@@ -73,7 +73,7 @@ pub struct GraphColoredVertices {
 /// Symbolic representation of a vertex set.
 ///
 /// Implementation contains all symbolic variables, but parameter variables are unconstrained.
-#[derive(Clone, Eq, PartialEq, Hash)]
+#[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct GraphVertices {
     bdd: Bdd,
     state_variables: Vec<BddVariable>,
