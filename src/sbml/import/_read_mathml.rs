@@ -7,14 +7,14 @@ const NUMBER_TAG: (&str, &str) = (MATHML, "cn");
 const IDENTIFIER_TAG: (&str, &str) = (MATHML, "ci");
 const SYMBOL_TAG: (&str, &str) = (MATHML, "csymbol");
 
-pub enum MathML {
+pub enum MathMl {
     Integer(i64),
     Identifier(String),
-    Apply(String, Vec<MathML>),
-    SymbolApply(String, Vec<MathML>),
+    Apply(String, Vec<MathMl>),
+    SymbolApply(String, Vec<MathMl>),
 }
 
-pub fn read_mathml(math: Node) -> Result<MathML, String> {
+pub fn read_mathml(math: Node) -> Result<MathMl, String> {
     let child_count = math.children().filter(|c| c.is_element()).count();
     if child_count == 0 {
         return Err("Tag <math> has no children.".to_string());
@@ -26,7 +26,7 @@ pub fn read_mathml(math: Node) -> Result<MathML, String> {
     read_expression(math.first_element_child().unwrap())
 }
 
-fn read_expression(math: Node) -> Result<MathML, String> {
+fn read_expression(math: Node) -> Result<MathMl, String> {
     if math.tag_name() == ExpandedName::from(IDENTIFIER_TAG) {
         let id = math
             .text()
@@ -35,7 +35,7 @@ fn read_expression(math: Node) -> Result<MathML, String> {
         if id.is_empty() {
             return Err("Empty math identifier.".to_string());
         }
-        return Ok(MathML::Identifier(id));
+        return Ok(MathMl::Identifier(id));
     }
 
     if math.tag_name() == ExpandedName::from(NUMBER_TAG) {
@@ -51,7 +51,7 @@ fn read_expression(math: Node) -> Result<MathML, String> {
             ));
         }
         return if let Ok(parsed) = value.parse::<i64>() {
-            Ok(MathML::Integer(parsed))
+            Ok(MathMl::Integer(parsed))
         } else {
             Err(format!("Invalid integer constant: `{}`.", value))
         };
@@ -73,10 +73,10 @@ fn read_expression(math: Node) -> Result<MathML, String> {
                 if symbol.is_empty() {
                     Err("Empty <csymbol> in MathML.".to_string())
                 } else {
-                    Ok(MathML::SymbolApply(symbol, args))
+                    Ok(MathMl::SymbolApply(symbol, args))
                 }
             } else {
-                Ok(MathML::Apply(op_tag.tag_name().name().to_string(), args))
+                Ok(MathMl::Apply(op_tag.tag_name().name().to_string(), args))
             }
         } else {
             Err("MathML <apply> with no child elements.".to_string())
@@ -90,14 +90,14 @@ fn read_expression(math: Node) -> Result<MathML, String> {
 }
 
 /// Some utility methods for working with MathML trees.
-impl MathML {
+impl MathMl {
     /// Returns true if the function contains given identifier (function symbols do not count).
     pub fn contains_identifier(&self, id: &str) -> bool {
         match self {
-            MathML::Integer(_) => false,
-            MathML::Identifier(value) => value == id,
-            MathML::SymbolApply(_, args) => args.iter().any(|a| a.contains_identifier(id)),
-            MathML::Apply(_, args) => args.iter().any(|a| a.contains_identifier(id)),
+            MathMl::Integer(_) => false,
+            MathMl::Identifier(value) => value == id,
+            MathMl::SymbolApply(_, args) => args.iter().any(|a| a.contains_identifier(id)),
+            MathMl::Apply(_, args) => args.iter().any(|a| a.contains_identifier(id)),
         }
     }
 }

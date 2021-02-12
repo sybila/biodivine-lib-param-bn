@@ -9,12 +9,12 @@ use std::collections::HashMap;
 /// If contains dimensions of the layout and a mapping
 /// from SBML ids to coordinates in such layout.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SBMLLayout {
+pub struct SbmlLayout {
     pub dimensions: (f64, f64),
     pub glyphs: HashMap<String, (f64, f64)>,
 }
 
-pub fn read_sbml_layout(model: Node) -> Result<SBMLLayout, String> {
+pub fn read_sbml_layout(model: Node) -> Result<SbmlLayout, String> {
     let layout_list = read_unique_child(model, (SBML_LAYOUT, "listOfLayouts"))?;
 
     let layouts = child_tags(layout_list, (SBML_LAYOUT, "layout"));
@@ -25,7 +25,7 @@ pub fn read_sbml_layout(model: Node) -> Result<SBMLLayout, String> {
 
     // If there are multiple layouts, just pick the first one.
 
-    let mut result = SBMLLayout {
+    let mut result = SbmlLayout {
         dimensions: (0.0, 0.0),
         glyphs: HashMap::new(),
     };

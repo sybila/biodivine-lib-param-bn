@@ -1,8 +1,8 @@
 use crate::sbml::import::_convert_mathml_to_fn_update::sbml_transition_to_update_function;
 use crate::sbml::import::_read_layout::read_sbml_layout;
-use crate::sbml::import::_read_mathml::MathML;
-use crate::sbml::import::_read_species::{read_species, SBMLSpecie};
-use crate::sbml::import::_read_transitions::{read_transitions, SBMLTransition};
+use crate::sbml::import::_read_mathml::MathMl;
+use crate::sbml::import::_read_species::{read_species, SbmlSpecie};
+use crate::sbml::import::_read_transitions::{read_transitions, SbmlTransition};
 use crate::sbml::Layout;
 use crate::{BooleanNetwork, Monotonicity, RegulatoryGraph};
 use regex::Regex;
@@ -171,7 +171,7 @@ fn child_tags<'a, 'input: 'a>(
 /// If the name contains an invalid character, it is replaced with `_`.
 /// If there are duplicate names, they are prefixed with their IDs.
 fn create_normalized_names(
-    species: &[SBMLSpecie],
+    species: &[SbmlSpecie],
     warnings: &mut Vec<String>,
 ) -> Result<HashMap<String, String>, String> {
     let mut id_to_name = HashMap::new();
@@ -233,7 +233,7 @@ fn create_normalized_names(
 /// added if the MathML formula in the transition contains the input variable.
 fn create_regulations(
     rg: &mut RegulatoryGraph,
-    transitions: &[SBMLTransition],
+    transitions: &[SbmlTransition],
     id_to_var: &HashMap<String, String>,
 ) -> Result<(), String> {
     for transition in transitions {
@@ -303,17 +303,17 @@ fn create_regulations(
 }
 
 /// Create any explicit parameters used in the given MathML tree.
-fn create_explicit_parameters(math: &MathML, network: &mut BooleanNetwork) -> Result<(), String> {
+fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Result<(), String> {
     match math {
-        MathML::Integer(_) => Ok(()),
-        MathML::Identifier(_) => Ok(()),
-        MathML::Apply(_, args) => {
+        MathMl::Integer(_) => Ok(()),
+        MathMl::Identifier(_) => Ok(()),
+        MathMl::Apply(_, args) => {
             for a in args {
                 create_explicit_parameters(a, network)?;
             }
             Ok(())
         }
-        MathML::SymbolApply(name, args) => {
+        MathMl::SymbolApply(name, args) => {
             if let Some(p) = network.find_parameter(name) {
                 let current = network.get_parameter(p).get_arity();
                 if current != u32::try_from(args.len()).unwrap() {
@@ -509,7 +509,7 @@ mod tests {
                         "ERROR: Invalid SBML model in {}.",
                         bench_dir.path().display()
                     );
-                    panic!(err);
+                    panic!("{}", err);
                 }
                 Ok((model, _)) => model,
             };

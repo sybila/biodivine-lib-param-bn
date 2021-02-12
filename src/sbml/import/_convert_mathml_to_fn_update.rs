@@ -1,5 +1,5 @@
-use crate::sbml::import::_read_mathml::MathML;
-use crate::sbml::import::_read_transitions::SBMLTransition;
+use crate::sbml::import::_read_mathml::MathMl;
+use crate::sbml::import::_read_transitions::SbmlTransition;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate};
 use std::collections::HashMap;
 
@@ -9,18 +9,18 @@ use std::collections::HashMap;
 /// defined.
 pub fn sbml_transition_to_update_function(
     network: &BooleanNetwork,
-    transition: &SBMLTransition,
+    transition: &SbmlTransition,
     id_to_var: &HashMap<String, String>,
 ) -> Result<FnUpdate, String> {
     // Recursive procedure to convert a MathML object to FnUpdate.
     fn math_to_update(
-        math: &MathML,
+        math: &MathMl,
         network: &BooleanNetwork,
-        transition: &SBMLTransition,
+        transition: &SbmlTransition,
         id_to_var: &HashMap<String, String>,
     ) -> Result<FnUpdate, String> {
         match math {
-            MathML::Integer(i) => {
+            MathMl::Integer(i) => {
                 if *i == 0 {
                     Ok(FnUpdate::Const(false))
                 } else if *i == 1 {
@@ -29,7 +29,7 @@ pub fn sbml_transition_to_update_function(
                     Err(format!("Cannot convert integer `{}` to Boolean.", i))
                 }
             }
-            MathML::Identifier(name) => {
+            MathMl::Identifier(name) => {
                 let input = transition
                     .inputs
                     .iter()
@@ -47,7 +47,7 @@ pub fn sbml_transition_to_update_function(
                     ))
                 }
             }
-            MathML::SymbolApply(p_name, args) => {
+            MathMl::SymbolApply(p_name, args) => {
                 let mut variables = Vec::new();
                 for arg in args {
                     let update = math_to_update(arg, network, transition, id_to_var)?;
@@ -63,7 +63,7 @@ pub fn sbml_transition_to_update_function(
 
                 Ok(FnUpdate::Param(param, variables))
             }
-            MathML::Apply(op, args) => {
+            MathMl::Apply(op, args) => {
                 match op.as_str() {
                     "not" => {
                         if args.len() != 1 {

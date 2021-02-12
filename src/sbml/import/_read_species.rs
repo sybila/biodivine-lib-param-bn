@@ -4,7 +4,7 @@ use roxmltree::Node;
 /// Approximate representation of an SBML specie. Note that only ID is required, all other
 /// properties are optional.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct SBMLSpecie {
+pub struct SbmlSpecie {
     pub id: String,
     pub compartment: Option<String>,
     pub name: Option<String>,
@@ -12,7 +12,7 @@ pub struct SBMLSpecie {
     pub is_constant: bool,
 }
 
-pub fn read_species(model: Node) -> Result<Vec<SBMLSpecie>, String> {
+pub fn read_species(model: Node) -> Result<Vec<SbmlSpecie>, String> {
     let mut result = Vec::new();
 
     let list = read_unique_child(model, (SBML_QUAL, "listOfQualitativeSpecies"))?;
@@ -39,7 +39,7 @@ pub fn read_species(model: Node) -> Result<Vec<SBMLSpecie>, String> {
             let is_constant = specie
                 .attribute((SBML_QUAL, "constant"))
                 .map(|s| s == "true");
-            result.push(SBMLSpecie {
+            result.push(SbmlSpecie {
                 id: id.to_string(),
                 is_constant: is_constant.unwrap_or(false),
                 compartment,
