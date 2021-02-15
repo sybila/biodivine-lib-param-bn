@@ -1,9 +1,9 @@
-use crate::sbml::import::_read_mathml::{read_mathml, MathML};
+use crate::sbml::import::_read_mathml::{read_mathml, MathMl};
 use crate::sbml::import::{child_tags, read_unique_child, MATHML, SBML_QUAL};
 use roxmltree::{ExpandedName, Node};
 
 /// Maps almost directly to the SBML transition input tag.
-pub struct SBMLTransitionInput {
+pub struct SbmlTransitionInput {
     pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
     pub transition_effect: Option<String>,
@@ -11,27 +11,27 @@ pub struct SBMLTransitionInput {
 }
 
 /// Maps almost directly to the SBML transition output tag.
-pub struct SBMLTransitionOutput {
+pub struct SbmlTransitionOutput {
     pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
     pub transition_effect: Option<String>,
 }
 
 /// Represents an SBML transition term (note that default term should not have math in it).
-pub struct SBMLTransitionTerm {
+pub struct SbmlTransitionTerm {
     pub result_level: u32,
-    pub math: Option<MathML>,
+    pub math: Option<MathMl>,
 }
 
-pub struct SBMLTransition {
+pub struct SbmlTransition {
     pub id: String,
-    pub inputs: Vec<SBMLTransitionInput>,
-    pub outputs: Vec<SBMLTransitionOutput>,
-    pub default_term: Option<SBMLTransitionTerm>, // Is none if the whole function is unspecified
-    pub function_terms: Vec<SBMLTransitionTerm>,
+    pub inputs: Vec<SbmlTransitionInput>,
+    pub outputs: Vec<SbmlTransitionOutput>,
+    pub default_term: Option<SbmlTransitionTerm>, // Is none if the whole function is unspecified
+    pub function_terms: Vec<SbmlTransitionTerm>,
 }
 
-pub fn read_transitions(model: Node) -> Result<Vec<SBMLTransition>, String> {
+pub fn read_transitions(model: Node) -> Result<Vec<SbmlTransition>, String> {
     let mut result = Vec::new();
 
     let list = read_unique_child(model, (SBML_QUAL, "listOfTransitions"))?;
@@ -47,10 +47,10 @@ pub fn read_transitions(model: Node) -> Result<Vec<SBMLTransition>, String> {
     Ok(result)
 }
 
-pub fn read_transition(transition: Node) -> Result<SBMLTransition, String> {
+pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
     let id = transition
         .attribute((SBML_QUAL, "id"))
-        .ok_or_else(|| format!("Transition with a missing id found."))?;
+        .ok_or_else(|| "Transition with a missing id found.".to_string())?;
 
     // Inputs are optional when there aren't any.
     let inputs = read_unique_child(transition, (SBML_QUAL, "listOfInputs")).ok();
@@ -78,7 +78,7 @@ pub fn read_transition(transition: Node) -> Result<SBMLTransition, String> {
         Vec::new()
     };
 
-    let mut transition = SBMLTransition {
+    let mut transition = SbmlTransition {
         id: id.to_string(),
         inputs: Vec::new(),
         outputs: Vec::new(),
@@ -112,7 +112,7 @@ pub fn read_transition(transition: Node) -> Result<SBMLTransition, String> {
     Ok(transition)
 }
 
-fn read_transition_input(input: Node, transition_id: &str) -> Result<SBMLTransitionInput, String> {
+fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransitionInput, String> {
     let species = input.attribute((SBML_QUAL, "qualitativeSpecies"));
     let effect = input.attribute((SBML_QUAL, "transitionEffect"));
     let sign = input.attribute((SBML_QUAL, "sign"));
@@ -124,7 +124,7 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SBMLTransit
         ));
     }
 
-    Ok(SBMLTransitionInput {
+    Ok(SbmlTransitionInput {
         id: id.map(|s| s.to_string()),
         qual_species: species.unwrap().to_string(),
         transition_effect: effect.map(|s| s.to_string()),
@@ -135,7 +135,7 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SBMLTransit
 fn read_transition_output(
     output: Node,
     transition_id: &str,
-) -> Result<SBMLTransitionOutput, String> {
+) -> Result<SbmlTransitionOutput, String> {
     let species = output.attribute((SBML_QUAL, "qualitativeSpecies"));
     let effect = output.attribute((SBML_QUAL, "transitionEffect"));
     let id = output.attribute((SBML_QUAL, "id"));
@@ -146,14 +146,14 @@ fn read_transition_output(
         ));
     }
 
-    Ok(SBMLTransitionOutput {
+    Ok(SbmlTransitionOutput {
         id: id.map(|s| s.to_string()),
         qual_species: species.unwrap().to_string(),
         transition_effect: effect.map(|s| s.to_string()),
     })
 }
 
-fn read_transition_term(term: Node, transition_id: &str) -> Result<SBMLTransitionTerm, String> {
+fn read_transition_term(term: Node, transition_id: &str) -> Result<SbmlTransitionTerm, String> {
     let result_level = term.attribute((SBML_QUAL, "resultLevel"));
     if result_level.is_none() {
         return Err(format!(
@@ -177,7 +177,7 @@ fn read_transition_term(term: Node, transition_id: &str) -> Result<SBMLTransitio
         None
     };
 
-    Ok(SBMLTransitionTerm {
+    Ok(SbmlTransitionTerm {
         result_level: level.unwrap(),
         math,
     })

@@ -20,6 +20,7 @@ jobs:
 
   # Run all tests
   test:
+    needs: check
     name: Test Suite
     runs-on: ubuntu-latest
     env:
@@ -38,6 +39,7 @@ jobs:
 
   # Run all tests, but with beta
   test-beta:
+    needs: check
     name: Test Suite (Beta)
     runs-on: ubuntu-latest
     env:
@@ -56,6 +58,7 @@ jobs:
 
   # Run all tests, but with nightly
   test-nightly:
+    needs: check
     name: Test Suite (Nightly)
     runs-on: ubuntu-latest
     env:
@@ -93,6 +96,7 @@ jobs:
 
   # Check code style
   clippy:
+    needs: check
     name: Clippy
     runs-on: ubuntu-latest
     env:
@@ -111,18 +115,28 @@ jobs:
 
   # Compute code coverage
   codecov:
-    name: Codecov
+    needs: test
+    name: Code coverage
     runs-on: ubuntu-latest
-    env:
-      CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
-          profile: minimal
           toolchain: stable
           override: true
-      - uses: actions-rs/cargo@v1
-      - run: cargo install cargo-tarpaulin
-      - run: cargo tarpaulin --out Xml --features "shields_up"
-      - run: bash <(curl -s https://codecov.io/bash)
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.15.0'
+          args: '-- --test-threads 1'
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v1.0.2
+        with:
+          token: ${{secrets.CODECOV_TOKEN}}
+      - name: Archive code coverage results
+        uses: actions/upload-artifact@v1
+        with:
+          name: code-coverage-report
+          path: cobertura.xml

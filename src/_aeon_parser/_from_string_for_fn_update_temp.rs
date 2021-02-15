@@ -1,6 +1,6 @@
-use crate::parser::FnUpdateTemp;
-use crate::parser::FnUpdateTemp::*;
 use crate::BinaryOp::*;
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp::*;
 use std::convert::TryFrom;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -10,7 +10,7 @@ impl TryFrom<&str> for FnUpdateTemp {
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         let tokens = tokenize_function_group(&mut value.chars().peekable(), true)?;
-        return Ok(*(parse_update_function(&tokens)?));
+        Ok(*(parse_update_function(&tokens)?))
     }
 }
 
@@ -95,21 +95,21 @@ fn tokenize_function_group(
             _ => return Result::Err(format!("Unexpected '{}'.", c)),
         }
     }
-    return if top_level {
+    if top_level {
         Result::Ok(output)
     } else {
         Result::Err("Expected ')'.".to_string())
-    };
+    }
 }
 
 /// **(internal)** Check if given char can appear in a name.
 fn is_valid_in_name(c: char) -> bool {
-    return c.is_alphanumeric() || c == '_' || c == '{' || c == '}';
+    c.is_alphanumeric() || c == '_' || c == '{' || c == '}'
 }
 
 /// **(internal)** Parse a `FnUpdateTemp` using the recursive steps.
 fn parse_update_function(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
-    return iff(data);
+    iff(data)
 }
 
 /// **(internal)** Utility method to find first occurrence of a specific token in the token tree.
@@ -120,56 +120,56 @@ fn index_of_first(data: &[Token], token: Token) -> Option<usize> {
 /// **(internal)** Recursive parsing step 1: extract `<=>` operators.
 fn iff(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     let iff_token = index_of_first(data, Token::Iff);
-    return Ok(if let Some(i) = iff_token {
+    Ok(if let Some(i) = iff_token {
         Box::new(Binary(Iff, imp(&data[..i])?, iff(&data[(i + 1)..])?))
     } else {
         imp(data)?
-    });
+    })
 }
 
 /// **(internal)** Recursive parsing step 2: extract `=>` operators.
 fn imp(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     let imp_token = index_of_first(data, Token::Imp);
-    return Ok(if let Some(i) = imp_token {
+    Ok(if let Some(i) = imp_token {
         Box::new(Binary(Imp, or(&data[..i])?, imp(&data[(i + 1)..])?))
     } else {
         or(data)?
-    });
+    })
 }
 
 /// **(internal)** Recursive parsing step 3: extract `|` operators.
 fn or(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     let or_token = index_of_first(data, Token::Or);
-    return Ok(if let Some(i) = or_token {
+    Ok(if let Some(i) = or_token {
         Box::new(Binary(Or, and(&data[..i])?, or(&data[(i + 1)..])?))
     } else {
         and(data)?
-    });
+    })
 }
 
 /// **(internal)** Recursive parsing step 4: extract `&` operators.
 fn and(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     let and_token = index_of_first(data, Token::And);
-    return Ok(if let Some(i) = and_token {
+    Ok(if let Some(i) = and_token {
         Box::new(Binary(And, xor(&data[..i])?, and(&data[(i + 1)..])?))
     } else {
         xor(data)?
-    });
+    })
 }
 
 /// **(internal)** Recursive parsing step 5: extract `^` operators.
 fn xor(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     let xor_token = index_of_first(data, Token::Xor);
-    return Ok(if let Some(i) = xor_token {
+    Ok(if let Some(i) = xor_token {
         Box::new(Binary(Xor, terminal(&data[..i])?, xor(&data[(i + 1)..])?))
     } else {
         terminal(data)?
-    });
+    })
 }
 
 /// **(internal)** Recursive parsing step 6: extract terminals and negations.
 fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
-    return if data.is_empty() {
+    if data.is_empty() {
         Err("Expected formula, found nothing.".to_string())
     } else {
         if data[0] == Token::Not {
@@ -186,7 +186,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
                         Ok(Box::new(Var(name.clone())))
                     }
                 }
-                Token::Tokens(inner) => return Ok(parse_update_function(inner)?),
+                Token::Tokens(inner) => return parse_update_function(inner),
                 _ => {} // otherwise, fall through to the error at the end.
             }
         } else if data.len() == 2 {
@@ -200,7 +200,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
             }
         }
         Err(format!("Unexpected: {:?}. Expecting formula.", data))
-    };
+    }
 }
 
 /// **(internal)** Parse a list of function arguments. All arguments must be names separated
@@ -225,12 +225,12 @@ fn read_args(data: &[Token]) -> Result<Vec<String>, String> {
             return Err("Unexpected ',' at the end of an argument list.".to_string());
         }
     }
-    return Err(format!("Unexpected token {:?} in argument list.", data[i]));
+    Err(format!("Unexpected token {:?} in argument list.", data[i]))
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::FnUpdateTemp;
+    use crate::_aeon_parser::FnUpdateTemp;
     use std::convert::TryFrom;
 
     #[test]

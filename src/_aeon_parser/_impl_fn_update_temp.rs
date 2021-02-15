@@ -1,13 +1,14 @@
-use crate::parser::FnUpdateTemp;
-use crate::parser::FnUpdateTemp::*;
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp::*;
 use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
 use std::collections::HashSet;
+use std::convert::TryFrom;
 
 impl FnUpdateTemp {
     /// Replace all variables that are not valid in the given `RegulatoryGraph` with
     /// unary parameters.
     pub fn unknown_variables_to_parameters(self, rg: &RegulatoryGraph) -> Box<FnUpdateTemp> {
-        return Box::new(match self {
+        Box::new(match self {
             Const(value) => Const(value),
             Binary(op, l, r) => Binary(
                 op,
@@ -23,7 +24,7 @@ impl FnUpdateTemp {
                     Param(name, Vec::new())
                 }
             }
-        });
+        })
     }
 
     /// Write all parameters that appear in this function into a given set.
@@ -42,7 +43,7 @@ impl FnUpdateTemp {
             Param(name, args) => {
                 result.insert(Parameter {
                     name: name.clone(),
-                    cardinality: args.len(),
+                    arity: u32::try_from(args.len()).unwrap(),
                 });
             }
         }
@@ -61,11 +62,11 @@ impl FnUpdateTemp {
             Param(name, args) => {
                 let parameter_id = Self::get_parameter(bn, &name)?;
                 let parameter = bn.get_parameter(parameter_id);
-                if parameter.cardinality != args.len() {
+                if parameter.arity != u32::try_from(args.len()).unwrap() {
                     return Err(format!(
                         "'{}' has cardinality {} but is used with {} arguments.",
                         name,
-                        parameter.cardinality,
+                        parameter.arity,
                         args.len()
                     ));
                 }
@@ -81,31 +82,31 @@ impl FnUpdateTemp {
     /// **(internal)** Utility method to safely obtain a variable id from a
     /// network with an appropriate error.
     fn get_variable(bn: &BooleanNetwork, name: &str) -> Result<VariableId, String> {
-        return if let Some(var) = bn.graph.find_variable(name) {
+        if let Some(var) = bn.graph.find_variable(name) {
             Ok(var)
         } else {
             Err(format!(
                 "Can't create update function. Unknown variable '{}'.",
                 name
             ))
-        };
+        }
     }
 
     fn get_parameter(bn: &BooleanNetwork, name: &str) -> Result<ParameterId, String> {
-        return if let Some(par) = bn.find_parameter(name) {
+        if let Some(par) = bn.find_parameter(name) {
             Ok(par)
         } else {
             Err(format!(
                 "Can't create update function. Unknown parameter '{}'.",
                 name
             ))
-        };
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::parser::FnUpdateTemp;
+    use crate::_aeon_parser::FnUpdateTemp;
     use crate::{Parameter, RegulatoryGraph};
     use std::collections::HashSet;
     use std::convert::TryFrom;
@@ -133,15 +134,15 @@ mod tests {
         let mut expected = HashSet::new();
         expected.insert(Parameter {
             name: "f".to_string(),
-            cardinality: 0,
+            arity: 0,
         });
         expected.insert(Parameter {
             name: "par".to_string(),
-            cardinality: 3,
+            arity: 3,
         });
         expected.insert(Parameter {
             name: "q".to_string(),
-            cardinality: 1,
+            arity: 1,
         });
 
         assert_eq!(expected, params);

@@ -1,8 +1,20 @@
 [package]
 name = "biodivine-lib-param-bn"
-version = "0.1.0"
+version = "0.1.0-beta.1"
 authors = ["Samuel Pastva <daemontus@gmail.com>"]
 edition = "2018"
+description = "Library for working with parametrized Boolean networks."
+homepage = "https://github.com/sybila/biodivine-lib-param-bn"
+repository = "https://github.com/sybila/biodivine-lib-param-bn"
+readme = "README.md"
+keywords = ["boolean network", "asynchronous", "symbolic graph", "systems biology"]
+categories = ["science", "simulation"]
+license = "MIT"
+
+[badges]
+travis-ci = { repository = "sybila/biodivine-lib-param-bn" }
+codecov = { repository = "sybila/biodivine-lib-param-bn" }
+maintenance = { status = "actively-developed" }
 
 [lib]
 name = "biodivine_lib_param_bn"
@@ -18,8 +30,9 @@ rustdoc-args = ["--html-in-header", "docs-head.html"]
 
 [dependencies]
 regex = "1.3.3"     # used when parsing text format
+biodivine-lib-bdd = "0.2.1"
 roxmltree = "0.14.0"
-biodivine-lib-bdd = "0.1.0"
+bitvector = "0.1.5"
 
 [features]
 # With shields_up you enable explicit assertions of pre/post conditions and invariants in critical

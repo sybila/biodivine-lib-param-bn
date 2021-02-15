@@ -15,7 +15,7 @@ impl FunctionTableEntry<'_> {
         panic!("Variable {:?} is not an input.", variable);
     }
 
-    /// Obtain a table entry with the value of [variable] flipped.
+    /// Obtain a table entry with the value of `variable` flipped.
     pub fn flip_value(&self, variable: VariableId) -> FunctionTableEntry {
         for i in 0..self.regulators.len() {
             if variable == self.regulators[i] {

@@ -9,17 +9,16 @@ use std::hash::Hash;
 /// Build a mapping from elements of the given vector to their respective indices.
 ///
 /// **Warning:** Duplicates are not detected or handled in any way, they are just overwritten.
-pub fn build_index_map<T, F, R>(keys: &Vec<T>, transform_index: F) -> HashMap<T, R>
+pub fn build_index_map<T, F, R>(keys: &[T], transform_index: F) -> HashMap<T, R>
 where
     F: Fn(&T, usize) -> R,
     T: Clone + Hash + PartialEq + Eq,
 {
     let mut result = HashMap::new();
-    for i in 0..keys.len() {
-        let item = &keys[i];
+    for (i, item) in keys.iter().enumerate() {
         result.insert(item.clone(), transform_index(item, i));
     }
-    return result;
+    result
 }
 
 /// A very basic implementation of a `State` which simply stores a single `usize` index.
@@ -37,40 +36,40 @@ impl State for IdState {}
 
 impl From<usize> for IdState {
     fn from(val: usize) -> Self {
-        return IdState(val);
+        IdState(val)
     }
 }
 
-impl Into<usize> for IdState {
-    fn into(self) -> usize {
-        return self.0;
+impl From<IdState> for usize {
+    fn from(state: IdState) -> Self {
+        state.0
     }
 }
 
 impl Display for IdState {
     fn fmt(&self, f: &mut Formatter) -> Result<(), Error> {
-        return write!(f, "State({})", self.0);
+        write!(f, "State({})", self.0)
     }
 }
 
 impl IdState {
     /// Test if the bit at the given position is set or not.
     pub fn get_bit(self, bit: usize) -> bool {
-        return (self.0 >> bit) & 1 == 1;
+        (self.0 >> bit) & 1 == 1
     }
 
     /// Flip the bit a the given position.
     pub fn flip_bit(self, bit: usize) -> IdState {
-        return IdState(self.0 ^ (1 << bit));
+        IdState(self.0 ^ (1 << bit))
     }
 }
 
 impl IdStateRange {
     pub fn new(state_count: usize) -> IdStateRange {
-        return IdStateRange {
+        IdStateRange {
             next: 0,
             remaining: state_count,
-        };
+        }
     }
 }
 
@@ -78,14 +77,14 @@ impl Iterator for IdStateRange {
     type Item = IdState;
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if self.remaining == 0 {
+        if self.remaining == 0 {
             None
         } else {
             let result = self.next;
             self.remaining -= 1;
             self.next += 1;
             Some(IdState::from(result))
-        };
+        }
     }
 }
 

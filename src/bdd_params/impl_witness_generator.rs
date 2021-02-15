@@ -13,13 +13,20 @@ impl BooleanNetwork {
         if valuation.is_none() {
             panic!("Cannot create witness for empty parameter set.");
         }
-        let valuation = valuation.unwrap();
+        self.make_witness_for_valuation(valuation.unwrap(), encoder)
+    }
+
+    pub fn make_witness_for_valuation(
+        &self,
+        valuation: BddValuation,
+        encoder: &BddParameterEncoder,
+    ) -> BooleanNetwork {
         // First, make functions for explicit parameters:
         let mut explicit_parameter_expressions = Vec::with_capacity(self.parameters.len());
         for i_p in 0..self.parameters.len() {
             let parameter = &self.parameters[i_p];
             let parameter_input_table = &encoder.explicit_function_tables[i_p];
-            let num_inputs = parameter.cardinality as u16;
+            let num_inputs = parameter.arity as u16;
             if num_inputs == 0 {
                 assert_eq!(parameter_input_table.len(), 1);
                 explicit_parameter_expressions.push(BooleanExpression::Const(
@@ -88,7 +95,7 @@ impl BooleanNetwork {
         result.parameters.clear();
         result.parameter_to_index.clear();
 
-        return result;
+        result
     }
 
     /// Make a Bdd that exactly describes given valuation.
@@ -103,14 +110,14 @@ impl BooleanNetwork {
                 vars.mk_not_var(var)
             });
         }
-        return bdd;
+        bdd
     }
 
     fn replace_parameters(
         update_function: &FnUpdate,
-        parameter_expressions: &Vec<BooleanExpression>,
+        parameter_expressions: &[BooleanExpression],
     ) -> Box<FnUpdate> {
-        return Box::new(match update_function {
+        Box::new(match update_function {
             FnUpdate::Const(value) => FnUpdate::Const(*value),
             FnUpdate::Var(id) => FnUpdate::Var(*id),
             FnUpdate::Not(a) => FnUpdate::Not(Self::replace_parameters(a, parameter_expressions)),
@@ -123,14 +130,14 @@ impl BooleanNetwork {
                 let parameter_expression = &parameter_expressions[id.0];
                 *Self::expression_to_fn_update(parameter_expression, args)
             }
-        });
+        })
     }
 
     fn expression_to_fn_update(
         expression: &BooleanExpression,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Box<FnUpdate> {
-        return Box::new(match expression {
+        Box::new(match expression {
             BooleanExpression::Const(value) => FnUpdate::Const(*value),
             BooleanExpression::Iff(a, b) => FnUpdate::Binary(
                 BinaryOp::Iff,
@@ -164,7 +171,7 @@ impl BooleanNetwork {
                 let arg_index: usize = name.parse().unwrap();
                 FnUpdate::Var(args[arg_index])
             }
-        });
+        })
     }
 }
 

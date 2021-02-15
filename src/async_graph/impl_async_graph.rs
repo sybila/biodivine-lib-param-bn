@@ -4,12 +4,12 @@ use crate::BooleanNetwork;
 impl AsyncGraph<DefaultEdgeParams> {
     /// Create a new `AsyncGraph` from the given `BooleanNetwork` using default edge parameter implementation.
     pub fn new(network: BooleanNetwork) -> Result<AsyncGraph<DefaultEdgeParams>, String> {
-        return if network.graph.num_vars() > 32 {
+        if network.graph.num_vars() > 32 {
             Err("Can't create the graph. At most 32 variables supported".to_string())
         } else {
             let edge_params = DefaultEdgeParams::new(network)?;
-            return Ok(AsyncGraph { edges: edge_params });
-        };
+            Ok(AsyncGraph { edges: edge_params })
+        }
     }
 }
 
@@ -19,38 +19,38 @@ impl<Params: AsyncGraphEdgeParams> AsyncGraph<Params> {
         return if edge_params.network().graph.num_vars() > 32 {
             Err("Can't create the graph. At most 32 variables supported".to_string())
         } else {
-            return Ok(AsyncGraph { edges: edge_params });
+            Ok(AsyncGraph { edges: edge_params })
         };
     }
 
     /// Return the total number of states in this graph.
     pub fn num_states(&self) -> usize {
-        return 1 << self.network().graph.num_vars();
+        1 << self.network().graph.num_vars()
     }
 
     /// Return a reference to the original Boolean network.
     pub fn network(&self) -> &BooleanNetwork {
-        return self.edges.network();
+        self.edges.network()
     }
 
     /// Expose the inner edge implementation.
     pub fn edges(&self) -> &Params {
-        return &self.edges;
+        &self.edges
     }
 
     /// Make a witness network for one parametrisation in the given set.
     pub fn make_witness(&self, params: &Params::ParamSet) -> BooleanNetwork {
-        return self.edges.make_witness(params);
+        self.edges.make_witness(params)
     }
 
     /// Return an empty set of parameters.
     pub fn empty_params(&self) -> &Params::ParamSet {
-        return self.edges.empty_params();
+        self.edges.empty_params()
     }
 
     /// Return a full set of parameters.
     pub fn unit_params(&self) -> &Params::ParamSet {
-        return self.edges.unit_params();
+        self.edges.unit_params()
     }
 }
 

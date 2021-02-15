@@ -1,4 +1,4 @@
-use crate::parser::{FnUpdateTemp, RegulationTemp};
+use crate::_aeon_parser::{FnUpdateTemp, RegulationTemp};
 use crate::{BooleanNetwork, Parameter, RegulatoryGraph};
 use regex::Regex;
 use std::collections::HashSet;
@@ -11,7 +11,7 @@ impl TryFrom<&str> for BooleanNetwork {
         // trim lines and remove comments
         let lines = value.lines().filter_map(|l| {
             let line = l.trim();
-            if line.is_empty() || line.chars().next() == Some('#') {
+            if line.is_empty() || line.starts_with('#') {
                 None
             } else {
                 Some(line)
@@ -73,7 +73,7 @@ impl TryFrom<&str> for BooleanNetwork {
 
         // Add the parameters (if there is a cardinality clash, here it will be thrown).
         for parameter in &parameters {
-            bn.add_parameter(&parameter.name, parameter.cardinality)?;
+            bn.add_parameter(&parameter.name, parameter.arity)?;
         }
 
         // Actually build and add the functions
@@ -81,7 +81,7 @@ impl TryFrom<&str> for BooleanNetwork {
             bn.add_update_function_template(&name, function)?;
         }
 
-        return Ok(bn);
+        Ok(bn)
     }
 }
 
@@ -160,22 +160,25 @@ mod tests {
         let parameters = vec![
             Parameter {
                 name: "k".to_string(),
-                cardinality: 0,
+                arity: 0,
             },
             Parameter {
                 name: "p".to_string(),
-                cardinality: 1,
+                arity: 1,
             },
             Parameter {
                 name: "q".to_string(),
-                cardinality: 2,
+                arity: 2,
             },
         ];
 
         let bn = BooleanNetwork {
             graph: rg,
             parameter_to_index: build_index_map(
-                &parameters.iter().map(|p| p.name.clone()).collect(),
+                &parameters
+                    .iter()
+                    .map(|p| p.name.clone())
+                    .collect::<Vec<_>>(),
                 |_, i| ParameterId(i),
             ),
             parameters,

@@ -10,7 +10,7 @@ impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Fwd<'a, Params> {
     fn step(&self, current: IdState) -> Self::Iterator {
         return FwdIterator {
             graph: self.graph,
-            variables: self.graph.network().graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
         };
     }
@@ -20,7 +20,7 @@ impl<'a, Params: AsyncGraphEdgeParams> InvertibleEvolutionOperator for Fwd<'a, P
     type InvertedOperator = Bwd<'a, Params>;
 
     fn invert(&self) -> Self::InvertedOperator {
-        return Bwd { graph: self.graph };
+        Bwd { graph: self.graph }
     }
 }
 
@@ -28,13 +28,13 @@ impl<Params: AsyncGraphEdgeParams> Iterator for FwdIterator<'_, Params> {
     type Item = (IdState, Params::ParamSet);
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if let Some(var) = self.variables.next() {
+        if let Some(var) = self.variables.next() {
             let target = self.state.flip_bit(var.0);
             let edge_params = self.graph.edges.edge_params(self.state, var);
             Some((target, edge_params))
         } else {
             None
-        };
+        }
     }
 }
 
@@ -44,11 +44,11 @@ impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Bwd<'a, Params> {
     type Iterator = BwdIterator<'a, Params>;
 
     fn step(&self, current: IdState) -> Self::Iterator {
-        return BwdIterator {
+        BwdIterator {
             graph: self.graph,
-            variables: self.graph.network().graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
-        };
+        }
     }
 }
 
@@ -56,7 +56,7 @@ impl<'a, Params: AsyncGraphEdgeParams> InvertibleEvolutionOperator for Bwd<'a, P
     type InvertedOperator = Fwd<'a, Params>;
 
     fn invert(&self) -> Self::InvertedOperator {
-        return Fwd { graph: self.graph };
+        Fwd { graph: self.graph }
     }
 }
 
@@ -64,13 +64,13 @@ impl<Params: AsyncGraphEdgeParams> Iterator for BwdIterator<'_, Params> {
     type Item = (IdState, Params::ParamSet);
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if let Some(var) = self.variables.next() {
+        if let Some(var) = self.variables.next() {
             let source = self.state.flip_bit(var.0);
             let edge_params = self.graph.edges.edge_params(source, var);
             Some((source, edge_params))
         } else {
             None
-        };
+        }
     }
 }
 

@@ -1,18 +1,19 @@
 use crate::sbml::import::_convert_mathml_to_fn_update::sbml_transition_to_update_function;
 use crate::sbml::import::_read_layout::read_sbml_layout;
-use crate::sbml::import::_read_mathml::MathML;
-use crate::sbml::import::_read_species::{read_species, SBMLSpecie};
-use crate::sbml::import::_read_transitions::{read_transitions, SBMLTransition};
+use crate::sbml::import::_read_mathml::MathMl;
+use crate::sbml::import::_read_species::{read_species, SbmlSpecie};
+use crate::sbml::import::_read_transitions::{read_transitions, SbmlTransition};
 use crate::sbml::Layout;
 use crate::{BooleanNetwork, Monotonicity, RegulatoryGraph};
 use regex::Regex;
 use roxmltree::{ExpandedName, Node};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 
-const SBML: &'static str = "http://www.sbml.org/sbml/level3/version1/core";
-const SBML_QUAL: &'static str = "http://www.sbml.org/sbml/level3/version1/qual/version1";
-const SBML_LAYOUT: &'static str = "http://www.sbml.org/sbml/level3/version1/layout/version1";
-const MATHML: &'static str = "http://www.w3.org/1998/Math/MathML";
+const SBML: &str = "http://www.sbml.org/sbml/level3/version1/core";
+const SBML_QUAL: &str = "http://www.sbml.org/sbml/level3/version1/qual/version1";
+const SBML_LAYOUT: &str = "http://www.sbml.org/sbml/level3/version1/layout/version1";
+const MATHML: &str = "http://www.w3.org/1998/Math/MathML";
 
 mod _convert_mathml_to_fn_update;
 mod _read_layout;
@@ -33,29 +34,25 @@ impl BooleanNetwork {
             roxmltree::Document::parse(model_file).map_err(|e| format!("XML Error: {:?}", e))?;
         let root = document.root();
         if root.children().count() == 0 {
-            return Err(format!("Document is empty."));
+            return Err("Document is empty.".to_string());
         }
         if root.children().count() > 1 {
-            return Err(format!(
-                "Document contains multiple top-level tags. Only SBML expected."
-            ));
+            return Err(
+                "Document contains multiple top-level tags. Only SBML expected.".to_string(),
+            );
         }
         let sbml = root.children().next().unwrap();
         if sbml.tag_name().name() != "sbml" {
-            return Err(format!("Root element is not <sbml>."));
+            return Err("Root element is not <sbml>.".to_string());
         }
 
         if sbml.tag_name().namespace() != Some(SBML) {
-            return Err(format!(
-                "The document does not use the SBML Level3 namespace."
-            ));
+            return Err("The document does not use the SBML Level3 namespace.".to_string());
         }
 
         let requires_qual = sbml.attribute((SBML_QUAL, "required"));
         if requires_qual != Some("true") {
-            warnings.push(format!(
-                "This model does not declare SBML-qual as a requirement."
-            ));
+            warnings.push("This model does not declare SBML-qual as a requirement.".to_string());
         }
 
         let model = read_unique_child(sbml, (SBML, "model"))?;
@@ -120,7 +117,7 @@ impl BooleanNetwork {
         for (k, v) in &layout {
             let var_name = specie_to_name.get(k);
             if let Some(var) = var_name {
-                transformed_layout.insert(var.clone(), v.clone());
+                transformed_layout.insert(var.clone(), *v);
             } else {
                 warnings.push(format!("Unknown layout glyph `{}`.", k));
             }
@@ -174,7 +171,7 @@ fn child_tags<'a, 'input: 'a>(
 /// If the name contains an invalid character, it is replaced with `_`.
 /// If there are duplicate names, they are prefixed with their IDs.
 fn create_normalized_names(
-    species: &[SBMLSpecie],
+    species: &[SbmlSpecie],
     warnings: &mut Vec<String>,
 ) -> Result<HashMap<String, String>, String> {
     let mut id_to_name = HashMap::new();
@@ -184,7 +181,7 @@ fn create_normalized_names(
     // First, eliminate invalid characters and detect duplicates simultaneously.
     let name_regex = Regex::new(r"[^a-zA-Z0-9_]").unwrap();
     for specie in species {
-        let name = specie.name.clone().unwrap_or(specie.id.clone());
+        let name = specie.name.clone().unwrap_or_else(|| specie.id.clone());
         let normalized = name_regex.replace_all(&name, "_").to_string();
         if normalized != name {
             warnings.push(format!(
@@ -236,7 +233,7 @@ fn create_normalized_names(
 /// added if the MathML formula in the transition contains the input variable.
 fn create_regulations(
     rg: &mut RegulatoryGraph,
-    transitions: &[SBMLTransition],
+    transitions: &[SbmlTransition],
     id_to_var: &HashMap<String, String>,
 ) -> Result<(), String> {
     for transition in transitions {
@@ -306,20 +303,20 @@ fn create_regulations(
 }
 
 /// Create any explicit parameters used in the given MathML tree.
-fn create_explicit_parameters(math: &MathML, network: &mut BooleanNetwork) -> Result<(), String> {
+fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Result<(), String> {
     match math {
-        MathML::Integer(_) => Ok(()),
-        MathML::Identifier(_) => Ok(()),
-        MathML::Apply(_, args) => {
+        MathMl::Integer(_) => Ok(()),
+        MathMl::Identifier(_) => Ok(()),
+        MathMl::Apply(_, args) => {
             for a in args {
                 create_explicit_parameters(a, network)?;
             }
             Ok(())
         }
-        MathML::SymbolApply(name, args) => {
+        MathMl::SymbolApply(name, args) => {
             if let Some(p) = network.find_parameter(name) {
-                let current = network.get_parameter(p).cardinality;
-                if current != args.len() {
+                let current = network.get_parameter(p).get_arity();
+                if current != u32::try_from(args.len()).unwrap() {
                     return Err(format!(
                         "Parameter `{}` is used with cardinality {} as well as {}",
                         name,
@@ -329,7 +326,7 @@ fn create_explicit_parameters(math: &MathML, network: &mut BooleanNetwork) -> Re
                 }
             } else {
                 // Seems that at the moment there are no restrictions on parameter names (weird).
-                network.add_parameter(name, args.len())?;
+                network.add_parameter(name, u32::try_from(args.len()).unwrap())?;
             }
             // Also run this, in case we allow complex parameter applications in the future.
             for a in args {
@@ -512,7 +509,7 @@ mod tests {
                         "ERROR: Invalid SBML model in {}.",
                         bench_dir.path().display()
                     );
-                    panic!(err);
+                    panic!("{}", err);
                 }
                 Ok((model, _)) => model,
             };
@@ -522,7 +519,7 @@ mod tests {
             let aeon_model = BooleanNetwork::try_from(model_string.as_str()).unwrap();
 
             assert_eq!(aeon_model.graph.num_vars(), sbml_model.graph.num_vars());
-            for v in aeon_model.graph.variable_ids() {
+            for v in aeon_model.graph.variables() {
                 print!("..{}..", aeon_model.graph.get_variable(v).name);
                 assert_eq!(
                     aeon_model.graph.get_variable(v),

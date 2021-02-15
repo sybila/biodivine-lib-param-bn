@@ -7,17 +7,17 @@ impl FnUpdate {
     /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
     /// valuations for which this function evaluates to `true`.
     pub fn symbolic_eval_true(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
-        return BddParams(self._symbolic_eval(state, encoder));
+        BddParams(self._symbolic_eval(state, encoder))
     }
 
     /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
     /// valuations for which this function evaluates to `false`.
     pub fn symbolic_eval_false(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
-        return BddParams(self._symbolic_eval(state, encoder).not());
+        BddParams(self._symbolic_eval(state, encoder).not())
     }
 
     pub(super) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
-        return match self {
+        match self {
             FnUpdate::Const(value) => {
                 if *value {
                     encoder.bdd_variables.mk_true()
@@ -48,6 +48,6 @@ impl FnUpdate {
                     BinaryOp::Iff => l.iff(&r),
                 }
             }
-        };
+        }
     }
 }

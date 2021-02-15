@@ -1,5 +1,5 @@
-use crate::sbml::import::_read_mathml::MathML;
-use crate::sbml::import::_read_transitions::SBMLTransition;
+use crate::sbml::import::_read_mathml::MathMl;
+use crate::sbml::import::_read_transitions::SbmlTransition;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate};
 use std::collections::HashMap;
 
@@ -9,18 +9,18 @@ use std::collections::HashMap;
 /// defined.
 pub fn sbml_transition_to_update_function(
     network: &BooleanNetwork,
-    transition: &SBMLTransition,
+    transition: &SbmlTransition,
     id_to_var: &HashMap<String, String>,
 ) -> Result<FnUpdate, String> {
     // Recursive procedure to convert a MathML object to FnUpdate.
     fn math_to_update(
-        math: &MathML,
+        math: &MathMl,
         network: &BooleanNetwork,
-        transition: &SBMLTransition,
+        transition: &SbmlTransition,
         id_to_var: &HashMap<String, String>,
     ) -> Result<FnUpdate, String> {
         match math {
-            MathML::Integer(i) => {
+            MathMl::Integer(i) => {
                 if *i == 0 {
                     Ok(FnUpdate::Const(false))
                 } else if *i == 1 {
@@ -29,7 +29,7 @@ pub fn sbml_transition_to_update_function(
                     Err(format!("Cannot convert integer `{}` to Boolean.", i))
                 }
             }
-            MathML::Identifier(name) => {
+            MathMl::Identifier(name) => {
                 let input = transition
                     .inputs
                     .iter()
@@ -47,7 +47,7 @@ pub fn sbml_transition_to_update_function(
                     ))
                 }
             }
-            MathML::SymbolApply(p_name, args) => {
+            MathMl::SymbolApply(p_name, args) => {
                 let mut variables = Vec::new();
                 for arg in args {
                     let update = math_to_update(arg, network, transition, id_to_var)?;
@@ -63,7 +63,7 @@ pub fn sbml_transition_to_update_function(
 
                 Ok(FnUpdate::Param(param, variables))
             }
-            MathML::Apply(op, args) => {
+            MathMl::Apply(op, args) => {
                 match op.as_str() {
                     "not" => {
                         if args.len() != 1 {
@@ -116,7 +116,7 @@ pub fn sbml_transition_to_update_function(
                         // And/Or support variable arguments because some CNF/DNF editors will output like this
                         let is_and = op == "and";
                         let op = if is_and { BinaryOp::And } else { BinaryOp::Or };
-                        if args.len() == 0 {
+                        if args.is_empty() {
                             Ok(FnUpdate::Const(!is_and))
                         } else if args.len() == 1 {
                             math_to_update(&args[0], network, transition, id_to_var)
@@ -142,7 +142,7 @@ pub fn sbml_transition_to_update_function(
         panic!("Converting an unspecified transition to FnUpdate.");
     }
 
-    return if transition.function_terms.len() == 0 {
+    return if transition.function_terms.is_empty() {
         if transition.default_term.as_ref().unwrap().result_level == 0 {
             Ok(FnUpdate::Const(false))
         } else if transition.default_term.as_ref().unwrap().result_level == 1 {
@@ -154,25 +154,17 @@ pub fn sbml_transition_to_update_function(
             ))
         }
     } else if transition.function_terms.len() > 1 {
-        Err(format!(
-            "More than one function term is not supported at the moment."
-        ))
+        Err("More than one function term is not supported at the moment.".to_string())
+    } else if transition.default_term.as_ref().unwrap().result_level != 0 {
+        Err("Function terms are only supported with default level 0.".to_string())
     } else {
-        if transition.default_term.as_ref().unwrap().result_level != 0 {
-            Err(format!(
-                "Function terms are only supported with default level 0."
-            ))
+        let term = &transition.function_terms[0];
+        if term.result_level != 1 {
+            Err("Function terms are only supported with result level 1.".to_string())
+        } else if term.math.is_none() {
+            Err("Function term has no math formula.".to_string())
         } else {
-            let term = &transition.function_terms[0];
-            if term.result_level != 1 {
-                Err(format!(
-                    "Function terms are only supported with result level 1."
-                ))
-            } else if term.math.is_none() {
-                Err(format!("Function term has no math formula."))
-            } else {
-                math_to_update(term.math.as_ref().unwrap(), network, transition, id_to_var)
-            }
+            math_to_update(term.math.as_ref().unwrap(), network, transition, id_to_var)
         }
     };
 }
@@ -202,16 +194,14 @@ fn transform_comparison(op: &str, left: FnUpdate, right: FnUpdate) -> FnUpdate {
                 transform_comparison("eq", right, left)
             } else if left == right {
                 left
+            } else if let FnUpdate::Const(true) = left {
+                // 1 == A === A
+                right
+            } else if let FnUpdate::Const(false) = left {
+                // 0 == A === !A
+                FnUpdate::Not(Box::new(right))
             } else {
-                if let FnUpdate::Const(true) = left {
-                    // 1 == A === A
-                    right
-                } else if let FnUpdate::Const(false) = left {
-                    // 0 == A === !A
-                    FnUpdate::Not(Box::new(right))
-                } else {
-                    FnUpdate::Binary(BinaryOp::Iff, Box::new(left), Box::new(right))
-                }
+                FnUpdate::Binary(BinaryOp::Iff, Box::new(left), Box::new(right))
             }
         }
         "lt" => {

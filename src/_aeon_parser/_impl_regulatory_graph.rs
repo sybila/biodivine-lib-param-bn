@@ -1,5 +1,5 @@
-use crate::parser::RegulationTemp;
 use crate::RegulatoryGraph;
+use crate::_aeon_parser::RegulationTemp;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 
@@ -29,7 +29,7 @@ impl RegulatoryGraph {
             rg.add_regulation_temp(template)?;
         }
 
-        return Ok(rg);
+        Ok(rg)
     }
 
     /// Add a new `Regulation` to this `RegulatoryGraph` where the regulation is
@@ -39,17 +39,17 @@ impl RegulatoryGraph {
     /// plus all conditions of `add_regulation` must be satisfied as well.
     pub fn add_regulation_string(&mut self, regulation: &str) -> Result<(), String> {
         let template = RegulationTemp::try_from(regulation)?;
-        return self.add_regulation_temp(template);
+        self.add_regulation_temp(template)
     }
 
     /// **(internal)** A utility method for adding regulations once they are parsed.
     pub(super) fn add_regulation_temp(&mut self, regulation: RegulationTemp) -> Result<(), String> {
-        return self.add_regulation(
+        self.add_regulation(
             &regulation.regulator,
             &regulation.target,
             regulation.observable,
             regulation.monotonicity,
-        );
+        )
     }
 }
 
@@ -60,10 +60,10 @@ impl TryFrom<&str> for RegulatoryGraph {
         let lines: Vec<String> = value
             .lines()
             .map(|l| l.trim().to_string())
-            .filter(|l| !l.is_empty() && l.chars().next() != Some('#'))
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .collect();
 
-        return RegulatoryGraph::from_regulation_strings(lines);
+        RegulatoryGraph::from_regulation_strings(lines)
     }
 }
 
@@ -79,7 +79,7 @@ mod tests {
         map.insert("abc".to_string(), VariableId(0));
         map.insert("hello".to_string(), VariableId(1));
         map.insert("numbers_123".to_string(), VariableId(2));
-        return RegulatoryGraph {
+        RegulatoryGraph {
             variables: vec![
                 Variable {
                     name: "abc".to_string(),
@@ -122,7 +122,7 @@ mod tests {
                 },
             ],
             variable_to_index: map,
-        };
+        }
     }
 
     #[test]
