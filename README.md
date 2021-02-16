@@ -17,13 +17,12 @@ Rust library for working with parametrised Boolean networks. Supports:
  - Fully symbolic asynchronous transition graphs.
  - (Legacy) semi-symbolic asynchronous transition graphs.
 
-**In `beta` for now**. Tutorial in progress; have a look at API docs, 
-specifically `BooleanNetwork`, `AsyncGraph` and `SymbolicAsyncGraph` to get started.
+To learn more, check out the documentation in our [tutorial module](https://docs.rs/biodivine-lib-param-bn/tutorial/index.html). 
 
-### PBN to colour graph dump
+#### PBN to colour graph dump
 
 To analyse (very) small networks, it can be useful to 
-dump them as explicit coloured graphs. There is a binary for that.
+dump them as explicit coloured graphs. There is a binary for that as well.
 
 First, run `cargo build --release`.
 
