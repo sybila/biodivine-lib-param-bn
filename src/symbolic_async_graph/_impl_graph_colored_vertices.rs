@@ -1,3 +1,4 @@
+use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
@@ -50,24 +51,24 @@ impl GraphColoredVertices {
 }
 
 /// Set operations.
-impl GraphColoredVertices {
-    pub fn union(&self, other: &Self) -> Self {
+impl Set for GraphColoredVertices {
+    fn union(&self, other: &Self) -> Self {
         self.copy(self.bdd.or(&other.bdd))
     }
 
-    pub fn intersect(&self, other: &Self) -> Self {
+    fn intersect(&self, other: &Self) -> Self {
         self.copy(self.bdd.and(&other.bdd))
     }
 
-    pub fn minus(&self, other: &Self) -> Self {
+    fn minus(&self, other: &Self) -> Self {
         self.copy(self.bdd.and_not(&other.bdd))
     }
 
-    pub fn is_empty(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.bdd.is_false()
     }
 
-    pub fn is_subset(&self, other: &Self) -> bool {
+    fn is_subset(&self, other: &Self) -> bool {
         self.bdd.and_not(&other.bdd).is_false()
     }
 }

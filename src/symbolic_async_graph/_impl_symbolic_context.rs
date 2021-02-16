@@ -331,6 +331,7 @@ fn network_symbolic_size(network: &BooleanNetwork) -> u32 {
 
 #[cfg(test)]
 mod tests {
+    use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::BooleanNetwork;
     use std::convert::TryFrom;

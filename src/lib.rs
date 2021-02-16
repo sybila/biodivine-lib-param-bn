@@ -223,10 +223,11 @@ pub struct BooleanNetwork {
     parameter_to_index: HashMap<String, ParameterId>,
 }
 
-/// An iterator over all `VariableId`s of a `RegulatoryGraph` (or a `BooleanNetwork`).
+/// An iterator over all `VariableIds` of a `RegulatoryGraph` (or a `BooleanNetwork`).
 pub type VariableIdIterator = Map<Range<usize>, fn(usize) -> VariableId>;
 
-/// An iterator over all `ParameterId`s of a `BooleanNetwork`.
+/// An iterator over all `ParameterIds` of a `BooleanNetwork`.
 pub type ParameterIdIterator = Map<Range<usize>, fn(usize) -> ParameterId>;
 
-// TODO: Add RegulationIterator alias.
+/// An iterator over all `Regulations` of a `RegulatoryGraph`.
+pub type RegulationIterator<'a> = std::slice::Iter<'a, Regulation>;

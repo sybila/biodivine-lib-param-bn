@@ -1,32 +1,44 @@
 use crate::{FnUpdate, RegulatoryGraph};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
 
-// TODO: This really should be try_from_expression and return Option.
 impl FnUpdate {
     /// Convert a `BooleanExpression` to a `FnUpdate`, using `RegulatoryGraph` to resolve variable
     /// names.
-    ///
-    /// Panics: expression contains unknown variable.
-    pub fn from_boolean_expression(
+    pub fn try_from_expression(
         expression: BooleanExpression,
         graph: &RegulatoryGraph,
-    ) -> FnUpdate {
-        match expression {
+    ) -> Option<FnUpdate> {
+        Some(match expression {
             BooleanExpression::Const(value) => FnUpdate::Const(value),
-            BooleanExpression::Variable(name) => FnUpdate::Var(graph.find_variable(&name).unwrap()),
+            BooleanExpression::Variable(name) => FnUpdate::Var(graph.find_variable(&name)?),
             BooleanExpression::Not(inner) => {
-                FnUpdate::from_boolean_expression(*inner, graph).negation()
+                FnUpdate::try_from_expression(*inner, graph)?.negation()
             }
-            BooleanExpression::Or(l, r) => FnUpdate::from_boolean_expression(*l, graph)
-                .or(FnUpdate::from_boolean_expression(*r, graph)),
-            BooleanExpression::And(l, r) => FnUpdate::from_boolean_expression(*l, graph)
-                .and(FnUpdate::from_boolean_expression(*r, graph)),
-            BooleanExpression::Iff(l, r) => FnUpdate::from_boolean_expression(*l, graph)
-                .iff(FnUpdate::from_boolean_expression(*r, graph)),
-            BooleanExpression::Imp(l, r) => FnUpdate::from_boolean_expression(*l, graph)
-                .implies(FnUpdate::from_boolean_expression(*r, graph)),
-            BooleanExpression::Xor(l, r) => FnUpdate::from_boolean_expression(*l, graph)
-                .xor(FnUpdate::from_boolean_expression(*r, graph)),
-        }
+            BooleanExpression::Or(l, r) => {
+                let l = FnUpdate::try_from_expression(*l, graph)?;
+                let r = FnUpdate::try_from_expression(*r, graph)?;
+                l.or(r)
+            }
+            BooleanExpression::And(l, r) => {
+                let l = FnUpdate::try_from_expression(*l, graph)?;
+                let r = FnUpdate::try_from_expression(*r, graph)?;
+                l.and(r)
+            }
+            BooleanExpression::Iff(l, r) => {
+                let l = FnUpdate::try_from_expression(*l, graph)?;
+                let r = FnUpdate::try_from_expression(*r, graph)?;
+                l.iff(r)
+            }
+            BooleanExpression::Imp(l, r) => {
+                let l = FnUpdate::try_from_expression(*l, graph)?;
+                let r = FnUpdate::try_from_expression(*r, graph)?;
+                l.implies(r)
+            }
+            BooleanExpression::Xor(l, r) => {
+                let l = FnUpdate::try_from_expression(*l, graph)?;
+                let r = FnUpdate::try_from_expression(*r, graph)?;
+                l.xor(r)
+            }
+        })
     }
 }

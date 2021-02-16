@@ -146,6 +146,7 @@ pub struct FunctionTableIterator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
     use crate::BooleanNetwork;
     use std::convert::TryFrom;

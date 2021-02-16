@@ -3,7 +3,7 @@
 /// In the future, these will be replaced by a more stable variants.
 use std::hash::Hash;
 
-/// A marker trait for anything that can be a state of a graph.
+/// **Deprecated** marker trait for anything that can be a state of a graph.
 ///
 /// Currently, we require each state to be a `Copy` struct, i.e. it has to be
 /// "small enough" so that it can be copied whenever needed. In the future, we might
@@ -11,17 +11,16 @@ use std::hash::Hash;
 /// can use dynamically indexed states.
 pub trait State: Hash + Eq + Clone + Copy {}
 
-/// `Params` represents a set of parameter valuations and thus typically behaves like a
-/// normal set.
+/// A very basic set trait.
 ///
-/// However, notice that there is no complement method available. This is because the
-/// `unit` set of parameters can be different every time or completely unknown. To
-/// implement complement, use `minus` with an appropriate `unit` set.
-///
-/// Also notice that we do not assume anything about the members of the set, we can't
+/// Notice that we do not assume anything about the members of the set, we can't
 /// iterate them or even retrieve them. This is because the sets might be uncountable
 /// or the elements might not be well representable.
-pub trait Params: Clone {
+///
+/// Also notice that there is no complement method available. This is because the
+/// `unit` set can be different every time or completely unknown. To
+/// implement complement, use `minus` with an appropriate `unit` set.
+pub trait Set: Clone {
     fn union(&self, other: &Self) -> Self;
     fn intersect(&self, other: &Self) -> Self;
     fn minus(&self, other: &Self) -> Self;
@@ -35,7 +34,7 @@ pub trait Params: Clone {
 /// is allowed.
 pub trait EvolutionOperator {
     type State: State;
-    type Params: Params;
+    type Params: Set;
     type Iterator: Iterator<Item = (Self::State, Self::Params)>;
     fn step(&self, current: Self::State) -> Self::Iterator;
 }
@@ -60,7 +59,7 @@ pub trait InvertibleEvolutionOperator: EvolutionOperator {
 /// A parametrised variant of a `Graph`.
 pub trait Graph {
     type State: State;
-    type Params: Params;
+    type Params: Set;
     type States: Iterator<Item = Self::State>;
     type FwdEdges: EvolutionOperator;
     type BwdEdges: EvolutionOperator;

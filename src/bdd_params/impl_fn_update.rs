@@ -3,18 +3,15 @@ use crate::biodivine_std::structs::IdState;
 use crate::{BinaryOp, FnUpdate};
 use biodivine_lib_bdd::Bdd;
 
-/// TODO: This probably should not be public...
 impl FnUpdate {
-    /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
+    /// **(internal)** Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
     /// valuations for which this function evaluates to `true`.
-    pub fn symbolic_eval_true(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
+    pub(crate) fn symbolic_eval_true(
+        &self,
+        state: IdState,
+        encoder: &BddParameterEncoder,
+    ) -> BddParams {
         BddParams(self._symbolic_eval(state, encoder))
-    }
-
-    /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
-    /// valuations for which this function evaluates to `false`.
-    pub fn symbolic_eval_false(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
-        BddParams(self._symbolic_eval(state, encoder).not())
     }
 
     pub(super) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {

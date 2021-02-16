@@ -1,5 +1,5 @@
 use super::BddParams;
-use crate::biodivine_std::traits::Params;
+use crate::biodivine_std::traits::Set;
 use biodivine_lib_bdd::Bdd;
 
 impl BddParams {
@@ -17,7 +17,7 @@ impl BddParams {
     }
 }
 
-impl Params for BddParams {
+impl Set for BddParams {
     fn union(&self, other: &Self) -> Self {
         BddParams(self.0.or(&other.0))
     }

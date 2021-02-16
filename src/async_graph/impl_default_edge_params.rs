@@ -1,7 +1,7 @@
 use crate::async_graph::{AsyncGraphEdgeParams, DefaultEdgeParams};
 use crate::bdd_params::{build_static_constraints, BddParameterEncoder, BddParams};
 use crate::biodivine_std::structs::IdState;
-use crate::biodivine_std::traits::Params;
+use crate::biodivine_std::traits::Set;
 use crate::{BooleanNetwork, VariableId};
 
 impl DefaultEdgeParams {

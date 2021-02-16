@@ -1,5 +1,4 @@
-//! This module provides methods and structures for representing the parameter valuations
-//! of `BooleanNetwork`s using `Bdd`s.
+//! *Legacy* symbolic representation of parameter space of a `BooleanNetwork` using `Bdds`.
 //!
 //! Specifically, there is the `BddParams` struct which represents the set of valuations
 //! and the `BddParameterEncoder` struct which allows creating new `Bdd` and `BddParams` that
@@ -17,21 +16,20 @@ mod impl_witness_generator;
 
 pub use impl_static_constraints::build_static_constraints;
 
-/// A wrapper for the `Bdd` object that implements `Params`;
+/// A wrapper for the `Bdd` object that implements a basic `Set` trait.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct BddParams(Bdd);
 
-/// Handles the translation between parameters of the `BooleanNetwork` and `BddVariable`s
-/// used when representing the parameter valuation sets as `Bdd`s.
+/// Handles the translation between parameters of the `BooleanNetwork` and `BddVariables`.
 ///
 /// There are two types of parameters in the `BooleanNetwork` - explicit and implicit.
 ///
 /// Explicit are the named parameters that are specifically declared in the update functions.
 /// Implicit are the anonymous parameters representing the missing update functions.
 ///
-/// Every explicit and implicit `Parameter` maps to a set of `BddVariable`s that represent
+/// Every explicit and implicit `Parameter` maps to a set of `BddVariables` that represent
 /// the values in its function table. The responsibility of this struct is to create all
-/// `BddVariable`s and maintain how they map to individual parameters.
+/// `BddVariables` and maintain how they map to individual parameters.
 #[derive(Clone)]
 pub struct BddParameterEncoder {
     /// The actual `BddVariableSet` used to represent the parameters - use this for `.dot` printing etc.
@@ -45,7 +43,7 @@ pub struct BddParameterEncoder {
     implicit_function_tables: Vec<Vec<BddVariable>>,
 }
 
-/// **(experimental)** Represents one "line" in a boolean function table.
+/// **(experimental)** Represents one "line" in a Boolean function table.
 ///
 /// You can query the state of input variables on this line or make a new line
 /// with updated variable values.

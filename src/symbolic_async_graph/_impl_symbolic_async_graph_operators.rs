@@ -1,3 +1,4 @@
+use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::VariableId;
 use biodivine_lib_bdd::Bdd;

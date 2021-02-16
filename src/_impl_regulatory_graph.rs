@@ -1,6 +1,6 @@
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
 use crate::biodivine_std::structs::build_index_map;
-use crate::{Monotonicity, VariableIdIterator, ID_REGEX};
+use crate::{Monotonicity, RegulationIterator, VariableIdIterator, ID_REGEX};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::Index;
@@ -222,7 +222,7 @@ impl RegulatoryGraph {
         (0..self.variables.len()).map(VariableId)
     }
 
-    pub fn regulations(&self) -> std::slice::Iter<Regulation> {
+    pub fn regulations(&self) -> RegulationIterator {
         self.regulations.iter()
     }
 

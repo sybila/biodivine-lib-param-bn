@@ -7,6 +7,7 @@
 //!
 //! ```rust
 //! use biodivine_lib_param_bn::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+//! use biodivine_lib_param_bn::biodivine_std::traits::Set;
 //!
 //! fn fwd(graph: &SymbolicAsyncGraph, initial: &GraphColoredVertices) -> GraphColoredVertices {
 //!     let mut result = initial.clone();
@@ -45,6 +46,7 @@
 //! # use biodivine_lib_param_bn::symbolic_async_graph::{SymbolicAsyncGraph, GraphColoredVertices};
 //! # use biodivine_lib_param_bn::BooleanNetwork;
 //! # use std::convert::TryFrom;
+//! # use biodivine_lib_param_bn::biodivine_std::traits::Set;
 //! # fn fwd(graph: &SymbolicAsyncGraph, initial: &GraphColoredVertices) -> GraphColoredVertices {
 //! #     let mut result = initial.clone();
 //! #     loop {

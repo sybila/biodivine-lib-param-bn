@@ -1,5 +1,5 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
-use crate::biodivine_std::traits::Params;
+use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
@@ -80,21 +80,18 @@ impl SymbolicAsyncGraph {
                     .symbolic_context
                     .instantiate_fn_update(&witness_valuation, function)
                     .to_boolean_expression(&self.symbolic_context.bdd);
-                *function = FnUpdate::from_boolean_expression(
-                    instantiated_expression,
-                    self.network.as_graph(),
-                );
+                *function =
+                    FnUpdate::try_from_expression(instantiated_expression, self.network.as_graph())
+                        .unwrap();
             } else {
                 let regulators = self.network.regulators(variable);
                 let instantiated_expression = self
                     .symbolic_context
                     .instantiate_implicit_function(&witness_valuation, variable, &regulators)
                     .to_boolean_expression(&self.symbolic_context.bdd);
-                let instantiated_fn_update = FnUpdate::from_boolean_expression(
-                    instantiated_expression,
-                    self.network.as_graph(),
-                );
-                witness.update_functions[variable.0] = Some(instantiated_fn_update);
+                let instantiated_fn_update =
+                    FnUpdate::try_from_expression(instantiated_expression, self.network.as_graph());
+                witness.update_functions[variable.0] = instantiated_fn_update;
             }
         }
         // Remove all explicit parameters since they have been eliminated.
@@ -161,7 +158,7 @@ impl SymbolicAsyncGraph {
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::bitvector::BitVector;
-    use crate::biodivine_std::traits::Params;
+    use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::BooleanNetwork;
     use std::convert::TryFrom;

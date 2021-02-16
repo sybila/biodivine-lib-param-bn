@@ -79,7 +79,7 @@ mod tests {
     use crate::async_graph::AsyncGraph;
     use crate::bdd_params::BddParams;
     use crate::biodivine_std::structs::IdState;
-    use crate::biodivine_std::traits::{EvolutionOperator, Graph, Params};
+    use crate::biodivine_std::traits::{EvolutionOperator, Graph, Set};
     use crate::BooleanNetwork;
     use std::collections::HashSet;
     use std::convert::TryFrom;

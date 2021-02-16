@@ -3,8 +3,10 @@ use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
 use biodivine_lib_bdd::{Bdd, BddValuation, BddValuationIterator, BddVariableSet};
 
-// TODO: This probably should not be part of `BooleanNetwork` public API.
 impl BooleanNetwork {
+    /// *Legacy* function for creating a fully instantiated `BooleanNetwork` using parameters.
+    ///
+    /// In later revisions, this should be part of `BddParameterEncoder`.
     pub fn make_witness(
         &self,
         params: &BddParams,
@@ -17,6 +19,9 @@ impl BooleanNetwork {
         self.make_witness_for_valuation(valuation.unwrap(), encoder)
     }
 
+    /// *Legacy* function for creating a fully instantiated `BooleanNetwork` using parameters.
+    ///
+    /// In later revisions, this should be part of `BddParameterEncoder`.
     pub fn make_witness_for_valuation(
         &self,
         valuation: BddValuation,
@@ -45,10 +50,7 @@ impl BooleanNetwork {
                 for (bdd_variable, input_valuation) in variables_and_valuations {
                     if valuation.value(*bdd_variable) {
                         // and for each `1` in the function table, we add the input valuation
-                        let input_valuation_bdd = Self::valuation_to_formula(
-                            &input_valuation,
-                            &parameter_function_input_vars,
-                        );
+                        let input_valuation_bdd = Bdd::from(input_valuation.clone());
                         function_bdd = function_bdd.or(&input_valuation_bdd);
                     }
                 }
@@ -79,8 +81,7 @@ impl BooleanNetwork {
                 let mut function_bdd = function_input_vars.mk_false();
                 for (bdd_variable, input_valuation) in variables_and_valuations {
                     if valuation.value(*bdd_variable) {
-                        let input_valuation_bdd =
-                            Self::valuation_to_formula(&input_valuation, &function_input_vars);
+                        let input_valuation_bdd = Bdd::from(input_valuation);
                         function_bdd = function_bdd.or(&input_valuation_bdd);
                     }
                 }
@@ -97,21 +98,6 @@ impl BooleanNetwork {
         result.parameter_to_index.clear();
 
         result
-    }
-
-    /// Make a Bdd that exactly describes given valuation.
-    /// TODO: This should maybe be part of the bdd library.
-    fn valuation_to_formula(valuation: &BddValuation, vars: &BddVariableSet) -> Bdd {
-        assert_eq!(valuation.num_vars(), vars.num_vars());
-        let mut bdd = vars.mk_true();
-        for var in vars.variables() {
-            bdd = bdd.and(&if valuation.value(var) {
-                vars.mk_var(var)
-            } else {
-                vars.mk_not_var(var)
-            });
-        }
-        bdd
     }
 
     fn replace_parameters(

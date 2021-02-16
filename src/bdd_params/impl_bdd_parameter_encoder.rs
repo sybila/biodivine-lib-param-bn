@@ -35,7 +35,7 @@ impl BddParameterEncoder {
 
     /*
         These utility functions should probably have some separate module, like static constraint computation,
-        but right now this is good enough... (TODO)
+        but right now this is good enough...
     */
 
     pub(crate) fn build_explicit_function_table(

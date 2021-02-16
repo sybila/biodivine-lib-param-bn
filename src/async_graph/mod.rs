@@ -1,6 +1,12 @@
+//! *Legacy* semi-symbolic representation of the coloured asynchronous state-transition graph.
+//!
+//! It represents states explicitly (see `IdState`), but uses symbolic representation (`BddParams`)
+//! for sets of parameters.
+//!
+
 use crate::bdd_params::{BddParameterEncoder, BddParams};
 use crate::biodivine_std::structs::{IdState, IdStateRange};
-use crate::biodivine_std::traits::{Graph, InvertibleGraph, Params};
+use crate::biodivine_std::traits::{Graph, InvertibleGraph, Set};
 use crate::{BooleanNetwork, VariableId, VariableIdIterator};
 
 mod impl_async_graph;
@@ -41,7 +47,7 @@ pub struct DefaultEdgeParams {
 /// parameter encoders, where we simply do not want to re-implement the whole graph trait
 /// front scratch.
 pub trait AsyncGraphEdgeParams {
-    type ParamSet: Params;
+    type ParamSet: Set;
     // A reference to the underlying Boolean network.
     fn network(&self) -> &BooleanNetwork;
     /// Create a new empty set of parameters.

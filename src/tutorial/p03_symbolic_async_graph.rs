@@ -26,7 +26,7 @@
 //! use biodivine_lib_param_bn::BooleanNetwork;
 //! use std::convert::TryFrom;
 //! use biodivine_lib_param_bn::symbolic_async_graph::{SymbolicAsyncGraph, GraphColoredVertices};
-//! use biodivine_lib_param_bn::biodivine_std::traits::Params;
+//! use biodivine_lib_param_bn::biodivine_std::traits::Set;
 //! use biodivine_lib_param_bn::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 //!
 //! // Boolean network from the previous tutorial:
@@ -119,7 +119,7 @@
 //! # use biodivine_lib_param_bn::BooleanNetwork;
 //! # use std::convert::TryFrom;
 //! # use biodivine_lib_param_bn::symbolic_async_graph::{SymbolicAsyncGraph, GraphColoredVertices};
-//! # use biodivine_lib_param_bn::biodivine_std::traits::Params;
+//! # use biodivine_lib_param_bn::biodivine_std::traits::Set;
 //! # use biodivine_lib_param_bn::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 //! # // Boolean network from the previous tutorial:
 //! # let bn = BooleanNetwork::try_from(r"

@@ -1,4 +1,4 @@
-use crate::biodivine_std::traits::Params;
+use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColors, SymbolicContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use std::convert::TryFrom;
@@ -58,7 +58,7 @@ impl GraphColors {
 }
 
 /// Set operations.
-impl Params for GraphColors {
+impl Set for GraphColors {
     fn union(&self, other: &Self) -> Self {
         self.copy(self.bdd.or(&other.bdd))
     }
