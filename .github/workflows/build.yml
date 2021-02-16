@@ -1,8 +1,28 @@
 name: build
 on: [push]
 jobs:
+  # Check formatting
+  fmt:
+    name: Rustfmt
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: true
+      - run: rustup component add rustfmt
+      - uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
   # Run basic code validity check.
   check:
+    needs: fmt
     name: Check
     runs-on: ubuntu-latest
     env:
@@ -74,25 +94,6 @@ jobs:
         with:
           command: test
           args: --features "shields_up"
-
-  # Check formatting
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-D warnings"
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
 
   # Check code style
   clippy:
