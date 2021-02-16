@@ -7,7 +7,7 @@ description = "Library for working with parametrized Boolean networks."
 homepage = "https://github.com/sybila/biodivine-lib-param-bn"
 repository = "https://github.com/sybila/biodivine-lib-param-bn"
 readme = "README.md"
-keywords = ["boolean network", "asynchronous", "symbolic", "graph", "systems biology"]
+keywords = ["boolean-network", "asynchronous", "symbolic", "graph", "systems-biology"]
 categories = ["science", "simulation"]
 license = "MIT"
 
