@@ -7,6 +7,7 @@ const NUMBER_TAG: (&str, &str) = (MATHML, "cn");
 const IDENTIFIER_TAG: (&str, &str) = (MATHML, "ci");
 const SYMBOL_TAG: (&str, &str) = (MATHML, "csymbol");
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MathMl {
     Integer(i64),
     Identifier(String),

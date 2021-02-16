@@ -6,7 +6,7 @@ use std::collections::HashMap;
 /// Convert a transition into an update function.
 ///
 /// This is basically "best effort" conversion, since a lot of this is just very vaguely
-/// defined.
+/// defined in the standard.
 pub fn sbml_transition_to_update_function(
     network: &BooleanNetwork,
     transition: &SbmlTransition,
@@ -169,7 +169,7 @@ pub fn sbml_transition_to_update_function(
     };
 }
 
-/// Utility function for turning comparisons into valid `FnUpdate` functions.
+/// **(internal)** Utility function for turning comparisons into valid `FnUpdate` functions.
 ///
 /// Allowed `op` values are `eq`, `neq`, `geq`, `leq`, `lt`, `gt`.
 fn transform_comparison(op: &str, left: FnUpdate, right: FnUpdate) -> FnUpdate {

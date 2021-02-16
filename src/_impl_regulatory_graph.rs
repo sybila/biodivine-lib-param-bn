@@ -24,8 +24,6 @@ impl RegulatoryGraph {
 
     /// Add a new `Regulation` to this `RegulatoryGraph`.
     ///
-    /// TODO: find_regulation uses IDs, this uses strings - we should make it consistent.
-    ///
     /// Returns `Err` if `regulator` or `target` are not valid graph variables or when
     /// the regulation between the two variables already exists.
     pub fn add_regulation(

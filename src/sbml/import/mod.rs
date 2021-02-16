@@ -22,12 +22,19 @@ mod _read_species;
 mod _read_transitions;
 
 impl BooleanNetwork {
-    // TODO: This should be named `try_from_sbml`.
-    pub fn from_sbml(model_file: &str) -> Result<(BooleanNetwork, Layout), String> {
-        BooleanNetwork::from_sbml_strict(model_file, &mut Vec::new())
+    /// Try to read a `BooleanNetwork` from an SBML string.
+    ///
+    /// Also reads `Layout` information from the file. If there is no layout, an empty map is
+    /// returned.
+    pub fn try_from_sbml(model_file: &str) -> Result<(BooleanNetwork, Layout), String> {
+        BooleanNetwork::try_from_sbml_strict(model_file, &mut Vec::new())
     }
 
-    pub fn from_sbml_strict(
+    /// The same as `try_from_sbml`, but provides access to all warnings generated during parsing.
+    ///
+    /// These can be for example due to incompatibility in variable names (which the parser
+    /// resolves automatically).
+    pub fn try_from_sbml_strict(
         model_file: &str,
         warnings: &mut Vec<String>,
     ) -> Result<(BooleanNetwork, Layout), String> {
@@ -35,25 +42,23 @@ impl BooleanNetwork {
             roxmltree::Document::parse(model_file).map_err(|e| format!("XML Error: {:?}", e))?;
         let root = document.root();
         if root.children().count() == 0 {
-            return Err("Document is empty.".to_string());
+            return Err("Document is empty.".into());
         }
         if root.children().count() > 1 {
-            return Err(
-                "Document contains multiple top-level tags. Only SBML expected.".to_string(),
-            );
+            return Err("Document contains multiple top-level tags. Only SBML expected.".into());
         }
         let sbml = root.children().next().unwrap();
         if sbml.tag_name().name() != "sbml" {
-            return Err("Root element is not <sbml>.".to_string());
+            return Err("Root element is not <sbml>.".into());
         }
 
         if sbml.tag_name().namespace() != Some(SBML) {
-            return Err("The document does not use the SBML Level3 namespace.".to_string());
+            return Err("The document does not use the SBML Level3 namespace.".into());
         }
 
         let requires_qual = sbml.attribute((SBML_QUAL, "required"));
         if requires_qual != Some("true") {
-            warnings.push("This model does not declare SBML-qual as a requirement.".to_string());
+            warnings.push("This model does not declare SBML-qual as a requirement.".into());
         }
 
         let model = read_unique_child(sbml, (SBML, "model"))?;
@@ -128,8 +133,8 @@ impl BooleanNetwork {
     }
 }
 
-/// Find the given tag in a parent `Node`. Returns error if the tag does not exist or
-/// is present in multiple instances.
+/// **(internal)** Find the given tag in a parent `Node`. Returns error if the tag does
+/// not exist or is present in multiple instances.
 fn read_unique_child<'a, 'input: 'a>(
     parent: Node<'a, 'input>,
     name: (&'static str, &'static str),
@@ -157,7 +162,7 @@ fn read_unique_child<'a, 'input: 'a>(
     }
 }
 
-/// Find all child `Nodes` that have a given name.
+/// **(internal)** Find all child `Nodes` that have a given name.
 fn child_tags<'a, 'input: 'a>(
     parent: Node<'a, 'input>,
     name: (&'static str, &'static str),
@@ -166,8 +171,8 @@ fn child_tags<'a, 'input: 'a>(
     parent.children().filter(|n| n.tag_name() == name).collect()
 }
 
-/// Assigns every specie a biodivine-friendly name. Returns a mapping between SBML IDs and
-/// valid specie names.
+/// **(internal)** Assigns every specie a biodivine-friendly name. Returns a mapping
+/// between SBML IDs and valid specie names.
 ///
 /// If the name contains an invalid character, it is replaced with `_`.
 /// If there are duplicate names, they are prefixed with their IDs.
@@ -228,7 +233,8 @@ fn create_normalized_names(
     Ok(id_to_name)
 }
 
-/// Add regulations to a `RegulatoryGraph` based on the collection of `SBMLTransitions`.
+/// **(internal)** Add regulations to a `RegulatoryGraph` based on the collection
+/// of `SBMLTransitions`.
 ///
 /// Monotonicity is inferred from the `sign` property of the transition. Observability is
 /// added if the MathML formula in the transition contains the input variable.
@@ -303,7 +309,7 @@ fn create_regulations(
     Ok(())
 }
 
-/// Create any explicit parameters used in the given MathML tree.
+/// **(internal)** Create any explicit parameters used in the given MathML tree.
 fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Result<(), String> {
     match math {
         MathMl::Integer(_) => Ok(()),
@@ -349,7 +355,7 @@ mod tests {
     fn test() {
         let model =
             std::fs::read_to_string("sbml_models/g2a.sbml").expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         // Compared by hand...
         let mut expected_layout = HashMap::new();
         expected_layout.insert("CtrA".to_string(), (419.0, 94.0));
@@ -390,7 +396,7 @@ mod tests {
     fn test_name_resolution() {
         let model = std::fs::read_to_string("sbml_models/g2a_with_names.sbml")
             .expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         // Compared by hand...
         // CtrA(+) contains three invalid characters that should be normalized to CtrA___
         let mut expected_layout = HashMap::new();
@@ -432,7 +438,7 @@ mod tests {
     fn test_cell_collective() {
         let model = std::fs::read_to_string("sbml_models/cell_collective_vut.sbml")
             .expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         assert_eq!(actual.graph.num_vars(), 66);
         assert_eq!(actual.graph.regulations.len(), 139);
         assert_eq!(layout.len(), actual.graph.num_vars());
@@ -459,7 +465,7 @@ mod tests {
         // Has colliding names/ids
         let model = std::fs::read_to_string("sbml_models/apoptosis_stable.sbml")
             .expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         assert_eq!(layout.len(), actual.graph.num_vars());
         // Normal variable
         assert!(actual.graph.find_variable("Apoptosome_complex").is_some());
@@ -475,7 +481,7 @@ mod tests {
         // Has OR with one argument
         let model = std::fs::read_to_string("sbml_models/hmox1_pathway.sbml")
             .expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         assert_eq!(layout.len(), actual.graph.num_vars());
     }
 
@@ -483,7 +489,7 @@ mod tests {
     fn test_apoptosis_network() {
         let model = std::fs::read_to_string("sbml_models/apoptosis_network.sbml")
             .expect("Cannot open result file.");
-        let (actual, layout) = BooleanNetwork::from_sbml(model.as_str()).unwrap();
+        let (actual, layout) = BooleanNetwork::try_from_sbml(model.as_str()).unwrap();
         assert_eq!(actual.graph.num_vars(), 41);
         assert_eq!(layout.len(), 0);
     }
@@ -503,7 +509,7 @@ mod tests {
 
             let sbml_model_path = bench_dir.path().join("model.sbml");
             let model_string = std::fs::read_to_string(sbml_model_path).unwrap();
-            let model = BooleanNetwork::from_sbml(&model_string);
+            let model = BooleanNetwork::try_from_sbml(&model_string);
             let sbml_model = match model {
                 Err(err) => {
                     eprintln!(

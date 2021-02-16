@@ -17,7 +17,7 @@ fn main() {
 
         let sbml_model_path = bench_dir.path().join("model.sbml");
         let model_string = std::fs::read_to_string(sbml_model_path).unwrap();
-        let model = BooleanNetwork::from_sbml(&model_string);
+        let model = BooleanNetwork::try_from_sbml(&model_string);
         let model = match model {
             Err(err) => {
                 eprintln!(

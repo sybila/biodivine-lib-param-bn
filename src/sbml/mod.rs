@@ -1,3 +1,5 @@
+//!Adds support for SBML-qual import and export to `BooleanNetwork`.
+
 use std::collections::HashMap;
 
 /// Contains code for parsing SBML models using xml-tree library. It is not 100% SBML-qual

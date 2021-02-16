@@ -1,30 +1,30 @@
+use crate::sbml::Layout;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, Monotonicity};
 use std::collections::HashMap;
 use std::io::{Error, Write};
 
 impl BooleanNetwork {
-    // TODO: This should accept `Layout` type and also have a variant with no layout.
-    pub fn to_sbml(&self, layout: &HashMap<String, (f64, f64)>) -> String {
+    /// Convert this network to an SBML string with an optional `Layout`.
+    pub fn to_sbml(&self, layout: Option<&Layout>) -> String {
         let mut buffer: Vec<u8> = Vec::new();
-        self.write_as_sbml(&mut buffer, layout)
+        self.write_as_sbml(layout, &mut buffer)
             .expect("Cannot write model to SBML.");
         String::from_utf8(buffer).expect("Invalid UTF formatting in string.")
     }
 
-    // TODO: This is just weird / maybe keep it internal? Or at least swap layout and out.
-    pub fn write_as_sbml(
-        &self,
-        out: &mut dyn Write,
-        layout: &HashMap<String, (f64, f64)>,
-    ) -> Result<(), Error> {
+    /// Write an SBML string representation (with an optional `Layout`) of this network
+    /// to the given `out` writer.
+    pub fn write_as_sbml(&self, layout: Option<&Layout>, out: &mut dyn Write) -> Result<(), Error> {
         write!(
             out,
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
         )?;
         write!(out, "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" layout:required=\"false\" level=\"3\" qual:required=\"true\" xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" version=\"1\" xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
         write!(out, "<model>")?;
-        if !layout.is_empty() {
-            write_layout(out, layout)?;
+        if let Some(layout) = layout {
+            if !layout.is_empty() {
+                write_layout(out, layout)?;
+            }
         }
         self.write_species(out)?;
         self.write_transitions(out)?;
@@ -35,8 +35,8 @@ impl BooleanNetwork {
 
     fn write_species(&self, out: &mut dyn Write) -> Result<(), Error> {
         write!(out, "<qual:listOfQualitativeSpecies xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
-        for v in &self.graph.variables {
-            write!(out, "<qual:qualitativeSpecies qual:maxLevel=\"1\" qual:constant=\"false\" qual:name=\"{}\" qual:id=\"{}\"/>", v.name, v.name)?;
+        for v in self.variables() {
+            write!(out, "<qual:qualitativeSpecies qual:maxLevel=\"1\" qual:constant=\"false\" qual:name=\"{}\" qual:id=\"{}\"/>", self[v].get_name(), self[v].get_name())?;
         }
         write!(out, "</qual:listOfQualitativeSpecies>")?;
         Ok(())
@@ -119,11 +119,9 @@ impl BooleanNetwork {
                 write!(out, "</apply>")?;
             }
             FnUpdate::Param(id, args) => {
-                let param = self.get_parameter(*id);
-                write!(out, "<apply><csymbol>{}</csymbol>", param.name)?;
+                write!(out, "<apply><csymbol>{}</csymbol>", self[*id].get_name())?;
                 for arg in args {
-                    let v = self.graph.get_variable(*arg);
-                    write!(out, "<ci>{}</ci>", v.name)?;
+                    write!(out, "<ci>{}</ci>", self[*arg].get_name())?;
                 }
                 write!(out, "</apply>")?;
             }
@@ -191,8 +189,8 @@ mod tests {
         expected_layout.insert("b".to_string(), (1.5, 2.8));
         expected_layout.insert("c".to_string(), (1542.123, -4.333));
         expected_layout.insert("d".to_string(), (121.776, 2.0));
-        let sbml = model.to_sbml(&expected_layout);
-        let (actual, layout) = BooleanNetwork::from_sbml(&sbml).unwrap();
+        let sbml = model.to_sbml(Some(&expected_layout));
+        let (actual, layout) = BooleanNetwork::try_from_sbml(&sbml).unwrap();
         assert_eq!(model, actual);
         assert_eq!(expected_layout, layout);
     }
