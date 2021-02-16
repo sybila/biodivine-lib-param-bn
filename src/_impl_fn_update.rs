@@ -224,7 +224,7 @@ mod tests {
         )
         .unwrap();
         let id_f = bn.add_parameter("f", 2).unwrap();
-        bn.add_update_function_string("c", fun_string.as_str())
+        bn.add_string_update_function("c", fun_string.as_str())
             .unwrap();
 
         assert_eq!(fun, bn.get_update_function(c).as_ref().unwrap());

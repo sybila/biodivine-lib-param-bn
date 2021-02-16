@@ -58,9 +58,9 @@
 //! assert!(bn.get_update_function(id_a).is_none());
 //! // We can use standard Boolean operators `&`, `|`, `=>`, `<=>`, `^` and `!`.
 //! // Names are alphanumeric strings (starting with a letter), possibly containing `_`.
-//! bn.add_update_function_string("A", "C | (!A & B)")?;
-//! bn.add_update_function_string("B", "A")?;
-//! bn.add_update_function_string("C", "true")?;
+//! bn.add_string_update_function("A", "C | (!A & B)")?;
+//! bn.add_string_update_function("B", "A")?;
+//! bn.add_string_update_function("C", "true")?;
 //!
 //! // We can also test that the functions are properly set.
 //! assert_eq!(&Some(FnUpdate::Const(true)), bn.get_update_function(id_c));
@@ -152,7 +152,7 @@
 //! // `ParameterId` indexes `BooleanNetwork` just as `VariableId` would.
 //! assert_eq!("f", bn[id_f].get_name());
 //! assert_eq!(2, bn[id_f].get_arity());
-//! bn.add_update_function_string("A", "C | f(A, B)")?;
+//! bn.add_string_update_function("A", "C | f(A, B)")?;
 //!
 //! let params: Vec<ParameterId> = bn.get_update_function(id_a).as_ref().unwrap().collect_parameters();
 //! assert_eq!(vec![id_f], params);

@@ -7,12 +7,12 @@ use std::convert::TryFrom;
 impl RegulatoryGraph {
     /// Create a `RegulatoryGraph` from a collection of regulation strings.
     ///
-    /// TODO: Give this a better name, or make it private.
-    ///
     /// The variables of the `RegulatoryGraph` are determined from the regulations
     /// and are ordered alphabetically. Otherwise, this is equivalent to iteratively
-    /// calling `add_regulation_string`.
-    pub fn from_regulation_strings(regulations: Vec<String>) -> Result<RegulatoryGraph, String> {
+    /// calling `add_string_regulation`.
+    pub fn try_from_string_regulations(
+        regulations: Vec<String>,
+    ) -> Result<RegulatoryGraph, String> {
         let mut templates = Vec::new();
         let mut variables = HashSet::new();
         for string in regulations {
@@ -28,7 +28,7 @@ impl RegulatoryGraph {
         let mut rg = RegulatoryGraph::new(variables);
 
         for template in templates {
-            rg.add_regulation_temp(template)?;
+            rg.add_temp_regulation(template)?;
         }
 
         Ok(rg)
@@ -37,17 +37,15 @@ impl RegulatoryGraph {
     /// Add a new `Regulation` to this `RegulatoryGraph` where the regulation is
     /// given in its string representation (e.g. "v1 ->? v2").
     ///
-    /// TODO: Better name would be add_regulation_from_string
-    ///
     /// The `regulation` parameter must be a valid string representation of a regulation,
     /// plus all conditions of `add_regulation` must be satisfied as well.
-    pub fn add_regulation_string(&mut self, regulation: &str) -> Result<(), String> {
+    pub fn add_string_regulation(&mut self, regulation: &str) -> Result<(), String> {
         let template = RegulationTemp::try_from(regulation)?;
-        self.add_regulation_temp(template)
+        self.add_temp_regulation(template)
     }
 
     /// **(internal)** A utility method for adding regulations once they are parsed.
-    pub(super) fn add_regulation_temp(&mut self, regulation: RegulationTemp) -> Result<(), String> {
+    pub(crate) fn add_temp_regulation(&mut self, regulation: RegulationTemp) -> Result<(), String> {
         self.add_regulation(
             &regulation.regulator,
             &regulation.target,
@@ -67,7 +65,7 @@ impl TryFrom<&str> for RegulatoryGraph {
             .filter(|l| !l.is_empty() && !l.starts_with('#'))
             .collect();
 
-        RegulatoryGraph::from_regulation_strings(lines)
+        RegulatoryGraph::try_from_string_regulations(lines)
     }
 }
 
@@ -148,7 +146,7 @@ mod tests {
 
     #[test]
     fn test_regulatory_graph_from_regulation_list() {
-        let rg = RegulatoryGraph::from_regulation_strings(vec![
+        let rg = RegulatoryGraph::try_from_string_regulations(vec![
             "abc -> hello".to_string(),
             "hello -|? abc".to_string(),
             "numbers_123 -?? abc".to_string(),
@@ -164,10 +162,10 @@ mod tests {
             "hello".to_string(),
             "numbers_123".to_string(),
         ]);
-        rg.add_regulation_string("abc -> hello").unwrap();
-        rg.add_regulation_string("hello -|? abc").unwrap();
-        rg.add_regulation_string("numbers_123 -?? abc").unwrap();
-        rg.add_regulation_string("numbers_123 -? hello").unwrap();
+        rg.add_string_regulation("abc -> hello").unwrap();
+        rg.add_string_regulation("hello -|? abc").unwrap();
+        rg.add_string_regulation("numbers_123 -?? abc").unwrap();
+        rg.add_string_regulation("numbers_123 -? hello").unwrap();
         assert_eq!(make_rg(), rg);
     }
 
@@ -175,9 +173,9 @@ mod tests {
     fn test_regulatory_graph_invalid_regulations() {
         let mut rg = RegulatoryGraph::new(vec!["a".to_string(), "b".to_string()]);
 
-        assert!(rg.add_regulation_string(" a -> bb ").is_err());
-        assert!(rg.add_regulation_string(" aa -> b ").is_err());
-        rg.add_regulation_string(" a -> b ").unwrap();
-        assert!(rg.add_regulation_string(" a -| b ").is_err());
+        assert!(rg.add_string_regulation(" a -> bb ").is_err());
+        assert!(rg.add_string_regulation(" aa -> b ").is_err());
+        rg.add_string_regulation(" a -> b ").unwrap();
+        assert!(rg.add_string_regulation(" a -| b ").is_err());
     }
 }

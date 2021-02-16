@@ -18,7 +18,7 @@ impl FnUpdateTemp {
             Not(inner) => Not(inner.unknown_variables_to_parameters(rg)),
             Param(name, args) => Param(name, args),
             Var(name) => {
-                if rg.find_variable(&name) != None {
+                if rg.find_variable(&name).is_some() {
                     Var(name)
                 } else {
                     Param(name, Vec::new())
@@ -41,10 +41,8 @@ impl FnUpdateTemp {
             Var(_) => {}
             Const(_) => {}
             Param(name, args) => {
-                result.insert(Parameter {
-                    name: name.clone(),
-                    arity: u32::try_from(args.len()).unwrap(),
-                });
+                let arity = u32::try_from(args.len()).unwrap();
+                result.insert(Parameter::new(name, arity));
             }
         }
     }
@@ -54,52 +52,50 @@ impl FnUpdateTemp {
     /// Fail if some variable or parameter is used inconsistently with the way they appear in
     /// the network.
     pub fn into_fn_update(self, bn: &BooleanNetwork) -> Result<Box<FnUpdate>, String> {
-        return Ok(Box::new(match self {
+        Ok(Box::new(match self {
             Const(value) => FnUpdate::Const(value),
             Var(name) => FnUpdate::Var(Self::get_variable(bn, &name)?),
             Not(inner) => FnUpdate::Not(inner.into_fn_update(bn)?),
             Binary(op, l, r) => FnUpdate::Binary(op, l.into_fn_update(bn)?, r.into_fn_update(bn)?),
             Param(name, args) => {
                 let parameter_id = Self::get_parameter(bn, &name)?;
-                let parameter = bn.get_parameter(parameter_id);
-                if parameter.arity != u32::try_from(args.len()).unwrap() {
-                    return Err(format!(
-                        "'{}' has cardinality {} but is used with {} arguments.",
-                        name,
-                        parameter.arity,
-                        args.len()
-                    ));
-                }
+                Self::check_parameter_arity(&bn[parameter_id], &args)?;
                 let mut arguments = Vec::with_capacity(args.len());
                 for arg in args {
                     arguments.push(Self::get_variable(bn, &arg)?);
                 }
                 FnUpdate::Param(parameter_id, arguments)
             }
-        }));
+        }))
     }
 
     /// **(internal)** Utility method to safely obtain a variable id from a
     /// network with an appropriate error.
     fn get_variable(bn: &BooleanNetwork, name: &str) -> Result<VariableId, String> {
-        if let Some(var) = bn.graph.find_variable(name) {
-            Ok(var)
-        } else {
-            Err(format!(
-                "Can't create update function. Unknown variable '{}'.",
-                name
-            ))
-        }
+        bn.graph
+            .find_variable(name)
+            .ok_or_else(|| format!("Invalid update function. Unknown variable `{}`.", name))
     }
 
+    /// **(internal)** Utility method to safely obtain a parameter id from a
+    /// network with an appropriate error.
     fn get_parameter(bn: &BooleanNetwork, name: &str) -> Result<ParameterId, String> {
-        if let Some(par) = bn.find_parameter(name) {
-            Ok(par)
-        } else {
+        bn.find_parameter(name)
+            .ok_or_else(|| format!("Invalid update function. Unknown parameter `{}`.", name))
+    }
+
+    /// **(internal)** Generate an error message if the given `parameter` does not have
+    /// arity matching the given `args` list.
+    fn check_parameter_arity(parameter: &Parameter, args: &[String]) -> Result<(), String> {
+        if parameter.get_arity() != u32::try_from(args.len()).unwrap() {
             Err(format!(
-                "Can't create update function. Unknown parameter '{}'.",
-                name
+                "`{}` has arity {}, but is used with {} arguments.",
+                parameter.get_name(),
+                parameter.get_arity(),
+                args.len()
             ))
+        } else {
+            Ok(())
         }
     }
 }

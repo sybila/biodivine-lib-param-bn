@@ -175,7 +175,7 @@
 //! assert_eq!(rg, rg_2);
 //!
 //! // You can also use the arrow string representation to add new regulations:
-//! rg_2.add_regulation_string("A -?? C")?;
+//! rg_2.add_string_regulation("A -?? C")?;
 //! assert_ne!(rg, rg_2);
 //!
 //! // This representation corresponds to the default `Display` format:

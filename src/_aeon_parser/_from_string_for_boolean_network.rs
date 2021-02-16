@@ -50,7 +50,7 @@ impl TryFrom<&str> for BooleanNetwork {
         let mut rg = RegulatoryGraph::new(variable_names);
 
         for reg in regulations {
-            rg.add_regulation_temp(reg)?;
+            rg.add_temp_regulation(reg)?;
         }
 
         // Replace unknown variables with parameters
@@ -78,7 +78,7 @@ impl TryFrom<&str> for BooleanNetwork {
 
         // Actually build and add the functions
         for (name, function) in update_functions {
-            bn.add_update_function_template(&name, function)?;
+            bn.add_template_update_function(&name, function)?;
         }
 
         Ok(bn)
@@ -150,12 +150,12 @@ mod tests {
             "c".to_string(),
             "d".to_string(),
         ]);
-        rg.add_regulation_string("a -> b").unwrap();
-        rg.add_regulation_string("a -?? a").unwrap();
-        rg.add_regulation_string("b -|? c").unwrap();
-        rg.add_regulation_string("a ->? c").unwrap();
-        rg.add_regulation_string("c -? a").unwrap();
-        rg.add_regulation_string("c -| d").unwrap();
+        rg.add_string_regulation("a -> b").unwrap();
+        rg.add_string_regulation("a -?? a").unwrap();
+        rg.add_string_regulation("b -|? c").unwrap();
+        rg.add_string_regulation("a ->? c").unwrap();
+        rg.add_string_regulation("c -? a").unwrap();
+        rg.add_string_regulation("c -| d").unwrap();
 
         let parameters = vec![
             Parameter {

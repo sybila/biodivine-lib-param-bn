@@ -14,7 +14,9 @@ impl FnUpdate {
         match expression {
             BooleanExpression::Const(value) => FnUpdate::Const(value),
             BooleanExpression::Variable(name) => FnUpdate::Var(graph.find_variable(&name).unwrap()),
-            BooleanExpression::Not(inner) => FnUpdate::from_boolean_expression(*inner, graph).negation(),
+            BooleanExpression::Not(inner) => {
+                FnUpdate::from_boolean_expression(*inner, graph).negation()
+            }
             BooleanExpression::Or(l, r) => FnUpdate::from_boolean_expression(*l, graph)
                 .or(FnUpdate::from_boolean_expression(*r, graph)),
             BooleanExpression::And(l, r) => FnUpdate::from_boolean_expression(*l, graph)
