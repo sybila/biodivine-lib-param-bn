@@ -1,4 +1,4 @@
-name: continuous-tests
+name: build
 on: [push]
 jobs:
   # Run basic code validity check.
