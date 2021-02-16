@@ -154,7 +154,7 @@
 //! assert_eq!(2, bn[id_f].get_arity());
 //! bn.add_update_function_string("A", "C | f(A, B)")?;
 //!
-//! let params: Vec<ParameterId> = bn.get_update_function(id_a).as_ref().unwrap().parameters();
+//! let params: Vec<ParameterId> = bn.get_update_function(id_a).as_ref().unwrap().collect_parameters();
 //! assert_eq!(vec![id_f], params);
 //! # Ok::<(), String>(())
 //! ```

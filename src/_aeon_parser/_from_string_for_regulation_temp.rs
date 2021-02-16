@@ -1,31 +1,24 @@
-use crate::Monotonicity;
+use crate::Regulation;
 use crate::_aeon_parser::RegulationTemp;
-use regex::Regex;
 use std::convert::TryFrom;
 
 impl TryFrom<&str> for RegulationTemp {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let re = Regex::new(r"^\s*(?P<regulator>[a-zA-Z0-9_]+)\s*-(?P<monotonicity>[|>?])(?P<observable>\??)\s*(?P<target>[a-zA-Z0-9_]+)\s*$").unwrap();
-        return if let Some(captures) = re.captures(value) {
+        if let Some((r, m, o, t)) = Regulation::try_from_string(value) {
             Ok(RegulationTemp {
-                regulator: captures["regulator"].to_string(),
-                target: captures["target"].to_string(),
-                observable: captures["observable"].is_empty(),
-                monotonicity: match &captures["monotonicity"] {
-                    "?" => None,
-                    "|" => Some(Monotonicity::Inhibition),
-                    ">" => Some(Monotonicity::Activation),
-                    _ => unreachable!("Nothing else matches this group."),
-                },
+                regulator: r,
+                target: t,
+                observable: o,
+                monotonicity: m,
             })
         } else {
             Err(format!(
                 "String \"{}\" does not describe a regulation.",
                 value
             ))
-        };
+        }
     }
 }
 

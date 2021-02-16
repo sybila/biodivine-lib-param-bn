@@ -7,6 +7,7 @@ impl BooleanNetwork {
     /// Add a new `UpdateFunction` to the `BooleanNetwork`. All variables and parameters
     /// must be already present in the network. Furthermore, all parameters must be used
     /// with their correct cardinality.
+    /// TODO: Weird name.
     pub fn add_update_function_string(
         &mut self,
         variable: &str,

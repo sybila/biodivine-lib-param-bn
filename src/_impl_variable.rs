@@ -13,3 +13,17 @@ impl Variable {
         &self.name
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::RegulatoryGraph;
+
+    #[test]
+    fn basic_variable_test() {
+        let rg = RegulatoryGraph::new(vec!["A".to_string()]);
+        let a = rg.find_variable("A").unwrap();
+        let a = &rg[a];
+        assert_eq!("A", a.to_string().as_str());
+        assert_eq!("A", a.get_name());
+    }
+}

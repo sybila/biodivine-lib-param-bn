@@ -7,6 +7,8 @@ use std::convert::TryFrom;
 impl RegulatoryGraph {
     /// Create a `RegulatoryGraph` from a collection of regulation strings.
     ///
+    /// TODO: Give this a better name, or make it private.
+    ///
     /// The variables of the `RegulatoryGraph` are determined from the regulations
     /// and are ordered alphabetically. Otherwise, this is equivalent to iteratively
     /// calling `add_regulation_string`.
@@ -34,6 +36,8 @@ impl RegulatoryGraph {
 
     /// Add a new `Regulation` to this `RegulatoryGraph` where the regulation is
     /// given in its string representation (e.g. "v1 ->? v2").
+    ///
+    /// TODO: Better name would be add_regulation_from_string
     ///
     /// The `regulation` parameter must be a valid string representation of a regulation,
     /// plus all conditions of `add_regulation` must be satisfied as well.

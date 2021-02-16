@@ -42,7 +42,7 @@ impl SymbolicContext {
             state_variables.push(state_variable);
             if let Some(update_function) = network.get_update_function(variable) {
                 // For explicit function, go through all parameters used in the function.
-                for parameter in update_function.parameters() {
+                for parameter in update_function.collect_parameters() {
                     if explicit_function_tables[parameter.0].is_none() {
                         // Only compute if not already handled...
                         let parameter_function = &network[parameter];

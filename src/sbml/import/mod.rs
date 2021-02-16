@@ -22,6 +22,7 @@ mod _read_species;
 mod _read_transitions;
 
 impl BooleanNetwork {
+    // TODO: This should be named `try_from_sbml`.
     pub fn from_sbml(model_file: &str) -> Result<(BooleanNetwork, Layout), String> {
         BooleanNetwork::from_sbml_strict(model_file, &mut Vec::new())
     }

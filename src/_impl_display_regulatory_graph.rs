@@ -1,30 +1,12 @@
-use crate::Monotonicity::{Activation, Inhibition};
-use crate::{Regulation, RegulatoryGraph};
+use crate::RegulatoryGraph;
 use std::fmt::{Display, Error, Formatter};
 
 impl Display for RegulatoryGraph {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), Error> {
         for r in &self.regulations {
-            writeln!(
-                f,
-                "{} {} {}",
-                self.get_variable(r.regulator),
-                relationship_string(&r),
-                self.get_variable(r.target)
-            )?;
+            writeln!(f, "{}", r.to_string(self))?;
         }
         Ok(())
-    }
-}
-
-pub(crate) fn relationship_string(regulation: &Regulation) -> &str {
-    match (regulation.observable, regulation.monotonicity) {
-        (true, Some(Activation)) => "->",
-        (true, Some(Inhibition)) => "-|",
-        (true, None) => "-?",
-        (false, Some(Activation)) => "->?",
-        (false, Some(Inhibition)) => "-|?",
-        (false, None) => "-??",
     }
 }
 

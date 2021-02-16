@@ -3,6 +3,7 @@ use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
 use biodivine_lib_bdd::{Bdd, BddValuation, BddValuationIterator, BddVariableSet};
 
+// TODO: This probably should not be part of `BooleanNetwork` public API.
 impl BooleanNetwork {
     pub fn make_witness(
         &self,

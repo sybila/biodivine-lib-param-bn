@@ -29,7 +29,8 @@ path = "src/bin/dump_graph.rs"
 rustdoc-args = ["--html-in-header", "docs-head.html"]
 
 [dependencies]
-regex = "1.3.3"     # used when parsing text format
+regex = "1.3.3"                 # Regexes used for parsing of basic .aeon constructs.
+lazy_static = "1.4.0"           # Used for initialization of commonly used regexes.
 biodivine-lib-bdd = "0.2.1"
 roxmltree = "0.14.0"
 bitvector = "0.1.5"

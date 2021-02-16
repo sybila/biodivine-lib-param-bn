@@ -3,6 +3,7 @@ use crate::biodivine_std::structs::IdState;
 use crate::{BinaryOp, FnUpdate};
 use biodivine_lib_bdd::Bdd;
 
+/// TODO: This probably should not be public...
 impl FnUpdate {
     /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
     /// valuations for which this function evaluates to `true`.

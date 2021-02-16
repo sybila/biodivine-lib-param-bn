@@ -1,6 +1,6 @@
 use super::{Regulation, RegulatoryGraph, Variable, VariableId};
 use crate::biodivine_std::structs::build_index_map;
-use crate::{Monotonicity, VariableIdIterator};
+use crate::{Monotonicity, VariableIdIterator, ID_REGEX};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::Index;
@@ -23,6 +23,8 @@ impl RegulatoryGraph {
     }
 
     /// Add a new `Regulation` to this `RegulatoryGraph`.
+    ///
+    /// TODO: find_regulation uses IDs, this uses strings - we should make it consistent.
     ///
     /// Returns `Err` if `regulator` or `target` are not valid graph variables or when
     /// the regulation between the two variables already exists.
@@ -177,7 +179,7 @@ impl RegulatoryGraph {
     ///
     /// When sorting topologically incomparable components, we use component size as
     /// the secondary criterion. Also, note that the algorithm is not particularly efficient,
-    /// so it should be used with caution in large networks!
+    /// so it should be used on large networks with caution!
     pub fn components(&self) -> Vec<HashSet<VariableId>> {
         let mut components = Vec::new();
         let mut remaining: HashSet<VariableId> = self.variables().collect();
@@ -224,6 +226,11 @@ impl RegulatoryGraph {
 
     pub fn regulations(&self) -> std::slice::Iter<Regulation> {
         self.regulations.iter()
+    }
+
+    /// A static check that allows to verify validity of a variable name.
+    pub fn is_valid_name(name: &str) -> bool {
+        ID_REGEX.is_match(name)
     }
 }
 

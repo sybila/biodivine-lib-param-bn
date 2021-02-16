@@ -1,6 +1,6 @@
 use crate::{
     BooleanNetwork, FnUpdate, Parameter, ParameterId, ParameterIdIterator, RegulatoryGraph,
-    Variable, VariableId, VariableIdIterator,
+    Variable, VariableId, VariableIdIterator, ID_REGEX,
 };
 use std::collections::HashMap;
 use std::ops::Index;
@@ -25,10 +25,7 @@ impl BooleanNetwork {
         self.assert_no_such_parameter(name)?;
         let id = ParameterId(self.parameters.len());
         self.parameter_to_index.insert(name.to_string(), id);
-        self.parameters.push(Parameter {
-            name: name.to_string(),
-            arity,
-        });
+        self.parameters.push(Parameter::new(name, arity));
         Ok(id)
     }
 
@@ -44,7 +41,7 @@ impl BooleanNetwork {
         function: FnUpdate,
     ) -> Result<(), String> {
         self.assert_no_update_function(variable)?;
-        self.assert_arguments_are_valid(variable, function.arguments())?;
+        self.assert_arguments_are_valid(variable, function.collect_arguments())?;
         self.update_functions[variable.0] = Some(function);
         Ok(())
     }
@@ -180,6 +177,11 @@ impl BooleanNetwork {
     /// Return an iterator over all parameter ids of this network.
     pub fn parameters(&self) -> ParameterIdIterator {
         (0..self.parameters.len()).map(ParameterId)
+    }
+
+    /// A static check that allows to verify validity of a parameter or variable name.
+    pub fn is_valid_name(name: &str) -> bool {
+        ID_REGEX.is_match(name)
     }
 }
 

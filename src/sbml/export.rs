@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::io::{Error, Write};
 
 impl BooleanNetwork {
+    // TODO: This should accept `Layout` type and also have a variant with no layout.
     pub fn to_sbml(&self, layout: &HashMap<String, (f64, f64)>) -> String {
         let mut buffer: Vec<u8> = Vec::new();
         self.write_as_sbml(&mut buffer, layout)
@@ -10,6 +11,7 @@ impl BooleanNetwork {
         String::from_utf8(buffer).expect("Invalid UTF formatting in string.")
     }
 
+    // TODO: This is just weird / maybe keep it internal? Or at least swap layout and out.
     pub fn write_as_sbml(
         &self,
         out: &mut dyn Write,
