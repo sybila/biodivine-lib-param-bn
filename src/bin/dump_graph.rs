@@ -33,7 +33,7 @@ fn main() {
             let s: usize = s.into();
             let t: usize = t.into();
             let p = p.into_bdd();
-            if !p.is_false() {
+            if !(p.and(&all_colors)).is_false() {
                 println!("{} -> {}", s, t);
                 let mut first = true;
                 for (i, valuation) in valid_valuations.iter().enumerate() {
