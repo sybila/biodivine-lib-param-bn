@@ -11,10 +11,11 @@ impl BooleanNetwork {
     pub fn try_from_bnet(model_string: &str) -> Result<BooleanNetwork, String> {
         let mut model_map: HashMap<String, String> = HashMap::new();
         for line in model_string.lines() {
-            if line.trim().starts_with('#') || line.trim().is_empty() {
-                continue; // Skip comments and empty lines.
-            } else if line.trim().starts_with("targets,") {
-                continue; // Skip targets, factors header.
+            if line.trim().starts_with('#')
+                || line.trim().is_empty()
+                || line.trim().starts_with("targets,")
+            {
+                continue; // Skip comments, empty lines and header.
             } else {
                 let segments = line.split(',').collect::<Vec<_>>();
                 if segments.len() != 2 {

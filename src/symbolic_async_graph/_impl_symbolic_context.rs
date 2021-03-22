@@ -72,10 +72,8 @@ impl SymbolicContext {
             }
         }
 
-        let explicit_function_tables: Vec<FunctionTable> = explicit_function_tables
-            .into_iter()
-            .filter_map(|x| x)
-            .collect();
+        let explicit_function_tables: Vec<FunctionTable> =
+            explicit_function_tables.into_iter().flatten().collect();
 
         // Finally, collect all parameter BddVariables into one vector.
         let mut parameter_variables: Vec<BddVariable> = Vec::new();
@@ -84,11 +82,9 @@ impl SymbolicContext {
                 parameter_variables.push(*p);
             }
         }
-        for table in &implicit_function_tables {
-            if let Some(table) = table {
-                for p in &table.rows {
-                    parameter_variables.push(*p);
-                }
+        for table in implicit_function_tables.iter().flatten() {
+            for p in &table.rows {
+                parameter_variables.push(*p);
             }
         }
 

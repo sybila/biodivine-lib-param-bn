@@ -175,11 +175,7 @@ fn read_transition_term(term: Node, transition_id: &str) -> Result<SbmlTransitio
     }
 
     let math = read_unique_child(term, (MATHML, "math")).ok();
-    let math = if let Some(math) = math {
-        Some(read_mathml(math)?)
-    } else {
-        None
-    };
+    let math = Ok(math).and_then(|node| node.map(read_mathml).transpose())?;
 
     Ok(SbmlTransitionTerm {
         result_level: level.unwrap(),
