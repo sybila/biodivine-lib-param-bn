@@ -47,6 +47,26 @@ impl FnUpdateTemp {
         }
     }
 
+    /// Write all variables that appear in the function to the given set.
+    pub fn dump_variables(&self, result: &mut HashSet<String>) {
+        match self {
+            Binary(_, l, r) => {
+                l.dump_variables(result);
+                r.dump_variables(result)
+            }
+            Not(inner) => inner.dump_variables(result),
+            Var(name) => {
+                result.insert(name.clone());
+            }
+            Const(_) => {}
+            Param(_, args) => {
+                for arg in args {
+                    result.insert(arg.clone());
+                }
+            }
+        }
+    }
+
     /// Safely build an actual update function using the information from the given `BooleanNetwork`.
     ///
     /// Fail if some variable or parameter is used inconsistently with the way they appear in

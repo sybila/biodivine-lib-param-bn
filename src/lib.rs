@@ -26,6 +26,8 @@ pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
 mod _aeon_parser;
+/// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
+mod _bnet_parser;
 /// **(internal)** Utility methods for `BinaryOp`.
 mod _impl_binary_op;
 /// **(internal)** Utility methods for `BooleanNetwork`.
