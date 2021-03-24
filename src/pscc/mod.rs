@@ -18,6 +18,7 @@ use rayon::prelude::*;
 use std::io;
 use std::io::Write;
 use std::ops::Shl;
+use std::sync::atomic::{AtomicU32, Ordering};
 
 // higher = more verbose
 const LOG_LEVEL: usize = 3;
@@ -648,7 +649,7 @@ pub fn trim(context: &PsccContext, universe: ColorVertexSet) -> ColorVertexSet {
     return result;
 }
 
-pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
+pub fn decomposition(context: &PsccContext, universe: ColorVertexSet, iterations: &AtomicU32) {
     if universe.is_empty() {
         return;
     }
@@ -722,8 +723,10 @@ pub fn decomposition(context: &PsccContext, universe: ColorVertexSet) {
         .intersect_colors(&f_lock)
         .union(&b.intersect_colors(&b_lock));
 
+    iterations.fetch_add(1, Ordering::SeqCst);
+
     rayon::join(
-        || decomposition(context, universe.minus(&converged)),
-        || decomposition(context, converged.minus(&scc)),
+        || decomposition(context, universe.minus(&converged), iterations),
+        || decomposition(context, converged.minus(&scc), iterations),
     );
 }

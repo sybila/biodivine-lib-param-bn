@@ -11,7 +11,7 @@ rustdoc-args = ["--html-in-header", "docs-head.html"]
 [dependencies]
 regex = "1.3.3"     # used when parsing text format
 xml-rs = "0.8.0"    # facilitates sbml parsing
-biodivine-lib-bdd = { git = "https://github.com/sybila/biodivine-lib-bdd.git" }
+biodivine-lib-bdd = { git = "https://github.com/sybila/biodivine-lib-bdd.git", rev = "2144aa9d93c48dbd8a8f6588b93b097dbfbdc614" }
 biodivine-lib-std = { git = "https://github.com/sybila/biodivine-lib-std.git" }
 rayon = "1.3.0"
 
