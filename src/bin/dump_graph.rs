@@ -20,8 +20,8 @@ fn main() {
 
     // Compute all actually valid valuations
     eprintln!("Graph loaded...");
-    eprintln!("Vertices: {}", graph.num_states());
-    eprintln!("Colors: {}", all_colors.cardinality());
+    println!("Vertices: {}", graph.num_states());
+    println!("Colors: {}", all_colors.cardinality());
     let p_num_vars = encoder.bdd_variables.num_vars();
     let valid_valuations: Vec<BddValuation> = BddValuationIterator::new(p_num_vars)
         .filter(|v| all_colors.eval_in(v))
