@@ -34,7 +34,8 @@ impl BooleanNetwork {
             }
         }
 
-        let variables = model_map.keys().cloned().collect::<Vec<_>>();
+        let mut variables = model_map.keys().cloned().collect::<Vec<_>>();
+        variables.sort();
         let mut graph = RegulatoryGraph::new(variables);
 
         // First, build graph.
