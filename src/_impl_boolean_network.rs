@@ -46,6 +46,22 @@ impl BooleanNetwork {
         Ok(())
     }
 
+    /// Allows to directly replace (or remove) the update function.
+    ///
+    /// The function will replace existing function (if any), but it still needs to satisfy
+    /// the declared regulations.
+    pub fn set_update_function(
+        &mut self,
+        variable: VariableId,
+        function: Option<FnUpdate>,
+    ) -> Result<(), String> {
+        if let Some(function) = function.as_ref() {
+            self.assert_arguments_are_valid(variable, function.collect_arguments())?;
+        }
+        self.update_functions[variable.0] = function;
+        Ok(())
+    }
+
     /// **(internal)** Utility method to ensure that a parameter is also not a variable.
     fn assert_no_such_variable(&self, name: &str) -> Result<(), String> {
         if self.graph.find_variable(name) == None {
