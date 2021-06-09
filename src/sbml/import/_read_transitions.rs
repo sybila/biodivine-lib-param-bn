@@ -9,6 +9,7 @@ pub struct SbmlTransitionInput {
     pub qual_species: String,
     pub transition_effect: Option<String>,
     pub sign: Option<String>,
+    pub essential: Option<bool>,
 }
 
 /// Maps almost directly to the SBML transition output tag.
@@ -121,6 +122,8 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransit
     let effect = input.attribute((SBML_QUAL, "transitionEffect"));
     let sign = input.attribute((SBML_QUAL, "sign"));
     let id = input.attribute((SBML_QUAL, "id"));
+    // WARNING: This attribute is not a part of the SBML-qual specification!
+    let essential = input.attribute((SBML_QUAL, "essential"));
     if species.is_none() {
         return Err(format!(
             "Transition {} is missing an input species.",
@@ -133,6 +136,7 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransit
         qual_species: species.unwrap().to_string(),
         transition_effect: effect.map(|s| s.to_string()),
         sign: sign.map(|s| s.to_string()),
+        essential: essential.map(|s| s == "true"),
     })
 }
 

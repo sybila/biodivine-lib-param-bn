@@ -272,21 +272,25 @@ fn create_regulations(
                 ));
             }
 
-            // We enable observability for empty functions because this typically means
-            // it was created as a completely unspecified free function, so it makes sense
-            // the inputs are observable.
-            let is_observable = transition.function_terms.iter().any(|t| {
-                t.math
-                    .as_ref()
-                    .map(|m| {
-                        m.contains_identifier(in_specie)
-                            || in_id
-                                .as_ref()
-                                .map(|id| m.contains_identifier(id))
-                                .unwrap_or(false)
-                    })
-                    .unwrap_or(false)
-            }) || transition.function_terms.is_empty();
+            let is_observable = if let Some(essential) = input.essential {
+                essential
+            } else {
+                // We enable observability for empty functions because this typically means
+                // it was created as a completely unspecified free function, so it makes sense
+                // the inputs are observable.
+                transition.function_terms.iter().any(|t| {
+                    t.math
+                        .as_ref()
+                        .map(|m| {
+                            m.contains_identifier(in_specie)
+                                || in_id
+                                    .as_ref()
+                                    .map(|id| m.contains_identifier(id))
+                                    .unwrap_or(false)
+                        })
+                        .unwrap_or(false)
+                }) || transition.function_terms.is_empty()
+            };
 
             let monotonicity = input.sign.as_ref().and_then(|sign| {
                 if sign == "positive" {
