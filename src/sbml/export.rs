@@ -71,16 +71,19 @@ impl BooleanNetwork {
             write!(out, "</qual:listOfOutputs>")?;
             if let Some(update_function) = self.get_update_function(id) {
                 write!(out, "<qual:listOfFunctionTerms>")?;
-                // set default value to 0
-                write!(
-                    out,
-                    "<qual:defaultTerm qual:resultLevel=\"0\"></qual:defaultTerm>"
-                )?;
-                write!(out, "<qual:functionTerm qual:resultLevel=\"1\">")?;
-                write!(out, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
-                self.write_update_function(out, update_function)?;
-                write!(out, "</math>")?;
-                write!(out, "</qual:functionTerm>")?;
+                if let FnUpdate::Const(value) = update_function {
+                    // Constants are encoded into the default term:
+                    let value = if *value { "1" } else { "0" };
+                    write!(out, "<qual:defaultTerm qual:resultLevel=\"{}\"/>", value)?;
+                } else {
+                    // set default value to 0
+                    write!(out, "<qual:defaultTerm qual:resultLevel=\"0\"/>")?;
+                    write!(out, "<qual:functionTerm qual:resultLevel=\"1\">")?;
+                    write!(out, "<math xmlns=\"http://www.w3.org/1998/Math/MathML\">")?;
+                    self.write_update_function(out, update_function)?;
+                    write!(out, "</math>")?;
+                    write!(out, "</qual:functionTerm>")?;
+                }
                 write!(out, "</qual:listOfFunctionTerms>")?;
             }
             write!(out, "</qual:transition>")?;
