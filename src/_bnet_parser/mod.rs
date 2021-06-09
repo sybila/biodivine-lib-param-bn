@@ -10,6 +10,7 @@ impl BooleanNetwork {
     /// unsupported `bnet` models.
     pub fn try_from_bnet(model_string: &str) -> Result<BooleanNetwork, String> {
         let mut model_map: HashMap<String, String> = HashMap::new();
+        let mut variables = HashSet::new();
         for line in model_string.lines() {
             if line.trim().starts_with('#')
                 || line.trim().is_empty()
@@ -22,19 +23,25 @@ impl BooleanNetwork {
                     return Err(format!("Unexpected line: `{}`", line));
                 }
 
-                let variable_name = segments[0].trim();
-                if model_map.contains_key(&variable_name.to_string()) {
+                let variable_name = segments[0].trim().to_string();
+                if model_map.contains_key(&variable_name) {
                     return Err(format!(
                         "Duplicate function declaration for `{}`.",
                         variable_name
                     ));
                 }
 
-                model_map.insert(variable_name.to_string(), segments[1].trim().to_string());
+                // Also scan regulators for variable names, as inputs don't need to have a function.
+                variables.insert(variable_name.clone());
+                let function_string = segments[1].trim().to_string();
+                let function_template = FnUpdateTemp::try_from(function_string.as_str())?;
+                function_template.dump_variables(&mut variables);
+
+                model_map.insert(variable_name, function_string);
             }
         }
 
-        let mut variables = model_map.keys().cloned().collect::<Vec<_>>();
+        let mut variables = variables.into_iter().collect::<Vec<_>>();
         variables.sort();
         let mut graph = RegulatoryGraph::new(variables);
 

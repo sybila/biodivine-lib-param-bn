@@ -28,6 +28,8 @@ pub mod tutorial;
 mod _aeon_parser;
 /// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
 mod _bnet_parser;
+/// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
+mod _bnet_writer;
 /// **(internal)** Utility methods for `BinaryOp`.
 mod _impl_binary_op;
 /// **(internal)** Utility methods for `BooleanNetwork`.
