@@ -190,7 +190,7 @@ impl Index<VariableId> for BooleanNetwork {
     type Output = Variable;
 
     fn index(&self, index: VariableId) -> &Self::Output {
-        return &self.graph.get_variable(index);
+        self.graph.get_variable(index)
     }
 }
 

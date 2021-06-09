@@ -161,7 +161,7 @@ impl Iterator for InputStatesPairIterator {
     type Item = (IdState, IdState);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(next_index) = self.range.next() {
+        for next_index in &mut self.range {
             if next_index & self.mask != 0 {
                 continue;
             } else {

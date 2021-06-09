@@ -237,7 +237,7 @@ impl Index<VariableId> for RegulatoryGraph {
     type Output = Variable;
 
     fn index(&self, index: VariableId) -> &Self::Output {
-        return &self.get_variable(index);
+        self.get_variable(index)
     }
 }
 

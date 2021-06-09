@@ -89,7 +89,7 @@ impl BooleanNetwork {
                 let function_expression = function_bdd.to_boolean_expression(&function_input_vars);
                 result.update_functions[i_var] = Some(*Self::expression_to_fn_update(
                     &function_expression,
-                    &regulators,
+                    regulators,
                 ));
             }
         }

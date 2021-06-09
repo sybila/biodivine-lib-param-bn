@@ -38,7 +38,7 @@ impl SymbolicContext {
 
         for variable in network.variables() {
             let variable_name = network[variable].get_name();
-            let state_variable = builder.make_variable(&variable_name);
+            let state_variable = builder.make_variable(variable_name);
             state_variables.push(state_variable);
             if let Some(update_function) = network.get_update_function(variable) {
                 // For explicit function, go through all parameters used in the function.
