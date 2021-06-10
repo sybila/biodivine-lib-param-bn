@@ -43,19 +43,23 @@ impl BooleanNetwork {
 
         let mut variables = variables.into_iter().collect::<Vec<_>>();
         variables.sort();
-        let mut graph = RegulatoryGraph::new(variables);
+        let mut graph = RegulatoryGraph::new(variables.clone());
 
         // First, build graph.
-        for (variable, function) in model_map.iter() {
-            // TODO: This is quite far from correct.
-            // Boolean functions in `bnet` can use other special symbols, but are "essentially"
-            // the same in terms of basic logical operators. So unless the function is using
-            // something special, this should work.
-            let function_template = FnUpdateTemp::try_from(function.as_str())?;
-            let mut regulators = HashSet::new();
-            function_template.dump_variables(&mut regulators);
-            for regulator in regulators {
-                graph.add_regulation(regulator.as_str(), variable.as_str(), true, None)?;
+        for variable in &variables {
+            if let Some(function) = model_map.get(variable) {
+                // TODO: This is quite far from correct.
+                // Boolean functions in `bnet` can use other special symbols, but are "essentially"
+                // the same in terms of basic logical operators. So unless the function is using
+                // something special, this should work.
+                let function_template = FnUpdateTemp::try_from(function.as_str())?;
+                let mut regulators = HashSet::new();
+                function_template.dump_variables(&mut regulators);
+                let mut regulators = regulators.iter().collect::<Vec<_>>();
+                regulators.sort();
+                for regulator in regulators {
+                    graph.add_regulation(regulator.as_str(), variable.as_str(), true, None)?;
+                }
             }
         }
 
