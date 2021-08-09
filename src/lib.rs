@@ -17,6 +17,8 @@ use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::Range;
 
+pub mod decomposition;
+
 pub mod async_graph;
 pub mod bdd_params;
 pub mod biodivine_std;
