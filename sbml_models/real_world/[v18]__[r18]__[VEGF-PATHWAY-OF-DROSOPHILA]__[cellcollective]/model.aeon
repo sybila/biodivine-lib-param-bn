@@ -1,0 +1,28 @@
+Raf -> Dsor1
+Pnt -> Targets
+Aop -| Targets
+Rl -> Pnt
+Pvf1 -> Pvr
+Pvf2 -> Pvr
+Pvf3 -> Pvr
+Ras -> Raf
+Ksr -> Raf
+CNK -> Raf
+Src42 -> Raf
+Rl -| Aop
+msk -> Rl
+Dsor1 -> Rl
+Drk -> Sos
+Pvr -> Drk
+Sos -> Ras
+Sty -| Ras
+$Aop: !Rl
+$Drk: Pvr
+$Dsor1: Raf
+$Pnt: Rl
+$Pvr: ((Pvf1 | Pvf2) | Pvf3)
+$Raf: (Ras & ((Ksr & CNK) & Src42))
+$Ras: (Sos & !Sty)
+$Rl: (Dsor1 & msk)
+$Sos: Drk
+$Targets: (Pnt & !Aop)

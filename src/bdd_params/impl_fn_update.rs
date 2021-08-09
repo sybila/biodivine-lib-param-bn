@@ -1,23 +1,21 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
+use crate::biodivine_std::structs::IdState;
 use crate::{BinaryOp, FnUpdate};
 use biodivine_lib_bdd::Bdd;
-use biodivine_lib_std::IdState;
 
 impl FnUpdate {
-    /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
+    /// **(internal)** Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
     /// valuations for which this function evaluates to `true`.
-    pub fn symbolic_eval_true(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
-        return BddParams(self._symbolic_eval(state, encoder));
+    pub(crate) fn symbolic_eval_true(
+        &self,
+        state: IdState,
+        encoder: &BddParameterEncoder,
+    ) -> BddParams {
+        BddParams(self._symbolic_eval(state, encoder))
     }
 
-    /// Evaluate this `FnUpdate` into symbolic `BddParams` that represent all parameter
-    /// valuations for which this function evaluates to `false`.
-    pub fn symbolic_eval_false(&self, state: IdState, encoder: &BddParameterEncoder) -> BddParams {
-        return BddParams(self._symbolic_eval(state, encoder).not());
-    }
-
-    pub(crate) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
-        return match self {
+    pub(super) fn _symbolic_eval(&self, state: IdState, encoder: &BddParameterEncoder) -> Bdd {
+        match self {
             FnUpdate::Const(value) => {
                 if *value {
                     encoder.bdd_variables.mk_true()
@@ -48,6 +46,6 @@ impl FnUpdate {
                     BinaryOp::Iff => l.iff(&r),
                 }
             }
-        };
+        }
     }
 }

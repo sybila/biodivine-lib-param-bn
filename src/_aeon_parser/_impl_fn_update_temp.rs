@@ -1,0 +1,166 @@
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::_aeon_parser::FnUpdateTemp::*;
+use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
+use std::collections::HashSet;
+use std::convert::TryFrom;
+
+impl FnUpdateTemp {
+    /// Replace all variables that are not valid in the given `RegulatoryGraph` with
+    /// unary parameters.
+    pub fn unknown_variables_to_parameters(self, rg: &RegulatoryGraph) -> Box<FnUpdateTemp> {
+        Box::new(match self {
+            Const(value) => Const(value),
+            Binary(op, l, r) => Binary(
+                op,
+                l.unknown_variables_to_parameters(rg),
+                r.unknown_variables_to_parameters(rg),
+            ),
+            Not(inner) => Not(inner.unknown_variables_to_parameters(rg)),
+            Param(name, args) => Param(name, args),
+            Var(name) => {
+                if rg.find_variable(&name).is_some() {
+                    Var(name)
+                } else {
+                    Param(name, Vec::new())
+                }
+            }
+        })
+    }
+
+    /// Write all parameters that appear in this function into a given set.
+    ///
+    /// Note that if there are parameters with the same name but different cardinality,
+    /// both will appear in the set because the instances are not equivalent.
+    pub fn dump_parameters(&self, result: &mut HashSet<Parameter>) {
+        match self {
+            Binary(_, l, r) => {
+                l.dump_parameters(result);
+                r.dump_parameters(result)
+            }
+            Not(inner) => inner.dump_parameters(result),
+            Var(_) => {}
+            Const(_) => {}
+            Param(name, args) => {
+                let arity = u32::try_from(args.len()).unwrap();
+                result.insert(Parameter::new(name, arity));
+            }
+        }
+    }
+
+    /// Write all variables that appear in the function to the given set.
+    pub fn dump_variables(&self, result: &mut HashSet<String>) {
+        match self {
+            Binary(_, l, r) => {
+                l.dump_variables(result);
+                r.dump_variables(result)
+            }
+            Not(inner) => inner.dump_variables(result),
+            Var(name) => {
+                result.insert(name.clone());
+            }
+            Const(_) => {}
+            Param(_, args) => {
+                for arg in args {
+                    result.insert(arg.clone());
+                }
+            }
+        }
+    }
+
+    /// Safely build an actual update function using the information from the given `BooleanNetwork`.
+    ///
+    /// Fail if some variable or parameter is used inconsistently with the way they appear in
+    /// the network.
+    pub fn into_fn_update(self, bn: &BooleanNetwork) -> Result<Box<FnUpdate>, String> {
+        Ok(Box::new(match self {
+            Const(value) => FnUpdate::Const(value),
+            Var(name) => FnUpdate::Var(Self::get_variable(bn, &name)?),
+            Not(inner) => FnUpdate::Not(inner.into_fn_update(bn)?),
+            Binary(op, l, r) => FnUpdate::Binary(op, l.into_fn_update(bn)?, r.into_fn_update(bn)?),
+            Param(name, args) => {
+                let parameter_id = Self::get_parameter(bn, &name)?;
+                Self::check_parameter_arity(&bn[parameter_id], &args)?;
+                let mut arguments = Vec::with_capacity(args.len());
+                for arg in args {
+                    arguments.push(Self::get_variable(bn, &arg)?);
+                }
+                FnUpdate::Param(parameter_id, arguments)
+            }
+        }))
+    }
+
+    /// **(internal)** Utility method to safely obtain a variable id from a
+    /// network with an appropriate error.
+    fn get_variable(bn: &BooleanNetwork, name: &str) -> Result<VariableId, String> {
+        bn.graph
+            .find_variable(name)
+            .ok_or_else(|| format!("Invalid update function. Unknown variable `{}`.", name))
+    }
+
+    /// **(internal)** Utility method to safely obtain a parameter id from a
+    /// network with an appropriate error.
+    fn get_parameter(bn: &BooleanNetwork, name: &str) -> Result<ParameterId, String> {
+        bn.find_parameter(name)
+            .ok_or_else(|| format!("Invalid update function. Unknown parameter `{}`.", name))
+    }
+
+    /// **(internal)** Generate an error message if the given `parameter` does not have
+    /// arity matching the given `args` list.
+    fn check_parameter_arity(parameter: &Parameter, args: &[String]) -> Result<(), String> {
+        if parameter.get_arity() != u32::try_from(args.len()).unwrap() {
+            Err(format!(
+                "`{}` has arity {}, but is used with {} arguments.",
+                parameter.get_name(),
+                parameter.get_arity(),
+                args.len()
+            ))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::_aeon_parser::FnUpdateTemp;
+    use crate::{Parameter, RegulatoryGraph};
+    use std::collections::HashSet;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_unknown_variables_to_parameters() {
+        let rg = RegulatoryGraph::new(vec![
+            "abc".to_string(),
+            "as123".to_string(),
+            "hello".to_string(),
+        ]);
+        let function = FnUpdateTemp::try_from("f & (!abc | as123_param => p(abc, hello))").unwrap();
+        let expected =
+            FnUpdateTemp::try_from("f() & (!abc | as123_param() => p(abc, hello))").unwrap();
+
+        assert_eq!(expected, *function.unknown_variables_to_parameters(&rg));
+    }
+
+    #[test]
+    fn test_dump_parameters() {
+        let function =
+            FnUpdateTemp::try_from("f() & !var1 => ((par(a, b, c) | g) <=> q(a))").unwrap();
+        let mut params = HashSet::new();
+        function.dump_parameters(&mut params);
+        let mut expected = HashSet::new();
+        expected.insert(Parameter {
+            name: "f".to_string(),
+            arity: 0,
+        });
+        expected.insert(Parameter {
+            name: "par".to_string(),
+            arity: 3,
+        });
+        expected.insert(Parameter {
+            name: "q".to_string(),
+            arity: 1,
+        });
+
+        assert_eq!(expected, params);
+    }
+}

@@ -1,0 +1,43 @@
+Fu -| Cos
+Smo -> Cos
+Ptc -| Smo
+Gprk2 -> Smo
+Tow -> Smo
+Hh -| Ptc
+Fu -| SuFu
+Ci_act -> Targets
+Ci_rep -| Targets
+Boi -> Hh
+Shf -> Hh
+Disp -> Hh
+iHog -> Hh
+Dlp -> Hh
+Dally -> Hh
+Lipophorin -> Hh
+Rasp -> Hh
+Ttv -> Dally
+Ttv -> Dlp
+Smo -> Fu
+SuFu -> Ci_act
+CK1a -> Ci_act
+Slmb -> Ci_act
+Pka -> Ci_act
+Cos -| Ci_act
+Sgg -> Ci_act
+SuFu -> Ci_rep
+CK1a -> Ci_rep
+Slmb -> Ci_rep
+Pka -> Ci_rep
+Cos -> Ci_rep
+Sgg -> Ci_rep
+$Ci_act: !((Cos & (SuFu & Slmb)) & ((CK1a | Pka) | Sgg))
+$Ci_rep: (CK1a & ((((SuFu & Slmb) & Pka) & Cos) & Sgg))
+$Cos: !(Fu & Smo)
+$Dally: Ttv
+$Dlp: Ttv
+$Fu: Smo
+$Hh: (iHog & ((((((Boi & Shf) & Disp) & Dlp) & Dally) & Lipophorin) & Rasp))
+$Ptc: !Hh
+$Smo: (Gprk2 & !(Ptc & Tow))
+$SuFu: !Fu
+$Targets: (Ci_act & !Ci_rep)

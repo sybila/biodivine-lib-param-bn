@@ -1,0 +1,32 @@
+R -| M
+C -> M
+Rm -| M
+Le -> Lm
+Lem -> Lm
+P -> Lm
+Ge -| Lm
+L -> Am
+Lm -> Am
+Le -> L
+P -> L
+Ge -| L
+L -> A
+B -> A
+M -> B
+M -> P
+Am -| Rm
+R -> Rm
+A -| Rm
+Am -| R
+A -| R
+Ge -| C
+$A: (L & B)
+$Am: (Lm | L)
+$B: M
+$C: !Ge
+$L: ((Le & P) & !Ge)
+$Lm: ((Le & !Ge) | ((Lem & P) & !Ge))
+$M: (C & !(Rm | R))
+$P: M
+$R: !(A | Am)
+$Rm: (R | !((Am | R) | A))

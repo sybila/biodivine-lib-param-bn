@@ -1,0 +1,112 @@
+PTEN -| PIP3
+PI3K -> PIP3
+PIP2 -> PIP3
+GF -> GFR
+IAP -| Cas7
+Cas8 -> Cas7
+APC -> Cas7
+p53 -> PTEN
+TNF -> TNFR2
+GFR -> PIP2
+p53 -> Apaf1
+RIP -> TRAF2
+TNFR2 -> TRAF2
+TRADD -> TRAF
+TNF -> TNFR1
+RIP -> MEKK1
+AKT -> IKK
+NIK -> IKK
+A20 -| IKK
+TNFR1 -> TRADD
+TRAF -> cFLIP
+BID -> Mito
+BclX -| Mito
+IKK -| IkB
+NFkB -> IkB
+TRADD -> RIP
+JNKK -> JNK
+TRAF2 -> NIK
+Cas3 -> DNADamageEvent
+AKT -| JNKK
+MEKK1 -> JNKK
+IkB -| NFkB
+PIP3 -> AKT
+NFkB -> BclX
+BAD -| BclX
+p53 -| BclX
+NFkB -> A20
+IAP -| Cas3
+Cas8 -> Cas3
+Cas6 -> Cas3
+APC -> Cas3
+cFLIP -| Cas8
+FADD -> Cas8
+Cas6 -> Cas8
+DNADamageEvent -> Apoptosis
+Cas3 -> Cas6
+IAP -| Cas6
+Mdm2 -| p53
+DNADamageEvent -> p53
+JNK -> p53
+GFR -> PI3K
+AKT -| BAD
+p53 -> BAD
+Cas9 -> APC
+IAP -| APC
+Mito -> APC
+Apaf1 -> APC
+AKT -> Mdm2
+p53 -> Mdm2
+Cas7 -> Cas12
+Cas3 -| IAP
+NFkB -> IAP
+Mito -| IAP
+Cas6 -> IAP
+AKT -| Cas9
+Cas3 -> Cas9
+IAP -| Cas9
+Cas12 -> Cas9
+p53 -> BID
+Cas8 -> BID
+JNK -> BID
+BclX -| BID
+TRADD -> FADD
+$A20: NFkB
+$AKT: PIP3
+$APC: ((Cas9 & (Mito & Apaf1)) & !IAP)
+$Apaf1: p53
+$Apoptosis: DNADamageEvent
+$BAD: (p53 & !AKT)
+$BID: (((JNK & p53) & !BclX) | ((Cas8 & p53) & !BclX))
+$BclX: (NFkB & !(p53 | BAD))
+$Cas12: Cas7
+$Cas3: (((APC & !IAP) | (Cas6 & !IAP)) | (Cas8 & !IAP))
+$Cas6: (Cas3 & !IAP)
+$Cas7: ((Cas8 & !IAP) | (APC & !IAP))
+$Cas8: ((FADD & !cFLIP) | (Cas6 & !cFLIP))
+$Cas9: ((Cas12 & !(AKT | IAP)) | (Cas3 & !(AKT | IAP)))
+$DNADamageEvent: Cas3
+$FADD: TRADD
+$GFR: GF
+$IAP: (NFkB & !((Cas3 & Cas6) | Mito))
+$IKK: ((NIK & !A20) | (AKT & !A20))
+$IkB: (NFkB & !IKK)
+$JNK: JNKK
+$JNKK: (MEKK1 & !AKT)
+$MEKK1: RIP
+$Mdm2: (p53 | AKT)
+$Mito: (BID & !BclX)
+$NFkB: !IkB
+$NIK: TRAF2
+$PI3K: GFR
+$PIP2: GFR
+$PIP3: ((PI3K & PIP2) & !PTEN)
+$PTEN: p53
+$RIP: TRADD
+$TNFR1: TNF
+$TNFR2: TNF
+$TRADD: TNFR1
+$TRAF: TRADD
+$TRAF2: (TNFR2 | RIP)
+$cFLIP: TRAF
+$p53: ((DNADamageEvent & !Mdm2) | (JNK & !Mdm2))

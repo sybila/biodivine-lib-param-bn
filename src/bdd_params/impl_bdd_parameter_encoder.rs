@@ -1,44 +1,78 @@
 use super::BddParameterEncoder;
-use crate::bdd_params::BddParams;
+use crate::bdd_params::{BddParams, FunctionTableEntry};
+use crate::biodivine_std::structs::IdState;
 use crate::{BooleanNetwork, ParameterId, VariableId};
 use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
-use biodivine_lib_std::IdState;
+
+const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
 
 impl BddParameterEncoder {
     /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`.
     pub fn new(bn: &BooleanNetwork) -> BddParameterEncoder {
-        let mut bdd = BddVariableSetBuilder::new();
-        let mut explicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
-        let mut implicit_function_tables: Vec<Vec<BddVariable>> = Vec::new();
-        let mut regulators: Vec<Vec<VariableId>> = Vec::new();
+        if bn.graph.num_vars() > MAX_VARIABLES {
+            panic!(
+                "Only up to {} variables supported by this parameter encoder.",
+                MAX_VARIABLES
+            );
+        }
+        let bdd = BddVariableSetBuilder::new();
+        Self::new_with_custom_variables(bn, bdd)
+    }
 
-        // First, create variables for all the explicit parameters:
-        for pid in bn.parameter_ids() {
-            let p = bn.get_parameter(pid);
+    /// Create a new `BddParameterEncoder` based on information given in a `BooleanNetwork`
+    /// and with variables already provided via `BddVariableSetBuilder`.
+    pub fn new_with_custom_variables(
+        bn: &BooleanNetwork,
+        mut bdd: BddVariableSetBuilder,
+    ) -> BddParameterEncoder {
+        BddParameterEncoder {
+            regulators: Self::build_regulators_table(bn),
+            explicit_function_tables: Self::build_explicit_function_table(bn, &mut bdd),
+            implicit_function_tables: Self::build_implicit_function_table(bn, &mut bdd),
+            bdd_variables: bdd.build(),
+        }
+    }
+
+    /*
+        These utility functions should probably have some separate module, like static constraint computation,
+        but right now this is good enough...
+    */
+
+    pub(crate) fn build_explicit_function_table(
+        network: &BooleanNetwork,
+        bdd: &mut BddVariableSetBuilder,
+    ) -> Vec<Vec<BddVariable>> {
+        let mut table = Vec::new();
+        for pid in network.parameters() {
+            let p = network.get_parameter(pid);
             // Here, we abuse BddValuationIterator to go over all possible valuations
             // of function inputs.
 
-            let p_vars = BddValuationIterator::new(p.cardinality as u16)
+            let p_vars = BddValuationIterator::new(p.arity as u16)
                 .map(|valuation| {
                     let bdd_name = format!("{}{}", p.name, valuation);
                     bdd.make_variable(&bdd_name)
                 })
                 .collect();
 
-            explicit_function_tables.push(p_vars);
+            table.push(p_vars);
         }
+        table
+    }
 
-        // Then create values for anonymous parameters:
-        for vid in bn.graph.variable_ids() {
-            let v = bn.graph.get_variable(vid);
+    pub(crate) fn build_implicit_function_table(
+        network: &BooleanNetwork,
+        bdd: &mut BddVariableSetBuilder,
+    ) -> Vec<Vec<BddVariable>> {
+        let mut table = Vec::new();
+        for vid in network.graph.variables() {
+            let v = network.graph.get_variable(vid);
 
-            if let Some(_) = bn.get_update_function(vid) {
-                regulators.push(Vec::new());
-                implicit_function_tables.push(Vec::new());
+            if network.get_update_function(vid).is_some() {
+                table.push(Vec::new());
             } else {
-                let args = bn.graph.regulators(vid);
+                let args = network.graph.regulators(vid);
                 let cardinality = args.len();
-                regulators.push(args);
 
                 // Note that if args are empty, one variable is still created because there is
                 // an "empty" valuation.
@@ -49,16 +83,46 @@ impl BddParameterEncoder {
                     })
                     .collect();
 
-                implicit_function_tables.push(p_vars);
+                table.push(p_vars);
             }
         }
+        table
+    }
 
-        return BddParameterEncoder {
-            bdd_variables: bdd.build(),
-            regulators,
-            explicit_function_tables,
-            implicit_function_tables,
-        };
+    pub(crate) fn build_regulators_table(network: &BooleanNetwork) -> Vec<Vec<VariableId>> {
+        let mut table = Vec::new();
+        for vid in network.graph.variables() {
+            if network.get_update_function(vid).is_some() {
+                table.push(Vec::new());
+            } else {
+                let args = network.graph.regulators(vid);
+                table.push(args);
+            }
+        }
+        table
+    }
+
+    /// A vector of entries in the table of a specific function.
+    pub fn implicit_function_table(&self, target: VariableId) -> Vec<FunctionTableEntry> {
+        let regulators = &self.regulators[target.0];
+        let table = &self.implicit_function_tables[target.0];
+        (0..table.len())
+            .map(|i| FunctionTableEntry {
+                table: target.0,
+                entry_index: i,
+                regulators,
+            })
+            .collect()
+    }
+
+    /// Get teh parameters which correspond to a specific table entry being one.
+    pub fn get_implicit_for_table(&self, entry: &FunctionTableEntry) -> BddParams {
+        let var = self.implicit_function_tables[entry.table][entry.entry_index];
+        BddParams(self.bdd_variables.mk_var(var))
+    }
+
+    pub fn get_implicit_var_for_table(&self, entry: &FunctionTableEntry) -> BddVariable {
+        self.implicit_function_tables[entry.table][entry.entry_index]
     }
 
     /// Find the `BddVariable` corresponding to the value of the `parameter` function
@@ -67,10 +131,10 @@ impl BddParameterEncoder {
         &self,
         state: IdState,
         parameter: ParameterId,
-        arguments: &Vec<VariableId>,
+        arguments: &[VariableId],
     ) -> BddVariable {
         let table_index = Self::compute_table_index(state, arguments);
-        return self.explicit_function_tables[parameter.0][table_index];
+        self.explicit_function_tables[parameter.0][table_index]
     }
 
     /// Make a `BddParams` set which corresponds to the valuations for which the value of
@@ -79,10 +143,10 @@ impl BddParameterEncoder {
         &self,
         state: IdState,
         parameter: ParameterId,
-        arguments: &Vec<VariableId>,
+        arguments: &[VariableId],
     ) -> BddParams {
         let var = self.get_explicit(state, parameter, arguments);
-        return BddParams(self.bdd_variables.mk_var(var));
+        BddParams(self.bdd_variables.mk_var(var))
     }
 
     /// Find the `BddVariable` corresponding to the value of the implicit update function
@@ -101,37 +165,37 @@ impl BddParameterEncoder {
             return table[0];
         }
         let table_index = Self::compute_table_index(state, regulators);
-        return self.implicit_function_tables[variable.0][table_index];
+        self.implicit_function_tables[variable.0][table_index]
     }
 
     /// Make a `BddParams` set which corresponds to the valuations for which the value of
     /// an implicit update function of `variable` is true in the given `state`.
     pub fn implicit_true_when(&self, state: IdState, variable: VariableId) -> BddParams {
         let var = self.get_implicit(state, variable);
-        return BddParams(self.bdd_variables.mk_var(var));
+        BddParams(self.bdd_variables.mk_var(var))
     }
 
     // Compute which function table entry does the arguments correspond to in the given `state`.
-    fn compute_table_index(state: IdState, args: &Vec<VariableId>) -> usize {
+    fn compute_table_index(state: IdState, args: &[VariableId]) -> usize {
         let mut table_index: usize = 0;
         for i in 0..args.len() {
             if state.get_bit(args[args.len() - 1 - i].0) {
                 table_index += 1;
             }
             if i < args.len() - 1 {
-                table_index = table_index << 1;
+                table_index <<= 1;
             }
         }
-        return table_index;
+        table_index
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::bdd_params::BddParameterEncoder;
+    use crate::biodivine_std::structs::IdState;
     use crate::BooleanNetwork;
     use crate::VariableId;
-    use biodivine_lib_std::IdState;
     use std::convert::TryFrom;
 
     #[test]

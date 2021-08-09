@@ -4,6 +4,9 @@ use biodivine_lib_bdd::boolean_expression::BooleanExpression;
 use biodivine_lib_bdd::{Bdd, BddValuation, BddValuationIterator, BddVariableSet};
 
 impl BooleanNetwork {
+    /// *Legacy* function for creating a fully instantiated `BooleanNetwork` using parameters.
+    ///
+    /// In later revisions, this should be part of `BddParameterEncoder`.
     pub fn make_witness(
         &self,
         params: &BddParams,
@@ -13,13 +16,23 @@ impl BooleanNetwork {
         if valuation.is_none() {
             panic!("Cannot create witness for empty parameter set.");
         }
-        let valuation = valuation.unwrap();
+        self.make_witness_for_valuation(valuation.unwrap(), encoder)
+    }
+
+    /// *Legacy* function for creating a fully instantiated `BooleanNetwork` using parameters.
+    ///
+    /// In later revisions, this should be part of `BddParameterEncoder`.
+    pub fn make_witness_for_valuation(
+        &self,
+        valuation: BddValuation,
+        encoder: &BddParameterEncoder,
+    ) -> BooleanNetwork {
         // First, make functions for explicit parameters:
         let mut explicit_parameter_expressions = Vec::with_capacity(self.parameters.len());
         for i_p in 0..self.parameters.len() {
             let parameter = &self.parameters[i_p];
             let parameter_input_table = &encoder.explicit_function_tables[i_p];
-            let num_inputs = parameter.cardinality as u16;
+            let num_inputs = parameter.arity as u16;
             if num_inputs == 0 {
                 assert_eq!(parameter_input_table.len(), 1);
                 explicit_parameter_expressions.push(BooleanExpression::Const(
@@ -37,10 +50,7 @@ impl BooleanNetwork {
                 for (bdd_variable, input_valuation) in variables_and_valuations {
                     if valuation.value(*bdd_variable) {
                         // and for each `1` in the function table, we add the input valuation
-                        let input_valuation_bdd = Self::valuation_to_formula(
-                            &input_valuation,
-                            &parameter_function_input_vars,
-                        );
+                        let input_valuation_bdd = Bdd::from(input_valuation.clone());
                         function_bdd = function_bdd.or(&input_valuation_bdd);
                     }
                 }
@@ -71,8 +81,7 @@ impl BooleanNetwork {
                 let mut function_bdd = function_input_vars.mk_false();
                 for (bdd_variable, input_valuation) in variables_and_valuations {
                     if valuation.value(*bdd_variable) {
-                        let input_valuation_bdd =
-                            Self::valuation_to_formula(&input_valuation, &function_input_vars);
+                        let input_valuation_bdd = Bdd::from(input_valuation);
                         function_bdd = function_bdd.or(&input_valuation_bdd);
                     }
                 }
@@ -80,7 +89,7 @@ impl BooleanNetwork {
                 let function_expression = function_bdd.to_boolean_expression(&function_input_vars);
                 result.update_functions[i_var] = Some(*Self::expression_to_fn_update(
                     &function_expression,
-                    &regulators,
+                    regulators,
                 ));
             }
         }
@@ -88,29 +97,14 @@ impl BooleanNetwork {
         result.parameters.clear();
         result.parameter_to_index.clear();
 
-        return result;
-    }
-
-    /// Make a Bdd that exactly describes given valuation.
-    /// TODO: This should maybe be part of the bdd library.
-    fn valuation_to_formula(valuation: &BddValuation, vars: &BddVariableSet) -> Bdd {
-        assert_eq!(valuation.num_vars(), vars.num_vars());
-        let mut bdd = vars.mk_true();
-        for var in vars.variables() {
-            bdd = bdd.and(&if valuation.value(var) {
-                vars.mk_var(var)
-            } else {
-                vars.mk_not_var(var)
-            });
-        }
-        return bdd;
+        result
     }
 
     fn replace_parameters(
         update_function: &FnUpdate,
-        parameter_expressions: &Vec<BooleanExpression>,
+        parameter_expressions: &[BooleanExpression],
     ) -> Box<FnUpdate> {
-        return Box::new(match update_function {
+        Box::new(match update_function {
             FnUpdate::Const(value) => FnUpdate::Const(*value),
             FnUpdate::Var(id) => FnUpdate::Var(*id),
             FnUpdate::Not(a) => FnUpdate::Not(Self::replace_parameters(a, parameter_expressions)),
@@ -123,14 +117,14 @@ impl BooleanNetwork {
                 let parameter_expression = &parameter_expressions[id.0];
                 *Self::expression_to_fn_update(parameter_expression, args)
             }
-        });
+        })
     }
 
     fn expression_to_fn_update(
         expression: &BooleanExpression,
-        args: &Vec<VariableId>,
+        args: &[VariableId],
     ) -> Box<FnUpdate> {
-        return Box::new(match expression {
+        Box::new(match expression {
             BooleanExpression::Const(value) => FnUpdate::Const(*value),
             BooleanExpression::Iff(a, b) => FnUpdate::Binary(
                 BinaryOp::Iff,
@@ -164,7 +158,7 @@ impl BooleanNetwork {
                 let arg_index: usize = name.parse().unwrap();
                 FnUpdate::Var(args[arg_index])
             }
-        });
+        })
     }
 }
 

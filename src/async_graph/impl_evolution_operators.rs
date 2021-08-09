@@ -1,77 +1,76 @@
-use crate::async_graph::{Bwd, BwdIterator, Fwd, FwdIterator};
-use crate::bdd_params::BddParams;
-use biodivine_lib_std::param_graph::{EvolutionOperator, InvertibleEvolutionOperator};
-use biodivine_lib_std::IdState;
+use crate::async_graph::{AsyncGraphEdgeParams, Bwd, BwdIterator, Fwd, FwdIterator};
+use crate::biodivine_std::structs::IdState;
+use crate::biodivine_std::traits::{EvolutionOperator, InvertibleEvolutionOperator};
 
-impl<'a> EvolutionOperator for Fwd<'a> {
+impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Fwd<'a, Params> {
     type State = IdState;
-    type Params = BddParams;
-    type Iterator = FwdIterator<'a>;
+    type Params = Params::ParamSet;
+    type Iterator = FwdIterator<'a, Params>;
 
     fn step(&self, current: IdState) -> Self::Iterator {
         return FwdIterator {
             graph: self.graph,
-            variables: self.graph.network.graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
         };
     }
 }
 
-impl<'a> InvertibleEvolutionOperator for Fwd<'a> {
-    type InvertedOperator = Bwd<'a>;
+impl<'a, Params: AsyncGraphEdgeParams> InvertibleEvolutionOperator for Fwd<'a, Params> {
+    type InvertedOperator = Bwd<'a, Params>;
 
     fn invert(&self) -> Self::InvertedOperator {
-        return Bwd { graph: self.graph };
+        Bwd { graph: self.graph }
     }
 }
 
-impl Iterator for FwdIterator<'_> {
-    type Item = (IdState, BddParams);
+impl<Params: AsyncGraphEdgeParams> Iterator for FwdIterator<'_, Params> {
+    type Item = (IdState, Params::ParamSet);
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if let Some(var) = self.variables.next() {
+        if let Some(var) = self.variables.next() {
             let target = self.state.flip_bit(var.0);
-            let edge_params = self.graph.edge_params(self.state, var);
+            let edge_params = self.graph.edges.edge_params(self.state, var);
             Some((target, edge_params))
         } else {
             None
-        };
+        }
     }
 }
 
-impl<'a> EvolutionOperator for Bwd<'a> {
+impl<'a, Params: AsyncGraphEdgeParams> EvolutionOperator for Bwd<'a, Params> {
     type State = IdState;
-    type Params = BddParams;
-    type Iterator = BwdIterator<'a>;
+    type Params = Params::ParamSet;
+    type Iterator = BwdIterator<'a, Params>;
 
     fn step(&self, current: IdState) -> Self::Iterator {
-        return BwdIterator {
+        BwdIterator {
             graph: self.graph,
-            variables: self.graph.network.graph.variable_ids(),
+            variables: self.graph.network().graph.variables(),
             state: current,
-        };
+        }
     }
 }
 
-impl<'a> InvertibleEvolutionOperator for Bwd<'a> {
-    type InvertedOperator = Fwd<'a>;
+impl<'a, Params: AsyncGraphEdgeParams> InvertibleEvolutionOperator for Bwd<'a, Params> {
+    type InvertedOperator = Fwd<'a, Params>;
 
     fn invert(&self) -> Self::InvertedOperator {
-        return Fwd { graph: self.graph };
+        Fwd { graph: self.graph }
     }
 }
 
-impl Iterator for BwdIterator<'_> {
-    type Item = (IdState, BddParams);
+impl<Params: AsyncGraphEdgeParams> Iterator for BwdIterator<'_, Params> {
+    type Item = (IdState, Params::ParamSet);
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if let Some(var) = self.variables.next() {
+        if let Some(var) = self.variables.next() {
             let source = self.state.flip_bit(var.0);
-            let edge_params = self.graph.edge_params(source, var);
+            let edge_params = self.graph.edges.edge_params(source, var);
             Some((source, edge_params))
         } else {
             None
-        };
+        }
     }
 }
 
@@ -79,9 +78,9 @@ impl Iterator for BwdIterator<'_> {
 mod tests {
     use crate::async_graph::AsyncGraph;
     use crate::bdd_params::BddParams;
+    use crate::biodivine_std::structs::IdState;
+    use crate::biodivine_std::traits::{EvolutionOperator, Graph, Set};
     use crate::BooleanNetwork;
-    use biodivine_lib_std::param_graph::{EvolutionOperator, Graph, Params};
-    use biodivine_lib_std::IdState;
     use std::collections::HashSet;
     use std::convert::TryFrom;
 
@@ -161,7 +160,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        assert_eq!(9.0, graph.unit_set.cardinality());
+        assert_eq!(9.0, graph.unit_params().cardinality());
 
         let mut fwd_edges: HashSet<(IdState, IdState, BddParams)> = HashSet::new();
         let mut bwd_edges: HashSet<(IdState, IdState, BddParams)> = HashSet::new();
