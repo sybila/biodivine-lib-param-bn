@@ -1,251 +1,236 @@
+#![allow(unused)]
+
 use crate::biodivine_std::traits::Set;
-use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsyncGraph};
 
-pub fn stepped_coloured_scc<F>(graph: &SymbolicAsyncGraph, callback: F)
+pub fn baseline_fwd_bwd<F>(graph: &SymbolicAsyncGraph, callback: F)
 where
-    F: Fn(GraphColoredVertices) -> (),
+    F: Fn(GraphColoredVertices),
 {
-    fn fwd_step(
-        graph: &SymbolicAsyncGraph,
-        set: &GraphColoredVertices,
-        universe: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph.var_post(var, set).minus(set).intersect(universe);
+    let mut counter = Counter::new(graph);
+    let mut universes = vec![graph.mk_unit_colored_vertices()];
 
-            if !stepped.is_empty() {
-                return stepped;
-            }
+    while let Some(universe) = universes.pop() {
+        let ref universe = trim_saturating(graph, universe);
+        //let ref universe = trim(graph, universe);
+        if universe.is_empty() {
+            continue;
         }
-        graph.mk_empty_vertices()
-        /*let mut result = graph.mk_empty_vertices();
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph
-                .var_post(var, &set.minus_colors(&result.colors()))
-                .minus(set)
-                .intersect(universe);
 
-            result = result.union(&stepped);
-            //if !stepped.is_empty() {
-            //    return stepped;
-            //}
-        }
-        result*/
-        //return graph.mk_empty_vertices();
-        //graph.post(set)
-    }
-
-    fn bwd_step(
-        graph: &SymbolicAsyncGraph,
-        set: &GraphColoredVertices,
-        universe: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph.var_pre(var, set).minus(set).intersect(universe);
-
-            if !stepped.is_empty() {
-                return stepped;
-            }
-        }
-        graph.mk_empty_vertices()
-        /*let mut result = graph.mk_empty_vertices();
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph
-                .var_pre(var, &set.minus_colors(&result.colors()))
-                .minus(set)
-                .intersect(universe);
-
-            result = result.union(&stepped);
-            //if !stepped.is_empty() {
-            //    return stepped;
-            //}
-        }
-        result*/
-        //return graph.mk_empty_vertices();
-        //graph.pre(set)
-    }
-
-    let mut universe = graph.mk_unit_colored_vertices();
-
-    while !universe.is_empty() {
-        println!(
-            "Remaining universe: {} ({} states)",
-            universe.approx_cardinality(),
-            universe.vertices().approx_cardinality()
-        );
         let pivot = universe.pick_vertex();
-        println!("Picked pivot: {}", pivot.colors().approx_cardinality());
-
-        let mut fwd = pivot.clone();
-        let mut bwd = pivot.clone();
-
-        let mut locked_colors = graph.mk_empty_colors();
-        loop {
-            for _ in 0..graph.as_network().num_vars() {
-                let fwd_stepped = fwd_step(graph, &fwd.minus_colors(&locked_colors), &universe);
-                let bwd_stepped = bwd_step(graph, &bwd.minus_colors(&locked_colors), &universe);
-
-                fwd = fwd.union(&fwd_stepped);
-                bwd = bwd.union(&bwd_stepped);
-            }
-
-            //let locked_fwd = fwd.colors().minus( &graph.can_post(&fwd).colors());//&fwd_stepped.colors());
-            //let locked_bwd = bwd.colors().minus(&graph.can_pre(&bwd).colors());//&bwd_stepped.colors());
-
-            let mut locked_fwd = graph.mk_unit_colors();
-            for var in graph.as_network().variables().rev() {
-                let stepped = graph.var_post(var, &fwd).minus(&fwd).intersect(&universe);
-                locked_fwd = locked_fwd.minus(&stepped.colors());
-            }
-
-            let mut locked_bwd = graph.mk_unit_colors();
-            for var in graph.as_network().variables().rev() {
-                let stepped = graph.var_pre(var, &bwd).minus(&bwd).intersect(&universe);
-                locked_bwd = locked_bwd.minus(&stepped.colors());
-            }
-
-            locked_colors = locked_fwd.union(&locked_bwd); //locked_colors.union(&locked_fwd).union(&locked_bwd);
-
-            let remaining =
-                graph.unit_colors().approx_cardinality() - locked_colors.approx_cardinality();
-            println!(
-                "Remaining: {}, Node count: {} {}",
-                remaining,
-                fwd.as_bdd().size(),
-                bwd.as_bdd().size()
-            );
-
-            if pivot.colors().minus(&locked_colors).is_empty() {
-                break;
-            }
-        }
-
-        let mut locked_fwd = graph.mk_unit_colors();
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph.var_post(var, &fwd).minus(&fwd).intersect(&universe);
-            locked_fwd = locked_fwd.minus(&stepped.colors());
-        }
-
-        let mut locked_bwd = graph.mk_unit_colors();
-        for var in graph.as_network().variables().rev() {
-            let stepped = graph.var_pre(var, &bwd).minus(&bwd).intersect(&universe);
-            locked_bwd = locked_bwd.minus(&stepped.colors());
-        }
-
-        loop {
-            let fwd_stepped = fwd_step(graph, &fwd.minus_colors(&locked_fwd), &bwd);
-            if !fwd_stepped.is_empty() {
-                fwd = fwd.union(&fwd_stepped);
-                println!("FWD count: {}", fwd.as_bdd().size());
-            } else {
-                break;
-            }
-        }
-
-        loop {
-            let bwd_stepped = bwd_step(graph, &bwd.minus_colors(&locked_bwd), &fwd);
-            if !bwd_stepped.is_empty() {
-                bwd = bwd.union(&bwd_stepped);
-                println!("BWD count: {}", bwd.as_bdd().size());
-            } else {
-                break;
-            }
-        }
+        //let fwd = fwd_normal(graph, &universe,pivot.clone());
+        let fwd = fwd_saturation(graph, &universe, pivot.clone());
+        //let bwd = bwd_normal(graph, &universe, pivot.clone());
+        let bwd = bwd_saturation(graph, &universe, pivot.clone());
 
         let scc = fwd.intersect(&bwd);
-        universe = universe.minus(&scc);
+
+        println!("SCC: {}", scc.approx_cardinality());
+
+        let below = fwd.minus(&scc);
+        if !below.is_empty() {
+            universes.push(below);
+        }
+
+        let above = bwd.minus(&scc);
+        if !above.is_empty() {
+            universes.push(above);
+        }
+
+        let rest = universe.minus(&fwd.union(&bwd));
+        if !rest.is_empty() {
+            universes.push(rest);
+        }
+
+        counter.push(&scc.minus(&pivot).colors());
         callback(scc);
+
+        let remaining: f64 = universes.iter().map(|it| it.approx_cardinality()).sum();
+        println!("REMAINING: {}; UNIVERSES: {}", remaining, universes.len());
+    }
+
+    counter.print();
+}
+
+fn fwd_saturation(
+    graph: &SymbolicAsyncGraph,
+    universe: &GraphColoredVertices,
+    mut fwd: GraphColoredVertices,
+) -> GraphColoredVertices {
+    'fwd: loop {
+        if fwd.as_bdd().size() > 100_000 {
+            println!(
+                "FWD: {}; {}/{}",
+                fwd.as_bdd().size(),
+                fwd.approx_cardinality(),
+                universe.approx_cardinality()
+            );
+        }
+        for var in graph.as_network().variables().rev() {
+            let successors = graph.var_post(var, &fwd).intersect(universe);
+
+            if !successors.is_subset(&fwd) {
+                fwd = fwd.union(&successors);
+                continue 'fwd;
+            }
+        }
+        return fwd;
     }
 }
 
-pub fn coloured_scc<F>(graph: &SymbolicAsyncGraph, callback: F)
-where
-    F: Fn(GraphColoredVertices) -> (),
-{
-    let mut universe = graph.mk_unit_colored_vertices();
-
-    while !universe.is_empty() {
-        let pivot = universe.pick_vertex();
-        println!("Picked pivot: {}", pivot.approx_cardinality());
-
-        let mut fwd = pivot.clone();
-        let mut bwd = pivot.clone();
-        let mut fwd_frontier = pivot.clone();
-        let mut bwd_frontier = pivot.clone();
-        let mut fwd_lock = graph.mk_empty_colors();
-        let mut bwd_lock = graph.mk_empty_colors();
-
-        let mut continue_fwd_frontier = graph.mk_empty_vertices();
-        let mut continue_bwd_frontier = graph.mk_empty_vertices();
-        let all_colors = universe.colors();
-        while !all_colors.minus(&fwd_lock.union(&bwd_lock)).is_empty() {
-            let new_fwd_frontier = graph.post(&fwd_frontier).intersect(&universe).minus(&fwd);
-            let new_bwd_frontier = graph.pre(&bwd_frontier).intersect(&universe).minus(&bwd);
-            fwd = fwd.union(&new_fwd_frontier);
-            bwd = bwd.union(&new_bwd_frontier);
-            let stopped_fwd_colors = fwd_frontier.colors().minus(&new_fwd_frontier.colors());
-            let stopped_bwd_colors = bwd_frontier.colors().minus(&new_bwd_frontier.colors());
-
-            fwd_lock = fwd_lock.union(&stopped_fwd_colors);
-            bwd_lock = bwd_lock.union(&stopped_bwd_colors);
-
-            fwd_frontier = new_fwd_frontier.minus_colors(&bwd_lock);
-            bwd_frontier = new_bwd_frontier.minus_colors(&fwd_lock);
-
-            continue_fwd_frontier = continue_fwd_frontier
-                .union(&new_fwd_frontier.intersect_colors(&stopped_bwd_colors));
-            continue_bwd_frontier = continue_bwd_frontier
-                .union(&new_bwd_frontier.intersect_colors(&stopped_fwd_colors));
-
-            let remaining =
-                all_colors.approx_cardinality() - fwd_lock.union(&bwd_lock).approx_cardinality();
+fn bwd_saturation(
+    graph: &SymbolicAsyncGraph,
+    universe: &GraphColoredVertices,
+    mut bwd: GraphColoredVertices,
+) -> GraphColoredVertices {
+    'bwd: loop {
+        if bwd.as_bdd().size() > 100_000 {
             println!(
-                "Remaining: {}, Node count: {} {}",
-                remaining,
-                fwd.as_bdd().size(),
-                bwd.as_bdd().size()
+                "BWD: {}; {}/{}",
+                bwd.as_bdd().size(),
+                bwd.approx_cardinality(),
+                universe.approx_cardinality()
             );
         }
+        for var in graph.as_network().variables().rev() {
+            let predecessors = graph.var_pre(var, &bwd).intersect(universe);
 
-        while !continue_fwd_frontier.intersect(&bwd).is_empty() {
-            continue_fwd_frontier = graph
-                .post(&continue_fwd_frontier)
-                .intersect(&bwd)
-                .minus(&fwd);
-            fwd = fwd.union(&continue_fwd_frontier);
-            println!("FWD Node count: {}", fwd.as_bdd().size());
+            if !predecessors.is_subset(&bwd) {
+                bwd = bwd.union(&predecessors);
+                continue 'bwd;
+            }
         }
+        return bwd;
+    }
+}
 
-        while !continue_bwd_frontier.intersect(&fwd).is_empty() {
-            continue_bwd_frontier = graph
-                .pre(&continue_bwd_frontier)
-                .intersect(&fwd)
-                .minus(&bwd);
-            bwd = bwd.union(&continue_bwd_frontier);
-            println!("BWD Node count: {}", bwd.as_bdd().size());
+fn fwd_normal(
+    graph: &SymbolicAsyncGraph,
+    universe: &GraphColoredVertices,
+    mut fwd: GraphColoredVertices,
+) -> GraphColoredVertices {
+    loop {
+        let successors = graph.post(&fwd).intersect(universe);
+        println!(
+            "FWD: {}; {}/{}",
+            fwd.as_bdd().size(),
+            fwd.approx_cardinality(),
+            universe.approx_cardinality()
+        );
+        if successors.is_subset(&fwd) {
+            // fixpoint done
+            return fwd;
         }
+        fwd = fwd.union(&successors);
+    }
+}
 
-        let scc = fwd.intersect(&bwd);
-        universe = universe.minus(&scc);
-        callback(scc);
+fn bwd_normal(
+    graph: &SymbolicAsyncGraph,
+    universe: &GraphColoredVertices,
+    mut bwd: GraphColoredVertices,
+) -> GraphColoredVertices {
+    loop {
+        let predecessors = graph.pre(&bwd).intersect(universe);
+        println!(
+            "BWD: {}; {}/{}",
+            bwd.as_bdd().size(),
+            bwd.approx_cardinality(),
+            universe.approx_cardinality()
+        );
+        if predecessors.is_subset(&bwd) {
+            // fixpoint done
+            return bwd;
+        }
+        bwd = bwd.union(&predecessors);
+    }
+}
 
-        //let converged = fwd
-        //    .intersect_colors(&fwd_lock)
-        //    .union(&bwd.intersect_colors(&bwd_lock));
+fn trim_saturating(
+    graph: &SymbolicAsyncGraph,
+    mut universe: GraphColoredVertices,
+) -> GraphColoredVertices {
+    'trim: loop {
+        for var in graph.as_network().variables().rev() {
+            // All vertices in universe with var-predecessor in universe:
+            let candidates = graph.var_post(var, &universe).intersect(&universe);
+
+            let can_go_fwd = graph
+                .pre(&graph.post(&candidates).intersect(&universe))
+                .intersect(&universe);
+
+            let remove = candidates.minus(&can_go_fwd);
+            if !remove.is_empty() {
+                println!(
+                    "TRIM: {}; {}",
+                    universe.as_bdd().size(),
+                    universe.approx_cardinality()
+                );
+                universe = universe.minus(&remove);
+                continue 'trim;
+            }
+        }
+        return universe;
+    }
+}
+
+fn trim(graph: &SymbolicAsyncGraph, mut universe: GraphColoredVertices) -> GraphColoredVertices {
+    loop {
+        let can_go_fwd = graph
+            .pre(&graph.post(&universe).intersect(&universe))
+            .intersect(&universe);
+
+        let can_go_bwd = graph
+            .post(&graph.pre(&universe).intersect(&universe))
+            .intersect(&universe);
+        let can_step = can_go_fwd.intersect(&can_go_bwd);
+        println!(
+            "TRIM: {}; {}",
+            universe.as_bdd().size(),
+            universe.approx_cardinality()
+        );
+        if universe.is_subset(&can_step) {
+            // universe == can_step
+            return can_step;
+        }
+        universe = can_step;
+    }
+}
+
+struct Counter<'a> {
+    graph: &'a SymbolicAsyncGraph,
+    // Index is the number of components
+    items: Vec<GraphColors>,
+}
+
+impl Counter<'_> {
+    pub fn new(graph: &SymbolicAsyncGraph) -> Counter {
+        Counter {
+            graph,
+            items: vec![graph.mk_unit_colors()],
+        }
     }
 
-    /*
+    pub fn push(&mut self, colors: &GraphColors) {
+        for i in (0..self.items.len()).rev() {
+            let move_up = self.items[i].intersect(colors);
+            if !move_up.is_empty() {
+                self.safe_union(i + 1, &move_up);
+            }
+            self.items[i] = self.items[i].minus(&move_up);
+        }
+    }
 
-    let converged = f
-        .intersect_colors(&f_lock)
-        .union(&b.intersect_colors(&b_lock));
+    fn safe_union(&mut self, position: usize, colors: &GraphColors) {
+        while self.items.len() <= position {
+            self.items.push(self.graph.mk_empty_colors());
+        }
+        self.items[position] = self.items[position].union(colors);
+    }
 
-    iterations.fetch_add(1, Ordering::SeqCst);
-
-    rayon::join(
-        || decomposition(context, universe.minus(&converged), iterations),
-        || decomposition(context, converged.minus(&scc), iterations),
-    );
-
-     */
+    pub fn print(&self) {
+        for i in 0..self.items.len() {
+            println!("{} SCCs: {}", i, self.items[i].approx_cardinality());
+        }
+    }
 }
