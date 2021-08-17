@@ -1,0 +1,51 @@
+SreA -| hapX
+HapX -| Cat1_2
+Yap1 -> Cat1_2
+HapX -| sreA
+LIP -| HapX
+hapX -> HapX
+SidA -> TAFC
+MirB -> LIP
+TAFC -> LIP
+EstB -> LIP
+_Iron -> LIP
+RIA -> LIP
+SreA -| RIA
+ROS -> Yap1
+HapX -| CccA
+SidA -> FCminusFe
+Yap1 -> SOD2_3
+SreA -| SidA
+HapX -> SidA
+LIP -> SreA
+sreA -> SreA
+FCplusFe -> ICP
+VAC -> ICP
+HapX -| ICP
+LIP -> VAC
+CccA -> VAC
+LIP -> ROS
+ThP -| ROS
+ROS -> ROS
+SOD2_3 -| ROS
+Superoxide -> ROS
+Cat1_2 -| ROS
+Yap1 -> ThP
+SreA -| MirB
+HapX -> MirB
+LIP -> FCplusFe
+FCminusFe -> FCplusFe
+SreA -| EstB
+$CccA: !HapX
+$EstB: !SreA
+$FCminusFe: SidA
+$ICP: ((VAC & !HapX) | (FCplusFe & !HapX))
+$LIP: ((RIA & _Iron) | (TAFC & (MirB & EstB)))
+$RIA: !SreA
+$ROS: (((Superoxide & !(SOD2_3 & (ThP & Cat1_2))) | (ROS & !(SOD2_3 & (ThP | Cat1_2)))) | LIP)
+$SOD2_3: Yap1
+$TAFC: SidA
+$ThP: Yap1
+$Yap1: ROS
+$hapX: !SreA
+$sreA: !HapX

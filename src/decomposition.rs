@@ -2,6 +2,68 @@
 
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsyncGraph};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Mutex;
+
+
+pub fn baseline_fwd_bwd_parallel<F>(graph: &SymbolicAsyncGraph, callback: F)
+    where
+        F: Fn(GraphColoredVertices)
+{
+    //let result = Mutex::new(Counter::new(graph));
+    let result = AtomicU64::new(0);
+    rayon::scope(|s| {
+        s.spawn(|_| parallel_recursion(graph, graph.mk_unit_colored_vertices(), &result));
+    });
+    println!("Counted: {}", result.load(Ordering::SeqCst));
+    //let result = result.lock().unwrap();
+    //for scc in result.iter() {
+    //    counter.push(&scc.colors());
+    //}
+    //let counter = result.into_inner().unwrap();
+    //counter.print();
+}
+
+const CUT_OFF: f64 = 10_000.0;
+
+fn parallel_recursion(graph: &SymbolicAsyncGraph, universe: GraphColoredVertices, result: &AtomicU64) {
+    let universe = &trim(graph, universe);
+    if universe.is_empty() {
+        println!("NO SCC.");
+        return;
+    }
+
+    let pivot = universe.pick_vertex();
+    //let fwd = fwd_normal(graph, &universe,pivot.clone());
+    let fwd = fwd_saturation(graph, universe, pivot.clone());
+    //let bwd = bwd_normal(graph, &universe, pivot.clone());
+    let bwd = bwd_saturation(graph, universe, pivot.clone());
+
+    let scc = fwd.intersect(&bwd);
+
+    if scc.minus(&pivot).vertices().approx_cardinality() >= CUT_OFF {
+        //let push = scc.minus(&pivot).colors();
+        println!("SCC: {} in {}", scc.approx_cardinality(), universe.approx_cardinality());
+        result.fetch_add(1, Ordering::SeqCst);
+        //let mut result = result.lock().unwrap();
+        //result.push(&push);
+    }
+
+    rayon::scope(|s| {
+        let below = fwd.minus(&scc);
+        if below.vertices().approx_cardinality() > CUT_OFF {
+            s.spawn(|_| parallel_recursion(graph, below, result));
+        }
+        let above = bwd.minus(&scc);
+        if above.vertices().approx_cardinality() > CUT_OFF {
+            s.spawn(|_| parallel_recursion(graph, above, result));
+        }
+        let rest = universe.minus(&fwd.union(&bwd));
+        if rest.vertices().approx_cardinality() > CUT_OFF {
+            s.spawn(|_| parallel_recursion(graph, rest, result));
+        }
+    });
+}
 
 pub fn baseline_fwd_bwd<F>(graph: &SymbolicAsyncGraph, callback: F)
 where
@@ -11,17 +73,18 @@ where
     let mut universes = vec![graph.mk_unit_colored_vertices()];
 
     while let Some(universe) = universes.pop() {
-        let ref universe = trim_saturating(graph, universe);
-        //let ref universe = trim(graph, universe);
+        //let ref universe = trim_saturating(graph, universe);
+        let universe = &trim(graph, universe);
         if universe.is_empty() {
+            println!("NO SCC.");
             continue;
         }
 
         let pivot = universe.pick_vertex();
         //let fwd = fwd_normal(graph, &universe,pivot.clone());
-        let fwd = fwd_saturation(graph, &universe, pivot.clone());
+        let fwd = fwd_saturation(graph, universe, pivot.clone());
         //let bwd = bwd_normal(graph, &universe, pivot.clone());
-        let bwd = bwd_saturation(graph, &universe, pivot.clone());
+        let bwd = bwd_saturation(graph, universe, pivot.clone());
 
         let scc = fwd.intersect(&bwd);
 
@@ -146,6 +209,13 @@ fn bwd_normal(
     }
 }
 
+fn trim_outside(
+    graph: &SymbolicAsyncGraph,
+    mut universe: GraphColoredVertices
+) -> GraphColoredVertices {
+    todo!()
+}
+
 fn trim_saturating(
     graph: &SymbolicAsyncGraph,
     mut universe: GraphColoredVertices,
@@ -184,11 +254,13 @@ fn trim(graph: &SymbolicAsyncGraph, mut universe: GraphColoredVertices) -> Graph
             .post(&graph.pre(&universe).intersect(&universe))
             .intersect(&universe);
         let can_step = can_go_fwd.intersect(&can_go_bwd);
-        println!(
-            "TRIM: {}; {}",
-            universe.as_bdd().size(),
-            universe.approx_cardinality()
-        );
+        if universe.as_bdd().size() > 100_000 {
+            println!(
+                "TRIM: {}; {}",
+                universe.as_bdd().size(),
+                universe.approx_cardinality()
+            );
+        }
         if universe.is_subset(&can_step) {
             // universe == can_step
             return can_step;
@@ -197,7 +269,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut universe: GraphColoredVertices) -> Graph
     }
 }
 
-struct Counter<'a> {
+pub struct Counter<'a> {
     graph: &'a SymbolicAsyncGraph,
     // Index is the number of components
     items: Vec<GraphColors>,
@@ -213,6 +285,7 @@ impl Counter<'_> {
 
     pub fn push(&mut self, colors: &GraphColors) {
         for i in (0..self.items.len()).rev() {
+            if self.items[i].is_empty() { continue; }
             let move_up = self.items[i].intersect(colors);
             if !move_up.is_empty() {
                 self.safe_union(i + 1, &move_up);
@@ -229,8 +302,19 @@ impl Counter<'_> {
     }
 
     pub fn print(&self) {
+        println!("Classification output:");
         for i in 0..self.items.len() {
-            println!("{} SCCs: {}", i, self.items[i].approx_cardinality());
+            if self.items[i].approx_cardinality() != 0.0 {
+                println!("{} SCCs: {}", i, self.items[i].approx_cardinality());
+            }
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.items.len() - 1
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.items.len() == 1
     }
 }

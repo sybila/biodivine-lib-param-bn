@@ -29,6 +29,9 @@ lazy_static = "1.4.0"           # Used for initialization of commonly used regex
 biodivine-lib-bdd = "0.2.1"
 roxmltree = "0.14.0"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
+rayon = "1.5.1"
+rand = "0.8.4"
+#futures = { version = "0.3.16", features = ["thread-pool"] }
 
 [features]
 # With shields_up you enable explicit assertions of pre/post conditions and invariants in critical
