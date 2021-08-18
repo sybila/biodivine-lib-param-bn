@@ -28,14 +28,20 @@ BINARY = ""
 # Basic forward/backward xie-beerel algorithm.
 if ALGORITHM == "BASIC":
 	BINARY = "./target/release/examples/algo_base < "
+if ALGORITHM == "BASIC-FRACTION":
+    BINARY = "./target/release/examples/algo_base_fraction < "
 # Fwd/bwd but with saturation.
 if ALGORITHM == "BASIC-SATURATION":
     BINARY = "./target/release/examples/algo_base_saturation < "
+if ALGORITHM == "BASIC-SATURATION-FRACTION"
+    BINARY = "./target/release/examples/algo_base_saturation_fraction < "
 # Not really lockstep, but computes reachability using saturation and
 # only finishes the "symbolically smaller" set. However, it does not consider
 # between each parametrisation separately in lockstep reach, so the logic is simpler.
 if ALGORITHM == "LOCKSTEP-ASYNC":
     BINARY = "./target/release/examples/algo_lockstep_async < "
+if ALGORITHM = "LOCKSTEP-ASYNC-FRACTION"
+    BINARY = "./target/release/examples/algo_lockstep_async_fraction < "
 
 if BINARY == "":
 	print("ERROR: Unknown algorithm", ALGORITHM)
