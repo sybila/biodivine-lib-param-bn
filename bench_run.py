@@ -25,10 +25,17 @@ print("Interactive:", INTERACTIVE)
 
 # Set binary based on algorithm (also setup so that an input file can be appended there).
 BINARY = ""
+# Basic forward/backward xie-beerel algorithm.
 if ALGORITHM == "BASIC":
 	BINARY = "./target/release/examples/algo_base < "
+# Fwd/bwd but with saturation.
 if ALGORITHM == "BASIC-SATURATION":
     BINARY = "./target/release/examples/algo_base_saturation < "
+# Not really lockstep, but computes reachability using saturation and
+# only finishes the "symbolically smaller" set. However, it does not consider
+# between each parametrisation separately in lockstep reach, so the logic is simpler.
+if ALGORITHM == "LOCKSTEP-ASYNC":
+    BINARY = "./target/release/examples/algo_lockstep_async < "
 
 if BINARY == "":
 	print("ERROR: Unknown algorithm", ALGORITHM)
