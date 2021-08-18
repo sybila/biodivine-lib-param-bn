@@ -97,6 +97,9 @@ for bench in BENCHMARKS:
 	# Filename without extension
 	name = os.path.splitext(bench)[0]
 	input_file = BENCH_DIR + "/" + bench
+	if not os.path.isfile(input_file):
+	    print("Skipped", input_file)
+	    continue
 	output_file = OUT_DIR + "/" + name + "_out.txt"
 	command = TIMEOUT + " " + CUT_OFF + " time -p " + BINARY + input_file + " > " + output_file + " 2>&1"
 	print(command)
