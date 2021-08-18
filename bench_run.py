@@ -40,7 +40,7 @@ if ALGORITHM == "BASIC-SATURATION-FRACTION":
 # between each parametrisation separately in lockstep reach, so the logic is simpler.
 if ALGORITHM == "LOCKSTEP-ASYNC":
     BINARY = "./target/release/examples/algo_lockstep_async < "
-if ALGORITHM = "LOCKSTEP-ASYNC-FRACTION":
+if ALGORITHM == "LOCKSTEP-ASYNC-FRACTION":
     BINARY = "./target/release/examples/algo_lockstep_async_fraction < "
 
 if BINARY == "":
