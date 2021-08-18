@@ -27,6 +27,8 @@ print("Interactive:", INTERACTIVE)
 BINARY = ""
 if ALGORITHM == "BASIC":
 	BINARY = "./target/release/examples/algo_base < "
+if ALGORITHM == "BASIC-SATURATION":
+    BINARY = "./target/release/examples/algo_base_saturation < "
 
 if BINARY == "":
 	print("ERROR: Unknown algorithm", ALGORITHM)
