@@ -42,6 +42,8 @@ if ALGORITHM == "LOCKSTEP-ASYNC":
     BINARY = "./target/release/examples/algo_lockstep_async < "
 if ALGORITHM == "LOCKSTEP-ASYNC-FRACTION":
     BINARY = "./target/release/examples/algo_lockstep_async_fraction < "
+if ALGORITHM == "LOCKSTEP":
+    BINARY = "./target/release/examples/algo_lockstep < "
 
 if BINARY == "":
 	print("ERROR: Unknown algorithm", ALGORITHM)
