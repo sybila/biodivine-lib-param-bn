@@ -284,13 +284,18 @@ impl Counter<'_> {
     }
 
     pub fn push(&mut self, colors: &GraphColors) {
+        let mut colors = colors.clone();
         for i in (0..self.items.len()).rev() {
             if self.items[i].is_empty() { continue; }
-            let move_up = self.items[i].intersect(colors);
+            let move_up = self.items[i].intersect(&colors);
             if !move_up.is_empty() {
+                colors = colors.minus(&move_up);
                 self.safe_union(i + 1, &move_up);
             }
             self.items[i] = self.items[i].minus(&move_up);
+            if colors.is_empty() {
+                return;
+            }
         }
     }
 
