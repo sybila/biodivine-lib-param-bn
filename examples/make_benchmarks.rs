@@ -1,6 +1,6 @@
+use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::BooleanNetwork;
 use std::convert::TryFrom;
-use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use std::path::Path;
 
 fn main() {

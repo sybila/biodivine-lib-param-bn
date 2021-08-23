@@ -5,10 +5,9 @@ use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsy
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 
-
 pub fn baseline_fwd_bwd_parallel<F>(graph: &SymbolicAsyncGraph, callback: F)
-    where
-        F: Fn(GraphColoredVertices)
+where
+    F: Fn(GraphColoredVertices),
 {
     //let result = Mutex::new(Counter::new(graph));
     let result = AtomicU64::new(0);
@@ -26,7 +25,11 @@ pub fn baseline_fwd_bwd_parallel<F>(graph: &SymbolicAsyncGraph, callback: F)
 
 const CUT_OFF: f64 = 10_000.0;
 
-fn parallel_recursion(graph: &SymbolicAsyncGraph, universe: GraphColoredVertices, result: &AtomicU64) {
+fn parallel_recursion(
+    graph: &SymbolicAsyncGraph,
+    universe: GraphColoredVertices,
+    result: &AtomicU64,
+) {
     let universe = &trim(graph, universe);
     if universe.is_empty() {
         println!("NO SCC.");
@@ -43,7 +46,11 @@ fn parallel_recursion(graph: &SymbolicAsyncGraph, universe: GraphColoredVertices
 
     if scc.minus(&pivot).vertices().approx_cardinality() >= CUT_OFF {
         //let push = scc.minus(&pivot).colors();
-        println!("SCC: {} in {}", scc.approx_cardinality(), universe.approx_cardinality());
+        println!(
+            "SCC: {} in {}",
+            scc.approx_cardinality(),
+            universe.approx_cardinality()
+        );
         result.fetch_add(1, Ordering::SeqCst);
         //let mut result = result.lock().unwrap();
         //result.push(&push);
@@ -211,7 +218,7 @@ fn bwd_normal(
 
 fn trim_outside(
     graph: &SymbolicAsyncGraph,
-    mut universe: GraphColoredVertices
+    mut universe: GraphColoredVertices,
 ) -> GraphColoredVertices {
     todo!()
 }
@@ -286,7 +293,9 @@ impl Counter<'_> {
     pub fn push(&mut self, colors: &GraphColors) {
         let mut colors = colors.clone();
         for i in (0..self.items.len()).rev() {
-            if self.items[i].is_empty() { continue; }
+            if self.items[i].is_empty() {
+                continue;
+            }
             let move_up = self.items[i].intersect(&colors);
             if !move_up.is_empty() {
                 colors = colors.minus(&move_up);

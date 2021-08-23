@@ -1,10 +1,9 @@
-use biodivine_lib_param_bn::symbolic_async_graph::{SymbolicAsyncGraph, GraphColoredVertices};
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
-use std::io::Read;
-use biodivine_lib_param_bn::{BooleanNetwork};
-use std::convert::TryFrom;
 use biodivine_lib_param_bn::decomposition::Counter;
-
+use biodivine_lib_param_bn::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use biodivine_lib_param_bn::BooleanNetwork;
+use std::convert::TryFrom;
+use std::io::Read;
 
 fn main() {
     let mut buffer = String::new();
@@ -14,18 +13,30 @@ fn main() {
     println!("Model vars: {}", model.as_graph().num_vars());
 
     let graph = SymbolicAsyncGraph::new(model).unwrap();
-    println!("Graph size: {} (Colors {})", graph.unit_colored_vertices().approx_cardinality(), graph.unit_colors().approx_cardinality());
+    println!(
+        "Graph size: {} (Colors {})",
+        graph.unit_colored_vertices().approx_cardinality(),
+        graph.unit_colors().approx_cardinality()
+    );
     let count = decomposition(&graph);
     println!("Counted: {}", count);
 }
 
 fn decomposition(graph: &SymbolicAsyncGraph) -> usize {
     let mut counter = Counter::new(graph);
-    let magnitude = graph.unit_colored_vertices().vertices().approx_cardinality().log2().ceil() as usize;
+    let magnitude = graph
+        .unit_colored_vertices()
+        .vertices()
+        .approx_cardinality()
+        .log2()
+        .ceil() as usize;
     let cut_off = (1 << magnitude / 2) as f64;
     println!("Minimal SCC size: {}", cut_off);
 
-    let mut universes = vec![(graph.mk_unit_colored_vertices(), graph.as_network().variables().next().unwrap())];
+    let mut universes = vec![(
+        graph.mk_unit_colored_vertices(),
+        graph.as_network().variables().next().unwrap(),
+    )];
 
     let start = std::time::SystemTime::now();
     let mut trimming = 0;
@@ -36,8 +47,19 @@ fn decomposition(graph: &SymbolicAsyncGraph) -> usize {
             continue;
         }
         let remaining: f64 = universes.iter().map(|u| u.0.approx_cardinality()).sum();
-        println!("Universes: {}; SCCs: {}; Remaining: {}/{}", universes.len(), counter.len(), remaining + universe.approx_cardinality(), graph.unit_colored_vertices().approx_cardinality());
-        println!("Elapsed: {}; Trim: {}; Reach: {};", start.elapsed().unwrap().as_millis(), trimming, reach);
+        println!(
+            "Universes: {}; SCCs: {}; Remaining: {}/{}",
+            universes.len(),
+            counter.len(),
+            remaining + universe.approx_cardinality(),
+            graph.unit_colored_vertices().approx_cardinality()
+        );
+        println!(
+            "Elapsed: {}; Trim: {}; Reach: {};",
+            start.elapsed().unwrap().as_millis(),
+            trimming,
+            reach
+        );
         let start_trim = std::time::SystemTime::now();
         let universe = &trim(graph, universe);
         trimming += start_trim.elapsed().unwrap().as_millis();
@@ -59,7 +81,11 @@ fn decomposition(graph: &SymbolicAsyncGraph) -> usize {
         let scc = &fwd.intersect(&bwd);
         let non_pivot_states = &scc.minus(&pivot);
         let non_trivial_colors = non_pivot_states.colors();
-        println!("SCC: {} ({} vertices)", scc.approx_cardinality(), scc.vertices().approx_cardinality());
+        println!(
+            "SCC: {} ({} vertices)",
+            scc.approx_cardinality(),
+            scc.vertices().approx_cardinality()
+        );
         if !non_trivial_colors.is_empty() {
             if scc.vertices().approx_cardinality() < cut_off {
                 println!("TOO SMALL.")
@@ -70,12 +96,16 @@ fn decomposition(graph: &SymbolicAsyncGraph) -> usize {
             println!("TRIVIAL.");
         }
 
-
         let rest = universe.minus(&fwd.union(&bwd));
         let above = bwd.minus(scc);
         let below = fwd.minus(scc);
 
-        println!("SPLIT: {} - {} - {}", rest.approx_cardinality(), above.approx_cardinality(), below.approx_cardinality());
+        println!(
+            "SPLIT: {} - {} - {}",
+            rest.approx_cardinality(),
+            above.approx_cardinality(),
+            below.approx_cardinality()
+        );
 
         if !rest.is_empty() {
             universes.push((rest, base));
@@ -153,11 +183,16 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
         // Successors of these predecessors inside set.
         let post = graph.post(&pre).intersect(&set);
         // Everything in set \ post has no predecessor in this set.
-        if set.is_subset(&post) {   // set == post
+        if set.is_subset(&post) {
+            // set == post
             break;
         }
         if set.as_bdd().size() > 10_000 {
-            println!("TRIM: {}; {}", set.as_bdd().size(), set.approx_cardinality());
+            println!(
+                "TRIM: {}; {}",
+                set.as_bdd().size(),
+                set.approx_cardinality()
+            );
         }
         set = post;
     }
@@ -167,11 +202,16 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
         // Predecessors of these successors inside set.
         let pre = graph.pre(&post).intersect(&set);
         // Everything in set \ pre has no successor in set.
-        if set.is_subset(&pre) {    // set == pre
+        if set.is_subset(&pre) {
+            // set == pre
             break;
         }
         if set.as_bdd().size() > 10_000 {
-            println!("TRIM: {}; {}", set.as_bdd().size(), set.approx_cardinality());
+            println!(
+                "TRIM: {}; {}",
+                set.as_bdd().size(),
+                set.approx_cardinality()
+            );
         }
         set = pre;
     }
