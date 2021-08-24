@@ -290,6 +290,24 @@ impl Counter<'_> {
         }
     }
 
+    pub fn push_count(&mut self, colors: &GraphColors, count: usize) {
+        let mut colors = colors.clone();
+        for i in (0..self.items.len()).rev() {
+            if self.items[i].is_empty() {
+                continue;
+            }
+            let move_up = self.items[i].intersect(&colors);
+            if !move_up.is_empty() {
+                colors = colors.minus(&move_up);
+                self.safe_union(i + count, &move_up);
+            }
+            self.items[i] = self.items[i].minus(&move_up);
+            if colors.is_empty() {
+                return;
+            }
+        }
+    }
+
     pub fn push(&mut self, colors: &GraphColors) {
         let mut colors = colors.clone();
         for i in (0..self.items.len()).rev() {
@@ -313,6 +331,15 @@ impl Counter<'_> {
             self.items.push(self.graph.mk_empty_colors());
         }
         self.items[position] = self.items[position].union(colors);
+    }
+
+    pub fn merge(&mut self, other: &Counter) {
+        for (i, set) in other.items.iter().enumerate() {
+            if i != 0 && !set.is_empty() {
+                //println!("PUSH!");
+                self.push_count(set, i as usize);
+            }
+        }
     }
 
     pub fn print(&self) {

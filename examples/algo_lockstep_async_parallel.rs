@@ -62,8 +62,16 @@ fn par_decomposition(graph: &SymbolicAsyncGraph, threads: u32) -> usize {
         }
     });
 
+    let mut result = Counter::new(graph);
     let locked_counters = counters.lock().unwrap();
-    locked_counters.len()
+    for counter in locked_counters.iter() {
+        println!("Counter: {}; {}", counter.len(), result.len());
+        result.merge(counter);
+        //result.print();
+    }
+
+    result.print();
+    result.len()
 }
 
 fn one_decomposition(
