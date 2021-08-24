@@ -81,7 +81,7 @@ fn one_decomposition(
     whole_universe: GraphColoredVertices,
     should_trim: bool,
 ) -> f64 {
-    let too_small = (1 << (graph.as_network().num_vars() / 2)) as f64;
+    let too_small = graph.unit_colored_vertices().vertices().approx_cardinality() / 100.0;//(1 << (graph.as_network().num_vars() / 2)) as f64;
     if whole_universe.vertices().approx_cardinality() < too_small {
         // All components are too small.
         return whole_universe.approx_cardinality();
@@ -194,14 +194,13 @@ fn one_decomposition(
 
     let scc = &fwd.intersect(&bwd);
     let non_pivot_states = &scc.minus(&pivot);
-    let non_trivial_colors = non_pivot_states.colors();
     /*println!(
         "SCC: {} ({} vertices)",
         scc.approx_cardinality(),
         scc.vertices().approx_cardinality()
     );*/
-    if !non_trivial_colors.is_empty() {
-        counter.push(&non_trivial_colors);
+    if non_pivot_states.vertices().approx_cardinality() > too_small {
+        counter.push(&non_pivot_states.colors());
     } else {
         //println!("TRIVIAL.");
     }
