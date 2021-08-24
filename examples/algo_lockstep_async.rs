@@ -201,6 +201,8 @@ fn decomposition(graph: &SymbolicAsyncGraph) -> usize {
 }
 
 fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColoredVertices {
+    let initial = set.as_bdd().size();
+    println!("Start trim: {}", initial);
     loop {
         // Predecessors of set inside set
         let pre = graph.pre(&set).intersect(&set);
@@ -217,6 +219,9 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );
+        }
+        if set.as_bdd().size() > 2 * initial {
+            return set;
         }
         set = post;
     }
@@ -236,6 +241,9 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );
+        }
+        if set.as_bdd().size() > 2 * initial {
+            return set;
         }
         set = pre;
     }
