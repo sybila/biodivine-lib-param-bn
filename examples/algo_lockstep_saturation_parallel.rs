@@ -88,7 +88,7 @@ fn one_decomposition(
     should_trim: bool,
 ) -> f64 {
     let too_small = (1 << (graph.as_network().num_vars() / 2)) as f64;
-    if universe.vertices().approx_cardinality() < too_small {
+    if whole_universe.vertices().approx_cardinality() < too_small {
         // All components are too small.
         return whole_universe.approx_cardinality();
     }
