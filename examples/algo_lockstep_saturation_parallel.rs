@@ -48,7 +48,17 @@ fn par_decomposition(graph: &SymbolicAsyncGraph, threads: u32) -> usize {
                     {
                         let mut lock_remaining = remaining.lock().unwrap();
                         *lock_remaining = *lock_remaining - removed;
-                        println!("Remaining: {} (Removed {})", lock_remaining, removed);
+                        let elapsed = start.elapsed().unwrap();
+                        let unit_per_second = (full - *lock_remaining) / (elapsed.as_secs() as f64);
+                        let remaining_seconds = *lock_remaining / unit_per_second;
+                        println!(
+                            "Remaining: {}; Expected: {}s; Throughput: {}/s; Removed {}; Found: {}",
+                            lock_remaining,
+                            remaining_seconds.round(),
+                            unit_per_second.round(),
+                            removed,
+                            counter.len(),
+                        );
                     }
                 }
                 counters.lock().unwrap().push(counter);
