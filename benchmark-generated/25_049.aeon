@@ -36,8 +36,8 @@ $Akt: PIP3
 $Bach1: !ROS
 $Bad: !Akt
 $GSK3b: !Akt
-$Keap1: ((Nrf2 & !Bach1) | (Keap1 & !Bach1))
-$Mdm2: ((p53 & !ATM) | (Akt & !ATM))
+#$Keap1: ((Nrf2 & !Bach1) | (Keap1 & !Bach1))
+#$Mdm2: ((p53 & !ATM) | (Akt & !ATM))
 $Nrf2: ((PKC | Akt) | !((Akt | Keap1) | PKC))
 $PI3K: Ras
 $PIP2: PI3K
