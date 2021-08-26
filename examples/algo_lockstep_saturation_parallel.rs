@@ -6,7 +6,7 @@ use std::cmp::min;
 use std::convert::TryFrom;
 use std::io::Read;
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 fn main() {
     let mut args = std::env::args();
@@ -36,7 +36,9 @@ fn main() {
 fn par_decomposition(graph: &SymbolicAsyncGraph, threads: u32) -> usize {
     let counters = Mutex::new(Vec::new());
     let queue = ParQueue::new(threads);
+    let full = graph.unit_colored_vertices().approx_cardinality();
     let remaining = Mutex::new(graph.unit_colored_vertices().approx_cardinality());
+    let start = SystemTime::now();
     rayon::scope(|s| {
         queue.push(graph.mk_unit_colored_vertices());
         for _ in 0..threads {
