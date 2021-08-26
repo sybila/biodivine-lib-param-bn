@@ -69,5 +69,5 @@ $M: ((!Clb2 & (M & !CD)) | ((Clb2 & (!S & (M & !CD))) | (Clb2 & (S & !CD))))
 $S: ((!Clb5 & (!Clb2 & (S & !CD))) | ((!Clb5 & (Clb2 & !CD)) | (Clb5 & !CD)))
 $SFF: ((!Clb2 & (!Cdc20 & (!CKI & B))) | ((!Clb2 & (Cdc20 & (!CKI & (!Cdh1 & B)))) | ((Clb2 & (!SFF & (!Cdc20 & (!CKI & B)))) | ((Clb2 & (!SFF & (Cdc20 & (!CKI & (!Cdh1 & B))))) | (Clb2 & SFF)))))
 $SMBF: ((!Cln3 & (!SMBF & (Cln2 & !Clb2))) | ((!Cln3 & (SMBF & !Clb2)) | (Cln3 & !Clb2)))
-$Swi5: ((!Clb2 & SFF) | (Clb2 & (SFF & Cdc14)))
+#$Swi5: ((!Clb2 & SFF) | (Clb2 & (SFF & Cdc14)))
 $Yhp1: SMBF

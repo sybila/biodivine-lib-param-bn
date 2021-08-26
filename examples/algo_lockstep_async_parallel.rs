@@ -280,7 +280,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
         }
         set = post;
         if set.as_bdd().size() > 2 * initial {
-            return set;
+            //return set;
         }
     }
     loop {
@@ -303,7 +303,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
         }
         set = pre;
         if set.as_bdd().size() > 2 * initial {
-            return set;
+            //return set;
         }
     }
 

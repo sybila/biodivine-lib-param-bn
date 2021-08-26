@@ -87,6 +87,12 @@ fn one_decomposition(
     whole_universe: GraphColoredVertices,
     should_trim: bool,
 ) -> f64 {
+    let too_small = (1 << (graph.as_network().num_vars() / 2)) as f64;
+    if universe.vertices().approx_cardinality() < too_small {
+        // All components are too small.
+        return whole_universe.approx_cardinality();
+    }
+
     let universe = if should_trim {
         trim(graph, whole_universe.clone())
     } else {
@@ -97,7 +103,6 @@ fn one_decomposition(
         return whole_universe.approx_cardinality();
     }
 
-    let too_small = (1 << (graph.as_network().num_vars() / 2)) as f64;
     if universe.vertices().approx_cardinality() < too_small {
         // All components are too small.
         return whole_universe.approx_cardinality();
@@ -171,19 +176,19 @@ fn one_decomposition(
     {
         let mut bwd_continue = bwd.intersect_colors(&done_fwd);
         'bwd: loop {
+            if bwd_continue.as_bdd().size() > 100_000 {
+                println!(
+                    "BWD {} ({})",
+                    bwd_continue.approx_cardinality(),
+                    bwd_continue.as_bdd().size()
+                );
+            }
+
             for var in graph.as_network().variables().rev() {
                 let step = graph
                     .var_pre(var, &bwd_continue)
                     .intersect(&fwd)
                     .minus(&bwd_continue);
-
-                if bwd_continue.as_bdd().size() > 100_000 {
-                    println!(
-                        "BWD {} ({})",
-                        bwd_continue.approx_cardinality(),
-                        bwd_continue.as_bdd().size()
-                    );
-                }
 
                 if !step.is_empty() {
                     bwd_continue = bwd_continue.union(&step);
@@ -196,19 +201,19 @@ fn one_decomposition(
 
         let mut fwd_continue = fwd.intersect_colors(&done_bwd);
         'fwd: loop {
+            if fwd_continue.as_bdd().size() > 100_000 {
+                println!(
+                    "FWD: {} ({})",
+                    fwd_continue.approx_cardinality(),
+                    fwd_continue.as_bdd().size()
+                );
+            }
+
             for var in graph.as_network().variables().rev() {
                 let step = graph
                     .var_post(var, &fwd_continue)
                     .intersect(&bwd)
                     .minus(&fwd_continue);
-
-                if fwd_continue.as_bdd().size() > 100_000 {
-                    println!(
-                        "FWD: {} ({})",
-                        fwd_continue.approx_cardinality(),
-                        fwd_continue.as_bdd().size()
-                    );
-                }
 
                 if !step.is_empty() {
                     fwd_continue = fwd_continue.union(&step);
