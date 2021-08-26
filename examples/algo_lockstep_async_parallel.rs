@@ -81,7 +81,11 @@ fn one_decomposition(
     whole_universe: GraphColoredVertices,
     should_trim: bool,
 ) -> f64 {
-    let too_small = graph.unit_colored_vertices().vertices().approx_cardinality() / 100.0;//(1 << (graph.as_network().num_vars() / 2)) as f64;
+    let too_small = graph
+        .unit_colored_vertices()
+        .vertices()
+        .approx_cardinality()
+        / 100.0; //(1 << (graph.as_network().num_vars() / 2)) as f64;
     if whole_universe.vertices().approx_cardinality() < too_small {
         // All components are too small.
         return whole_universe.approx_cardinality();

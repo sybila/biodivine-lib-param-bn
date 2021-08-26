@@ -51,8 +51,16 @@ fn par_decomposition(graph: &SymbolicAsyncGraph, threads: u32) -> usize {
         }
     });
 
+    let mut result = Counter::new(graph);
     let locked_counters = counters.lock().unwrap();
-    locked_counters.len()
+    for counter in locked_counters.iter() {
+        println!("Counter: {}; {}", counter.len(), result.len());
+        result.merge(counter);
+        //result.print();
+    }
+
+    result.print();
+    result.len()
 }
 
 fn one_decomposition(
@@ -194,18 +202,20 @@ fn one_decomposition(
     }
 
     let scc = &fwd.intersect(&bwd);
-    let non_pivot_states = &scc.minus(&pivot);
-    let non_trivial_colors = non_pivot_states.colors();
+    if scc.vertices().approx_cardinality() >= too_small {
+        let non_pivot_states = &scc.minus(&pivot);
+        let non_trivial_colors = non_pivot_states.colors();
+        if !non_trivial_colors.is_empty() {
+            counter.push(&non_trivial_colors);
+        } else {
+            //println!("TRIVIAL.");
+        }
+    }
     /*println!(
         "SCC: {} ({} vertices)",
         scc.approx_cardinality(),
         scc.vertices().approx_cardinality()
     );*/
-    if !non_trivial_colors.is_empty() {
-        counter.push(&non_trivial_colors);
-    } else {
-        //println!("TRIVIAL.");
-    }
 
     let fwd_converged = fwd.intersect_colors(&done_fwd);
     let bwd_converged = bwd.intersect_colors(&done_bwd);
@@ -233,7 +243,7 @@ fn one_decomposition(
 }
 
 fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColoredVertices {
-    let initial = set.as_bdd().size();
+    //let initial = set.as_bdd().size();
     loop {
         // Predecessors of set inside set
         let pre = graph.pre(&set).intersect(&set);
@@ -250,11 +260,12 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );
-        }
-        set = post;
-        if set.as_bdd().size() > 2 * initial {
             return set;
         }
+        set = post;
+        //if set.as_bdd().size() > 2 * initial {
+        //    return set;
+        //}
     }
     loop {
         // Successors of set inside set
@@ -272,11 +283,12 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );
-        }
-        set = pre;
-        if set.as_bdd().size() > 2 * initial {
             return set;
         }
+        set = pre;
+        //if set.as_bdd().size() > 2 * initial {
+        //    return set;
+        //}
     }
 
     set
