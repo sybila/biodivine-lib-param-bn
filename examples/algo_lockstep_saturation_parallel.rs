@@ -113,41 +113,43 @@ fn one_decomposition(
     {
         let mut remaining = universe.colors();
         while !remaining.is_empty() {
-            let mut fwd_to_step = remaining.clone();
-            for var in graph.as_network().variables().rev() {
-                let step = graph
-                    .var_post(var, &fwd.intersect_colors(&fwd_to_step))
-                    .intersect(&universe)
-                    .minus(&fwd);
+            if fwd.as_bdd().size() < bwd.as_bdd().size() {
+                let mut fwd_to_step = remaining.clone();
+                for var in graph.as_network().variables().rev() {
+                    let step = graph
+                        .var_post(var, &fwd.intersect_colors(&fwd_to_step))
+                        .intersect(&universe)
+                        .minus(&fwd);
 
-                if !step.is_empty() {
-                    fwd_to_step = fwd_to_step.minus(&step.colors());
-                    fwd = fwd.union(&step);
+                    if !step.is_empty() {
+                        fwd_to_step = fwd_to_step.minus(&step.colors());
+                        fwd = fwd.union(&step);
+                    }
+                    if fwd_to_step.is_empty() {
+                        break;
+                    }
                 }
-                if fwd_to_step.is_empty() {
-                    break;
+                // Colors in fwd_to_step had no successors
+                done_fwd = done_fwd.union(&fwd_to_step);
+                remaining = remaining.minus(&fwd_to_step);
+            } else {
+                let mut bwd_to_step = remaining.clone();
+                for var in graph.as_network().variables().rev() {
+                    let step = graph
+                        .var_pre(var, &bwd.intersect_colors(&bwd_to_step))
+                        .intersect(&universe)
+                        .minus(&bwd);
+
+                    if !step.is_empty() {
+                        bwd_to_step = bwd_to_step.minus(&step.colors());
+                        bwd = bwd.union(&step);
+                    }
+                    if bwd_to_step.is_empty() {
+                        break;
+                    }
                 }
+                remaining = remaining.minus(&bwd_to_step);
             }
-            // Colors in fwd_to_step had no successors
-            done_fwd = done_fwd.union(&fwd_to_step);
-            remaining = remaining.minus(&fwd_to_step);
-
-            let mut bwd_to_step = remaining.clone();
-            for var in graph.as_network().variables().rev() {
-                let step = graph
-                    .var_pre(var, &bwd.intersect_colors(&bwd_to_step))
-                    .intersect(&universe)
-                    .minus(&bwd);
-
-                if !step.is_empty() {
-                    bwd_to_step = bwd_to_step.minus(&step.colors());
-                    bwd = bwd.union(&step);
-                }
-                if bwd_to_step.is_empty() {
-                    break;
-                }
-            }
-            remaining = remaining.minus(&bwd_to_step);
 
             if fwd.as_bdd().size() > 100_000 || bwd.as_bdd().size() > 100_000 {
                 println!("Remaining: {}", remaining.approx_cardinality());
