@@ -20,6 +20,11 @@ fn main() {
 
     let graph = SymbolicAsyncGraph::new(model).unwrap();
     println!(
+        "Model params: {}",
+        (graph.symbolic_context().bdd_variable_set().num_vars() as usize)
+            - graph.as_network().num_vars()
+    );
+    println!(
         "Graph size: {} (Colors {})",
         graph.unit_colored_vertices().approx_cardinality(),
         graph.unit_colors().approx_cardinality()
