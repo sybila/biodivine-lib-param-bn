@@ -32,7 +32,9 @@ fn main() {
         graph.unit_colored_vertices().approx_cardinality(),
         graph.unit_colors().approx_cardinality()
     );
-    let universes = _decompose_by_values(&graph, vec![graph.mk_unit_colored_vertices()], threads);
+    let mut universes = _decompose_by_values(&graph, vec![graph.mk_unit_colored_vertices()], threads);
+    // Usually, the biggest universe ends up first, so move it to be popped first.
+    universes.reverse();
     let count = sccs(&graph, universes, threads);
     println!("Counted: {}", count);
 }
