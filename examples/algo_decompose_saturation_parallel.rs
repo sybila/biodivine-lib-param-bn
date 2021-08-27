@@ -32,7 +32,7 @@ fn main() {
         graph.unit_colored_vertices().approx_cardinality(),
         graph.unit_colors().approx_cardinality()
     );
-    let universes = decompose_by_transitions(&graph, vec![graph.mk_unit_colored_vertices()]);
+    let universes = decompose_by_transitions(&graph, vec![graph.mk_unit_colored_vertices()], threads);
     let count = sccs(&graph, universes, threads);
     println!("Counted: {}", count);
 }
