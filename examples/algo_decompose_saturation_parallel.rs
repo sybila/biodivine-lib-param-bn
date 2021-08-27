@@ -32,7 +32,7 @@ fn main() {
         graph.unit_colored_vertices().approx_cardinality(),
         graph.unit_colors().approx_cardinality()
     );
-    let universes = decompose_by_transitions(&graph, vec![graph.mk_unit_colored_vertices()], threads);
+    let universes = _decompose_by_values(&graph, vec![graph.mk_unit_colored_vertices()], threads);
     let count = sccs(&graph, universes, threads);
     println!("Counted: {}", count);
 }
@@ -133,7 +133,51 @@ fn one_scc(
     removed
 }
 
-fn decompose_by_transitions(
+fn _decompose_by_values(
+    graph: &SymbolicAsyncGraph,
+    mut universes: Vec<GraphColoredVertices>,
+    threads: u32,
+) -> Vec<GraphColoredVertices> {
+    for var in graph.as_network().variables().rev() {
+        println!("Splitting by var {:?}", var);
+        universes = universes
+            .par_iter()
+            .flat_map(|universe| {
+                let mut result = Vec::new();
+                let pivots = graph.fix_network_variable(var, true).intersect(&universe);
+                split_by(graph, &mut result, universe, &pivots);
+                result
+            })
+            .collect();
+        universes = universes
+            .par_iter()
+            .flat_map(|universe| {
+                let mut result = Vec::new();
+                let pivots = graph.fix_network_variable(var, false).intersect(&universe);
+                split_by(graph, &mut result, universe, &pivots);
+                result
+            })
+            .collect();
+        if (threads as usize) < universes.len() {
+            println!("Split into {}. Trim.", universes.len());
+            universes = universes
+                .par_iter()
+                .map(|universe| {
+                    trim(graph, universe.clone())
+                })
+                .filter(|it| !it.is_empty())
+                .collect();
+        }
+        let size: f64 = universes
+            .iter()
+            .map(|it| it.approx_cardinality())
+            .sum();
+        println!("Size after trimming: {}/{}", size, graph.unit_colored_vertices().approx_cardinality());
+    }
+    universes
+}
+
+fn _decompose_by_transitions(
     graph: &SymbolicAsyncGraph,
     mut universes: Vec<GraphColoredVertices>,
     threads: u32,
