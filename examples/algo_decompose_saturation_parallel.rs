@@ -9,6 +9,7 @@ use std::io::Read;
 use biodivine_lib_param_bn::BooleanNetwork;
 use std::convert::TryFrom;
 use std::sync::atomic::{AtomicU64, Ordering};
+use rand::prelude::SliceRandom;
 
 fn main() {
     let mut args = std::env::args();
@@ -19,7 +20,12 @@ fn main() {
 
 
     let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let model = shuffle(model);
     println!("Model vars: {}", model.as_graph().num_vars());
+    for var in model.variables() {
+        println!("{:?}: {}", var, model.get_variable_name(var));
+    }
+
 
     let graph = SymbolicAsyncGraph::new(model).unwrap();
     println!(
@@ -37,6 +43,19 @@ fn main() {
     universes.reverse();
     let count = sccs(&graph, universes, threads);
     println!("Counted: {}", count);
+}
+
+
+fn shuffle(mut network: BooleanNetwork) -> BooleanNetwork {
+    let mut new_index = (0..network.num_vars()).collect::<Vec<_>>();
+    new_index.shuffle(&mut rand::thread_rng());
+
+    for var in network.variables() {
+        let new_name = format!("{}_{}", new_index[var.as_index()], network.get_variable_name(var));
+        network.as_graph_mut().rename(var, new_name);
+    }
+
+    BooleanNetwork::try_from(network.to_string().as_str()).unwrap()
 }
 
 fn sccs(graph: &SymbolicAsyncGraph, universes: Vec<GraphColoredVertices>, threads: u32) -> usize {

@@ -77,6 +77,11 @@ impl RegulatoryGraph {
 
 /// Some basic utility methods for inspecting the `RegulatoryGraph`.
 impl RegulatoryGraph {
+
+    pub fn rename(&mut self, id: VariableId, name: String) {
+        self.variables[id.0].name = name;
+    }
+
     /// The number of variables in this `RegulatoryGraph`.
     pub fn num_vars(&self) -> usize {
         self.variables.len()

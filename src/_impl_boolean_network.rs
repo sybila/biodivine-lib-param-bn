@@ -140,6 +140,10 @@ impl BooleanNetwork {
         &self.graph
     }
 
+    pub fn as_graph_mut(&mut self) -> &mut RegulatoryGraph {
+        &mut self.graph
+    }
+
     /// The number of variables in this `BooleanNetwork`.
     pub fn num_vars(&self) -> usize {
         self.graph.num_vars()
