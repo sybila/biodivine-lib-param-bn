@@ -135,7 +135,8 @@ fn one_scc(
 
 fn decompose_by_transitions(
     graph: &SymbolicAsyncGraph,
-    mut universes: Vec<GraphColoredVertices>
+    mut universes: Vec<GraphColoredVertices>,
+    threads: u32,
 ) -> Vec<GraphColoredVertices> {
     for var in graph.as_network().variables().rev() {
         println!("Splitting by var {:?}", var);
@@ -148,14 +149,16 @@ fn decompose_by_transitions(
                 result
             })
             .collect();
-        println!("Split into {}. Trim.", universes.len());
-        universes = universes
-            .par_iter()
-            .map(|universe| {
-                trim(graph, universe.clone())
-            })
-            .filter(|it| !it.is_empty())
-            .collect();
+        if (threads as usize) < universes.len() {
+            println!("Split into {}. Trim.", universes.len());
+            universes = universes
+                .par_iter()
+                .map(|universe| {
+                    trim(graph, universe.clone())
+                })
+                .filter(|it| !it.is_empty())
+                .collect();
+        }
         let size: f64 = universes
             .iter()
             .map(|it| it.approx_cardinality())
@@ -257,7 +260,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );*/
-            //return set;
+            return set;
         }
         set = post;
     }
@@ -277,7 +280,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );*/
-            //return set;
+            return set;
         }
         set = pre;
     }
