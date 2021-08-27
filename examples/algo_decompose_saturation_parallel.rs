@@ -8,6 +8,7 @@ use std::cmp::min;
 use std::io::Read;
 use biodivine_lib_param_bn::BooleanNetwork;
 use std::convert::TryFrom;
+use std::sync::atomic::{AtomicU64, Ordering};
 
 fn main() {
     let mut args = std::env::args();
@@ -42,6 +43,7 @@ fn sccs(graph: &SymbolicAsyncGraph, universes: Vec<GraphColoredVertices>, thread
     let total_size = graph.unit_colored_vertices().approx_cardinality();
     let remaining = Mutex::new(graph.unit_colored_vertices().approx_cardinality());
     let start = SystemTime::now();
+    let last_print = AtomicU64::new(0);
     rayon::scope(|s| {
         for _ in 0..threads {
             s.spawn(|_| {
@@ -52,17 +54,24 @@ fn sccs(graph: &SymbolicAsyncGraph, universes: Vec<GraphColoredVertices>, thread
                     {
                         let mut lock_remaining = remaining.lock().unwrap();
                         *lock_remaining = *lock_remaining - removed;
-                        let elapsed = start.elapsed().unwrap();
-                        let unit_per_second = (total_size - *lock_remaining) / (elapsed.as_secs() as f64);
-                        let remaining_seconds = *lock_remaining / unit_per_second;
-                        println!(
-                            "Remaining: {}; Expected: {}s; Throughput: {}/s; Removed {}; Found: {}",
-                            lock_remaining,
-                            remaining_seconds.round(),
-                            unit_per_second.round(),
-                            removed,
-                            counter.len(),
-                        );
+                        let now = SystemTime::now()
+                            .duration_since(start)
+                            .unwrap()
+                            .as_secs();
+                        if now > last_print.load(Ordering::Relaxed) {
+                            last_print.store(now, Ordering::Relaxed);
+                            let elapsed = start.elapsed().unwrap();
+                            let unit_per_second = (total_size - *lock_remaining) / (elapsed.as_secs() as f64);
+                            let remaining_seconds = *lock_remaining / unit_per_second;
+                            println!(
+                                "Remaining: {}; Expected: {}s; Throughput: {}/s; Removed {}; Found: {}",
+                                lock_remaining,
+                                remaining_seconds.round(),
+                                unit_per_second.round(),
+                                removed,
+                                counter.len(),
+                            );
+                        }
                     }
                 }
                 aggregated.lock().unwrap().merge(&counter);
@@ -233,7 +242,7 @@ fn bwd_saturation(
 /// It is only allowed when the symbolic size of the set is less than 10k nodes.
 fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColoredVertices {
     if set.as_bdd().size() > 10_000 {
-        return set;
+        //return set;
     }
     loop {
         let pre = graph.pre(&set).intersect(&set);
@@ -248,7 +257,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );*/
-            return set;
+            //return set;
         }
         set = post;
     }
@@ -268,7 +277,7 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
                 set.as_bdd().size(),
                 set.approx_cardinality()
             );*/
-            return set;
+            //return set;
         }
         set = pre;
     }
