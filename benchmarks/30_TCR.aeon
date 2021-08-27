@@ -8,14 +8,14 @@ CD8 -> CD8
 $TCRlig:TCRlig
 TCRlig -> TCRlig
 #position:TCRbind:192,76
-$TCRbind:(TCRlig & !cCbl)
+#$TCRbind:(TCRlig & !cCbl)
 TCRlig -> TCRbind
 cCbl -| TCRbind
 #position:cCbl:335,301
 $cCbl:ZAP70
 ZAP70 -> cCbl
 #position:ZAP70:87,302
-$ZAP70:((LCK & !cCbl) & TCRphos)
+#$ZAP70:((LCK & !cCbl) & TCRphos)
 LCK -> ZAP70
 cCbl -| ZAP70
 TCRphos -> ZAP70
@@ -23,17 +23,17 @@ TCRphos -> ZAP70
 $PAGCsk:!TCRbind
 TCRbind -| PAGCsk
 #position:LCK:82,208
-$LCK:((CD45 & CD8) & !PAGCsk)
+#$LCK:((CD45 & CD8) & !PAGCsk)
 CD45 -> LCK
 CD8 -> LCK
 PAGCsk -| LCK
 #position:Fyn:275,177
-$Fyn:(((CD45 & !TCRbind) & LCK) | (CD45 & TCRbind))
+#$Fyn:(((CD45 & !TCRbind) & LCK) | (CD45 & TCRbind))
 CD45 -> Fyn
 TCRbind -> Fyn
 LCK -> Fyn
 #position:TCRphos:203,261
-$TCRphos:(((!TCRbind & Fyn) | ((TCRbind & !LCK) & Fyn)) | (TCRbind & LCK))
+#$TCRphos:(((!TCRbind & Fyn) | ((TCRbind & !LCK) & Fyn)) | (TCRbind & LCK))
 TCRbind -> TCRphos
 LCK -> TCRphos
 Fyn -> TCRphos
@@ -47,7 +47,7 @@ ZAP70 -> LAT
 $Gads:LAT
 LAT -> Gads
 #position:Itk:242,355
-$Itk:(ZAP70 & Slp76)
+#$Itk:(ZAP70 & Slp76)
 ZAP70 -> Itk
 Slp76 -> Itk
 #position:Slp76:242,402
@@ -88,14 +88,14 @@ Ras -> Raf
 $SEK:PKCth
 PKCth -> SEK
 #position:Ras:57,535
-$Ras:(Grb2Sos & RasGRP1)
+#$Ras:(Grb2Sos & RasGRP1)
 Grb2Sos -> Ras
 RasGRP1 -> Ras
 #position:Grb2Sos:54,484
 $Grb2Sos:LAT
 LAT -> Grb2Sos
 #position:RasGRP1:144,534
-$RasGRP1:(DAG & PKCth)
+#$RasGRP1:(DAG & PKCth)
 DAG -> RasGRP1
 PKCth -> RasGRP1
 #position:DAG:273,475
