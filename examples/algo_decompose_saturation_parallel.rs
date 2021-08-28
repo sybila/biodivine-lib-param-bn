@@ -184,9 +184,13 @@ fn _decompose_by_values(
         if (threads as usize) < universes.len() {
             println!("Split into {}. Trim.", universes.len());
             universes = universes
-                .par_iter()
+                .into_par_iter()
                 .map(|universe| {
-                    trim(graph, universe.clone())
+                    if universe.vertices().approx_cardinality() < cut_off {
+                        trim(graph, universe)
+                    } else {
+                        universe
+                    }
                 })
                 .filter(|it| !it.is_empty())
                 .collect();
@@ -200,8 +204,9 @@ fn _decompose_by_values(
             .iter()
             .map(|it| it.approx_cardinality())
             .sum();
-        println!("Size after trimming: {}/{} ({} done)", size, graph.unit_colored_vertices().approx_cardinality(), result.len());
+        println!("Size after trimming: {}/{}", size, graph.unit_colored_vertices().approx_cardinality());
     }
+    universes.append(&mut result);
     universes
 }
 
@@ -327,12 +332,12 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
             break;
         }
         if set.as_bdd().size() > 10_000 {
-            /*println!(
+            println!(
                 "TRIM: {}; {}",
                 set.as_bdd().size(),
                 set.approx_cardinality()
-            );*/
-            return set;
+            );
+            //return set;
         }
         set = post;
     }
@@ -347,12 +352,12 @@ fn trim(graph: &SymbolicAsyncGraph, mut set: GraphColoredVertices) -> GraphColor
             break;
         }
         if set.as_bdd().size() > 10_000 {
-            /*println!(
+            println!(
                 "TRIM: {}; {}",
                 set.as_bdd().size(),
                 set.approx_cardinality()
-            );*/
-            return set;
+            );
+            //return set;
         }
         set = pre;
     }
