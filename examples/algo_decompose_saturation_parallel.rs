@@ -159,6 +159,8 @@ fn _decompose_by_values(
     mut universes: Vec<GraphColoredVertices>,
     threads: u32,
 ) -> Vec<GraphColoredVertices> {
+    let cut_off = (1 << (graph.as_network().num_vars() / 2)) as f64;
+    let mut result = Vec::new();
     for var in graph.as_network().variables().rev() {
         println!("Splitting by var {:?}", var);
         universes = universes
@@ -189,11 +191,16 @@ fn _decompose_by_values(
                 .filter(|it| !it.is_empty())
                 .collect();
         }
+
+        let (mut move_result, keep) = universes.into_iter().partition(|it| it.vertices().approx_cardinality() < cut_off);
+        result.append(&mut move_result);
+        universes = keep;
+
         let size: f64 = universes
             .iter()
             .map(|it| it.approx_cardinality())
             .sum();
-        println!("Size after trimming: {}/{}", size, graph.unit_colored_vertices().approx_cardinality());
+        println!("Size after trimming: {}/{} ({} done)", size, graph.unit_colored_vertices().approx_cardinality(), result.len());
     }
     universes
 }
