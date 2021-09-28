@@ -33,8 +33,12 @@ fn fn_update_to_bnet_string(
 ) -> Result<String, String> {
     Ok(match function {
         FnUpdate::Var(id) => network.get_variable_name(*id).clone(),
-        FnUpdate::Param(_, _) => {
-            return Err("Parametrised network cannot be converted to .bnet.".to_string());
+        FnUpdate::Param(id, args) => {
+            if args.is_empty() {
+                network.get_parameter(*id).get_name().to_string()
+            } else {
+                return Err("Networks with free functions cannot be converted to .bnet.".to_string());
+            }
         }
         FnUpdate::Const(value) => {
             // .bnet does not have constants, but we can simulate a constant like this:
