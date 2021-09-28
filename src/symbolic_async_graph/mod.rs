@@ -30,7 +30,7 @@
 
 use crate::BooleanNetwork;
 use biodivine_lib_bdd::{
-    Bdd, BddSatisfyingValuations, BddValuationIterator, BddVariable, BddVariableSet,
+    Bdd, BddSatisfyingValuations, BddVariable, BddVariableSet, ValuationsOfClauseIterator,
 };
 use std::iter::Enumerate;
 
@@ -140,7 +140,7 @@ pub struct FunctionTable {
 
 /// Iterator over elements of the `FunctionTable`.
 pub struct FunctionTableIterator<'a> {
-    inner_iterator: Enumerate<BddValuationIterator>,
+    inner_iterator: Enumerate<ValuationsOfClauseIterator>,
     table: &'a FunctionTable,
 }
 

@@ -1,5 +1,5 @@
 use crate::symbolic_async_graph::{FunctionTable, FunctionTableIterator};
-use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
+use biodivine_lib_bdd::{BddVariable, BddVariableSetBuilder, ValuationsOfClauseIterator};
 
 impl FunctionTable {
     /// Construct a new `FunctionTable`, registering each row of the table as `BddVariable` in
@@ -8,7 +8,7 @@ impl FunctionTable {
     /// The `name` is necessary to give some semantic names to the
     /// symbolic variables.
     pub fn new(name: &str, arity: u16, bdd_builder: &mut BddVariableSetBuilder) -> FunctionTable {
-        let rows: Vec<BddVariable> = BddValuationIterator::new(arity)
+        let rows: Vec<BddVariable> = ValuationsOfClauseIterator::new_unconstrained(arity)
             .map(|arg_valuation| {
                 let bdd_var_name = format!("{}{}", name, arg_valuation);
                 bdd_builder.make_variable(bdd_var_name.as_str())
@@ -34,7 +34,7 @@ impl FunctionTableIterator<'_> {
     pub fn new(table: &FunctionTable) -> FunctionTableIterator {
         FunctionTableIterator {
             table,
-            inner_iterator: BddValuationIterator::new(table.arity).enumerate(),
+            inner_iterator: ValuationsOfClauseIterator::new_unconstrained(table.arity).enumerate(),
         }
     }
 }

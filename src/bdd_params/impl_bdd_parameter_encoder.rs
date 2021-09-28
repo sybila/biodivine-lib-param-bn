@@ -2,7 +2,7 @@ use super::BddParameterEncoder;
 use crate::bdd_params::{BddParams, FunctionTableEntry};
 use crate::biodivine_std::structs::IdState;
 use crate::{BooleanNetwork, ParameterId, VariableId};
-use biodivine_lib_bdd::{BddValuationIterator, BddVariable, BddVariableSetBuilder};
+use biodivine_lib_bdd::{BddVariable, BddVariableSetBuilder, ValuationsOfClauseIterator};
 
 const MAX_VARIABLES: usize = 8 * std::mem::size_of::<usize>();
 
@@ -48,7 +48,7 @@ impl BddParameterEncoder {
             // Here, we abuse BddValuationIterator to go over all possible valuations
             // of function inputs.
 
-            let p_vars = BddValuationIterator::new(p.arity as u16)
+            let p_vars = ValuationsOfClauseIterator::new_unconstrained(p.arity as u16)
                 .map(|valuation| {
                     let bdd_name = format!("{}{}", p.name, valuation);
                     bdd.make_variable(&bdd_name)
@@ -76,7 +76,7 @@ impl BddParameterEncoder {
 
                 // Note that if args are empty, one variable is still created because there is
                 // an "empty" valuation.
-                let p_vars = BddValuationIterator::new(cardinality as u16)
+                let p_vars = ValuationsOfClauseIterator::new_unconstrained(cardinality as u16)
                     .map(|valuation| {
                         let bdd_name = format!("\\{{{}}}{}", v.name, valuation);
                         bdd.make_variable(&bdd_name)

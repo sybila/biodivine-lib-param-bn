@@ -1,4 +1,4 @@
-use biodivine_lib_bdd::{BddValuation, BddValuationIterator};
+use biodivine_lib_bdd::{BddValuation, ValuationsOfClauseIterator};
 use biodivine_lib_param_bn::async_graph::AsyncGraph;
 use biodivine_lib_param_bn::bdd_params::BddParameterEncoder;
 use biodivine_lib_param_bn::biodivine_std::traits::{EvolutionOperator, Graph};
@@ -23,9 +23,10 @@ fn main() {
     println!("Vertices: {}", graph.num_states());
     println!("Colors: {}", all_colors.cardinality());
     let p_num_vars = encoder.bdd_variables.num_vars();
-    let valid_valuations: Vec<BddValuation> = BddValuationIterator::new(p_num_vars)
-        .filter(|v| all_colors.eval_in(v))
-        .collect();
+    let valid_valuations: Vec<BddValuation> =
+        ValuationsOfClauseIterator::new_unconstrained(p_num_vars)
+            .filter(|v| all_colors.eval_in(v))
+            .collect();
 
     let fwd = graph.fwd();
     for s in graph.states() {

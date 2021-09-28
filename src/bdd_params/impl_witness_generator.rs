@@ -1,7 +1,7 @@
 use crate::bdd_params::{BddParameterEncoder, BddParams};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
-use biodivine_lib_bdd::{Bdd, BddValuation, BddValuationIterator, BddVariableSet};
+use biodivine_lib_bdd::{Bdd, BddValuation, BddVariableSet, ValuationsOfClauseIterator};
 
 impl BooleanNetwork {
     /// *Legacy* function for creating a fully instantiated `BooleanNetwork` using parameters.
@@ -43,7 +43,7 @@ impl BooleanNetwork {
 
                 let variables_and_valuations = parameter_input_table
                     .iter()
-                    .zip(BddValuationIterator::new(num_inputs));
+                    .zip(ValuationsOfClauseIterator::new_unconstrained(num_inputs));
 
                 // initially, the function is just false
                 let mut function_bdd = parameter_function_input_vars.mk_false();
@@ -77,7 +77,7 @@ impl BooleanNetwork {
 
                 let variables_and_valuations = function_input_table
                     .iter()
-                    .zip(BddValuationIterator::new(num_inputs));
+                    .zip(ValuationsOfClauseIterator::new_unconstrained(num_inputs));
                 let mut function_bdd = function_input_vars.mk_false();
                 for (bdd_variable, input_valuation) in variables_and_valuations {
                     if valuation.value(*bdd_variable) {
