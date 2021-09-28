@@ -37,7 +37,9 @@ fn fn_update_to_bnet_string(
             if args.is_empty() {
                 network.get_parameter(*id).get_name().to_string()
             } else {
-                return Err("Networks with free functions cannot be converted to .bnet.".to_string());
+                return Err(
+                    "Networks with free functions cannot be converted to .bnet.".to_string()
+                );
             }
         }
         FnUpdate::Const(value) => {
