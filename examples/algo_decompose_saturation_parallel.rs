@@ -159,7 +159,7 @@ fn _decompose_by_values(
     mut universes: Vec<GraphColoredVertices>,
     threads: u32,
 ) -> Vec<GraphColoredVertices> {
-    let cut_off = (1 << (graph.as_network().num_vars() / 2)) as f64;
+    let cut_off = (1 << 15) as f64;
     let mut result = Vec::new();
     for var in graph.as_network().variables().rev() {
         println!("Splitting by var {:?}", var);
