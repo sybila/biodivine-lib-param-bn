@@ -1,3 +1,4 @@
+#![allow(deprecated)]
 use crate::bdd_params::{BddParameterEncoder, BddParams};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::boolean_expression::BooleanExpression;
