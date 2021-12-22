@@ -7,14 +7,14 @@
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 
-mod impl_bdd_parameter_encoder;
-mod impl_bdd_params;
-mod impl_fn_update;
-mod impl_function_table_entry;
-mod impl_static_constraints;
-mod impl_witness_generator;
+mod _impl_bdd_parameter_encoder;
+mod _impl_bdd_params;
+mod _impl_fn_update;
+mod _impl_function_table_entry;
+mod _impl_static_constraints;
+mod _impl_witness_generator;
 
-pub use impl_static_constraints::build_static_constraints;
+pub use _impl_static_constraints::build_static_constraints;
 
 /// A wrapper for the `Bdd` object that implements a basic `Set` trait.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]

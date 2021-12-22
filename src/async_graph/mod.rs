@@ -9,9 +9,9 @@ use crate::biodivine_std::structs::{IdState, IdStateRange};
 use crate::biodivine_std::traits::{Graph, InvertibleGraph, Set};
 use crate::{BooleanNetwork, VariableId, VariableIdIterator};
 
-mod impl_async_graph;
-mod impl_default_edge_params;
-mod impl_evolution_operators;
+mod _impl_async_graph;
+mod _impl_default_edge_params;
+mod _impl_evolution_operators;
 
 /// An asynchronous transition system of a `BooleanNetwork`. The states of the graph
 /// are standard `IdState`s. The parameter sets are given by the associated `AsyncGraphEdgeParams`.
