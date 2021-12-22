@@ -84,6 +84,7 @@ pub struct GraphVertices {
 ///
 /// Internally, this struct contains a `Bdd` that has all parameter variables fixed to false,
 /// so that we only iterate over vertices and can safely disregard colors.
+#[derive(Clone)]
 pub struct IterableVertices {
     materialized_bdd: Bdd,
     state_variables: Vec<BddVariable>,
@@ -98,6 +99,7 @@ pub struct GraphVertexIterator<'a> {
 /// A symbolic encoding of asynchronous transition system of a `BooleanNetwork`.
 ///
 /// Provides standard pre/post operations for exploring the graph symbolically.
+#[derive(Clone)]
 pub struct SymbolicAsyncGraph {
     network: BooleanNetwork,
     symbolic_context: SymbolicContext,
@@ -119,6 +121,7 @@ pub struct SymbolicAsyncGraph {
 ///
 /// Note that while this is technically public, it should not be used unless absolutely necessary.
 /// Playing with raw `BDDs` is dangerous.
+#[derive(Clone)]
 pub struct SymbolicContext {
     bdd: BddVariableSet,
     state_variables: Vec<BddVariable>,
