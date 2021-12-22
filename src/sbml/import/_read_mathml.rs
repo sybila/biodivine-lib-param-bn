@@ -6,9 +6,12 @@ const APPLY_TAG: (&str, &str) = (MATHML, "apply");
 const NUMBER_TAG: (&str, &str) = (MATHML, "cn");
 const IDENTIFIER_TAG: (&str, &str) = (MATHML, "ci");
 const SYMBOL_TAG: (&str, &str) = (MATHML, "csymbol");
+const TRUE_TAG: (&str, &str) = (MATHML, "true");
+const FALSE_TAG: (&str, &str) = (MATHML, "false");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MathMl {
+    Boolean(bool),
     Integer(i64),
     Identifier(String),
     Apply(String, Vec<MathMl>),
@@ -28,6 +31,14 @@ pub fn read_mathml(math: Node) -> Result<MathMl, String> {
 }
 
 fn read_expression(math: Node) -> Result<MathMl, String> {
+    if math.tag_name() == ExpandedName::from(TRUE_TAG) {
+        return Ok(MathMl::Boolean(true));
+    }
+
+    if math.tag_name() == ExpandedName::from(FALSE_TAG) {
+        return Ok(MathMl::Boolean(false));
+    }
+
     if math.tag_name() == ExpandedName::from(IDENTIFIER_TAG) {
         let id = math
             .text()
@@ -95,6 +106,7 @@ impl MathMl {
     /// Returns true if the function contains given identifier (function symbols do not count).
     pub fn contains_identifier(&self, id: &str) -> bool {
         match self {
+            MathMl::Boolean(_) => false,
             MathMl::Integer(_) => false,
             MathMl::Identifier(value) => value == id,
             MathMl::SymbolApply(_, args) => args.iter().any(|a| a.contains_identifier(id)),

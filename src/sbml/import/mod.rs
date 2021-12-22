@@ -316,6 +316,7 @@ fn create_regulations(
 /// **(internal)** Create any explicit parameters used in the given MathML tree.
 fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Result<(), String> {
     match math {
+        MathMl::Boolean(_) => Ok(()),
         MathMl::Integer(_) => Ok(()),
         MathMl::Identifier(_) => Ok(()),
         MathMl::Apply(_, args) => {
@@ -384,7 +385,7 @@ mod tests {
             SciP -| CcrM
             CtrA -> SciP
             DnaA -| SciP
-            $CtrA: ((((!CtrA & GcrA) & !CcrM) & !SciP) | ((CtrA & !CcrM) & !SciP))
+            $CtrA: ((false | ((((!CtrA & GcrA) & !CcrM) & !SciP) & true)) | ((CtrA & !CcrM) & !SciP))
             $GcrA: (!CtrA & DnaA)
             $DnaA: (((CtrA & !GcrA) & !DnaA) & CcrM)
             $CcrM: ((CtrA & !CcrM) & !SciP)

@@ -64,6 +64,7 @@
             <math xmlns="http://www.w3.org/1998/Math/MathML">            
               <apply>
                 <or/>
+                <false/>
                 <apply>
                   <and/>
                   <apply>
@@ -86,6 +87,7 @@
                     <ci> SciP </ci>
                     <cn type="integer"> 0 </cn>
                   </apply>
+                  <true/>
                 </apply>
                 <apply>
                   <and/>

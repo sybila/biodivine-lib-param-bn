@@ -20,6 +20,7 @@ pub fn sbml_transition_to_update_function(
         id_to_var: &HashMap<String, String>,
     ) -> Result<FnUpdate, String> {
         match math {
+            MathMl::Boolean(v) => Ok(FnUpdate::Const(*v)),
             MathMl::Integer(i) => {
                 if *i == 0 {
                     Ok(FnUpdate::Const(false))
