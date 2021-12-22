@@ -15,7 +15,16 @@ pub struct SbmlSpecie {
 pub fn read_species(model: Node) -> Result<Vec<SbmlSpecie>, String> {
     let mut result = Vec::new();
 
-    let list = read_unique_child(model, (SBML_QUAL, "listOfQualitativeSpecies"))?;
+    let list = read_unique_child(model, (SBML_QUAL, "listOfQualitativeSpecies"));
+    let list = match list {
+        Ok(list) => list,
+        Err(e) => {
+            return Err(format!(
+            "List of qualitative species is missing ({}). Are you sure this is an SBML-qual model?",
+            e
+        ))
+        }
+    };
 
     let species = child_tags(list, (SBML_QUAL, "qualitativeSpecies"));
 
