@@ -12,6 +12,10 @@ impl RegulatoryGraph {
     ///
     /// The ordering of the variables is preserved.
     pub fn new(variables: Vec<String>) -> RegulatoryGraph {
+        let variable_set = variables.iter().collect::<HashSet<_>>();
+        if variable_set.len() != variables.len() {
+            panic!("Variables {:?} contain duplicates.", variables);
+        }
         RegulatoryGraph {
             regulations: Vec::new(),
             variable_to_index: build_index_map(&variables, |_, i| VariableId(i)),

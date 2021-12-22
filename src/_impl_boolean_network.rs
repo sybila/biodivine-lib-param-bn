@@ -140,6 +140,14 @@ impl BooleanNetwork {
         &self.graph
     }
 
+    /// Obtain a mutable reference to the underlying `RegulatoryGraph`.
+    ///
+    /// However, note that at the moment, you can't really do much with this reference, only
+    /// add new regulations.
+    pub fn as_graph_mut(&mut self) -> &mut RegulatoryGraph {
+        &mut self.graph
+    }
+
     /// The number of variables in this `BooleanNetwork`.
     pub fn num_vars(&self) -> usize {
         self.graph.num_vars()
