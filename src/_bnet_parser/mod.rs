@@ -6,8 +6,13 @@ use std::convert::TryFrom;
 impl BooleanNetwork {
     /// Try to load a Boolean network from a `.bnet` model.
     ///
-    /// Note that this is currently only a "best effort" implementation and you may encounter
-    /// unsupported `bnet` models.
+    /// **Note that this is currently only a "best effort" implementation and you may encounter
+    /// unsupported `bnet` models.**
+    ///
+    /// We also support some features that bnet does not, in particular, you can use
+    /// Boolean constants. However, there are also other things that we do not support,
+    /// since bnet can essentially use R syntax to define more complex functions, but in
+    /// practice this is not used anywhere as far as I know.
     pub fn try_from_bnet(model_string: &str) -> Result<BooleanNetwork, String> {
         let mut model_map: HashMap<String, String> = HashMap::new();
         let mut variables = HashSet::new();
