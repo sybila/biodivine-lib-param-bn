@@ -122,8 +122,9 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransit
     let effect = input.attribute((SBML_QUAL, "transitionEffect"));
     let sign = input.attribute((SBML_QUAL, "sign"));
     let id = input.attribute((SBML_QUAL, "id"));
-    // WARNING: This attribute is not a part of the SBML-qual specification!
-    let essential = input.attribute((SBML_QUAL, "essential"));
+    // WARNING: This attribute is not a part of the SBML-qual specification. We thus do not use
+    // the SBML-qual namespace for it.
+    let essential = input.attribute("essential");
     if species.is_none() {
         return Err(format!(
             "Transition {} is missing an input species.",
@@ -179,7 +180,7 @@ fn read_transition_term(term: Node, transition_id: &str) -> Result<SbmlTransitio
     }
 
     let math = read_unique_child(term, (MATHML, "math")).ok();
-    let math = Ok(math).and_then(|node| node.map(read_mathml).transpose())?;
+    let math = math.map(read_mathml).transpose()?;
 
     Ok(SbmlTransitionTerm {
         result_level: level.unwrap(),

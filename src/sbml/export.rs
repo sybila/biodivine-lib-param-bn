@@ -52,16 +52,20 @@ impl BooleanNetwork {
             write!(out, "<qual:listOfInputs>")?;
             for r in self.regulators(id) {
                 let r_var_name = self[r].get_name();
-                let monotonicity = self
-                    .graph
-                    .find_regulation(r, id)
-                    .and_then(|r| r.monotonicity);
+                let regulation = self.graph.find_regulation(r, id);
+                let monotonicity = regulation.and_then(|r| r.monotonicity);
+                let observability = regulation.map(|r| r.is_observable());
                 let sign = match monotonicity {
                     None => "unknown",
                     Some(Monotonicity::Activation) => "positive",
                     Some(Monotonicity::Inhibition) => "negative",
                 };
-                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\"/>", r_var_name, sign, var_name, r_var_name)?;
+                let essential = if let Some(true) = observability {
+                    "true"
+                } else {
+                    "false"
+                };
+                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\" essential=\"{}\"/>", r_var_name, sign, var_name, r_var_name, essential)?;
             }
             write!(out, "</qual:listOfInputs>")?;
 
@@ -175,7 +179,10 @@ mod tests {
             "
             a -? a
             c -? a
-            a -> b
+            # This regulation is used in the function and therefore must
+            # use our custom `essential` attribute in order to preserved
+            # that it is in fact not essential.
+            a ->? b
             a ->? c
             b -| c
             # Also some comments are allowed
