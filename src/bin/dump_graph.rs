@@ -1,3 +1,5 @@
+#![allow(deprecated)]
+
 use biodivine_lib_bdd::{BddValuation, ValuationsOfClauseIterator};
 use biodivine_lib_param_bn::async_graph::AsyncGraph;
 use biodivine_lib_param_bn::bdd_params::BddParameterEncoder;
