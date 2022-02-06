@@ -49,6 +49,24 @@ impl RegulatoryGraph {
         Ok(())
     }
 
+    /// Set the name of a network variable. The name must not be used by any other variable.
+    ///
+    /// Note that you don't have to rename anything else in the network, since all other
+    /// structures reference variables with ids.
+    pub fn set_variable_name(&mut self, id: VariableId, name: &str) -> Result<(), String> {
+        if self.find_variable(name).is_some() {
+            Err(format!("Variable named `{}` already exists.", name))
+        } else if let Some(variable) = self.variables.get_mut(id.0) {
+            let mut name_string = name.to_string();
+            std::mem::swap(&mut name_string, &mut variable.name);
+            self.variable_to_index.remove(&name_string);
+            self.variable_to_index.insert(name.to_string(), id);
+            Ok(())
+        } else {
+            Err(format!("Unknown variable id: {:?}", id))
+        }
+    }
+
     /// **(internal)** Utility method to safely obtain a regulator variable (using an appropriate error message).
     fn get_regulator(&self, name: &str) -> Result<VariableId, String> {
         self.find_variable(name)
@@ -249,6 +267,18 @@ impl Index<VariableId> for RegulatoryGraph {
 mod tests {
     use crate::{RegulatoryGraph, Variable, VariableId};
     use std::collections::HashSet;
+
+    #[test]
+    fn test_rename() {
+        let mut rg = RegulatoryGraph::new(vec!["a".to_string(), "b".to_string()]);
+        let a = rg.find_variable("a").unwrap();
+        rg.set_variable_name(a, "x1").unwrap();
+        let x1 = rg.find_variable("x1").unwrap();
+        assert_eq!(a, x1);
+
+        assert!(rg.set_variable_name(a, "b").is_err());
+        assert!(rg.set_variable_name(VariableId(5), "z").is_err());
+    }
 
     #[test]
     fn test_regulatory_graph() {
