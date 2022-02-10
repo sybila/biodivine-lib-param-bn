@@ -7,6 +7,8 @@ use biodivine_lib_bdd::Bdd;
 impl SymbolicAsyncGraph {
     /// Compute the colored vertex set which is a result of applying the update function
     /// of the given `variable` to the `initial` set.
+    ///
+    /// Uses a single symbolic operation.
     pub fn var_post(
         &self,
         variable: VariableId,
@@ -23,6 +25,8 @@ impl SymbolicAsyncGraph {
     }
 
     /// Compute the subset of `set` that can perform `post` using given `variable`.
+    ///
+    /// Uses a single symbolic operation.
     pub fn var_can_post(
         &self,
         variable: VariableId,
@@ -37,6 +41,8 @@ impl SymbolicAsyncGraph {
 
     /// Compute the colored vertex set which can create some valuation in `initial` by
     /// applying the update function of the given `variable`.
+    ///
+    /// Uses a single symbolic operation.
     pub fn var_pre(
         &self,
         variable: VariableId,
@@ -54,6 +60,8 @@ impl SymbolicAsyncGraph {
     }
 
     /// Compute the subset of `set` that can perform `pre` using given `variable`.
+    ///
+    /// Uses a single symbolic operation.
     pub fn var_can_pre(
         &self,
         variable: VariableId,
@@ -72,6 +80,8 @@ impl SymbolicAsyncGraph {
 
     /// Compute the subset of `set` that can perform `post` using the given `variable`,
     /// such that the successor is also within `set`.
+    ///
+    /// Uses two symbolic operations.
     pub fn var_can_post_within(
         &self,
         variable: VariableId,
@@ -90,8 +100,33 @@ impl SymbolicAsyncGraph {
         )
     }
 
+    /// Compute the subset of `set` that can perform `post` using the given `variable`,
+    /// such that the successor is *not* within `set`.
+    ///
+    /// Uses two symbolic operations.
+    pub fn var_can_post_out(
+        &self,
+        variable: VariableId,
+        set: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        // s in output if s in set, but s not in set with var flipped
+        let has_no_dual_within_set = Bdd::fused_binary_flip_op(
+            (&set.bdd, None),
+            (&set.bdd, Some(symbolic_var)),
+            None,
+            biodivine_lib_bdd::op_function::and_not,
+        );
+        GraphColoredVertices::new(
+            has_no_dual_within_set.and(&self.update_functions[variable.0]),
+            &self.symbolic_context,
+        )
+    }
+
     /// Compute the subset of `set` that can perform `pre` using the given `variable`,
     /// such that the predecessor is also within `set`.
+    ///
+    /// Uses two symbolic operations.
     pub fn var_can_pre_within(
         &self,
         variable: VariableId,
@@ -106,6 +141,32 @@ impl SymbolicAsyncGraph {
         );
         let can_pre = Bdd::fused_binary_flip_op(
             (&has_dual_within_set, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            Some(symbolic_var),
+            biodivine_lib_bdd::op_function::and,
+        );
+        GraphColoredVertices::new(can_pre, &self.symbolic_context)
+    }
+
+    /// Compute the subset of `set` that can perform `pre` using the given `variable`,
+    /// such that the successor is *not* within `set`.
+    ///
+    /// Uses two symbolic operations.
+    pub fn var_can_pre_out(
+        &self,
+        variable: VariableId,
+        set: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        // s in output if s in set, but s not in set with var flipped
+        let has_no_dual_within_set = Bdd::fused_binary_flip_op(
+            (&set.bdd, None),
+            (&set.bdd, Some(symbolic_var)),
+            None,
+            biodivine_lib_bdd::op_function::and_not,
+        );
+        let can_pre = Bdd::fused_binary_flip_op(
+            (&has_no_dual_within_set, Some(symbolic_var)),
             (&self.update_functions[variable.0], None),
             Some(symbolic_var),
             biodivine_lib_bdd::op_function::and,
@@ -162,12 +223,14 @@ impl SymbolicAsyncGraph {
             })
     }
 
-    /// Compute the subset of `set` such that *every* `post` operation leads to a state
+    /// Compute the subset of `set` such that *every admissible* `post` operation leads to a state
     /// within the same `set`.
+    ///
+    /// Note that this also includes states which cannot perform any `post` operation.
     pub fn will_post_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network.variables().fold(set.clone(), |r, v| {
-            r.intersect(&self.var_can_post_within(v, set))
-        })
+        self.network
+            .variables()
+            .fold(set.clone(), |r, v| r.minus(&self.var_can_post_out(v, set)))
     }
 
     /// Compute the subset of `set` that can perform *some* `pre` operation which leads
@@ -180,11 +243,53 @@ impl SymbolicAsyncGraph {
             })
     }
 
-    /// Compute the subset of `set` such that *every* `pre` operation leads to a state
+    /// Compute the subset of `set` such that *every admissible* `pre` operation leads to a state
     /// within the same `set`.
+    ///
+    /// Note that this also includes states which cannot perform any `pre` operation.
     pub fn will_pre_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        self.network
+            .variables()
+            .fold(set.clone(), |r, v| r.minus(&self.var_can_pre_out(v, set)))
+    }
+
+    /// Compute the subset of `set` that can perform *some* `post` operation which leads
+    /// to a state outside of `set`.
+    pub fn can_post_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        self.network
+            .variables()
+            .fold(self.mk_empty_vertices(), |r, v| {
+                r.union(&self.var_can_post_out(v, set))
+            })
+    }
+
+    /// Compute the subset of `set` such that *every admissible* `post` operation leads
+    /// to a state outside the `set`.
+    ///
+    /// Note that this also includes states which cannot perform any `post` operation.
+    pub fn will_post_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
         self.network.variables().fold(set.clone(), |r, v| {
-            r.intersect(&self.var_can_pre_within(v, set))
+            r.minus(&self.var_can_post_within(v, set))
+        })
+    }
+
+    /// Compute the subset of `set` that can perform *some* `pre` operation which leads
+    /// to a state outside of `set`.
+    pub fn can_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        self.network
+            .variables()
+            .fold(self.mk_empty_vertices(), |r, v| {
+                r.union(&self.var_can_pre_out(v, set))
+            })
+    }
+
+    /// Compute the subset of `set` such that *every admissible* `pre` operation leads
+    /// to a state outside of `set`.
+    ///
+    /// Note that this also includes states which cannot perform any `pre` operation.
+    pub fn will_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        self.network.variables().fold(set.clone(), |r, v| {
+            r.minus(&self.var_can_pre_within(v, set))
         })
     }
 }
