@@ -1,6 +1,6 @@
 [package]
 name = "biodivine-lib-param-bn"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["Samuel Pastva <daemontus@gmail.com>"]
 edition = "2018"
 description = "Library for working with parametrized Boolean networks."
