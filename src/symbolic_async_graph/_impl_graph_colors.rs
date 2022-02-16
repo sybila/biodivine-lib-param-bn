@@ -55,6 +55,16 @@ impl GraphColors {
         let state_count = (2.0f64).powi(state_variable_count.into());
         self.bdd.cardinality() / state_count
     }
+
+    /// Amount of storage used for this symbolic set.
+    pub fn symbolic_size(&self) -> usize {
+        self.bdd.size()
+    }
+
+    /// Convert this set to a `.dot` graph.
+    pub fn to_dot_string(&self, context: &SymbolicContext) -> String {
+        self.bdd.to_dot_string(&context.bdd, true)
+    }
 }
 
 /// Set operations.
