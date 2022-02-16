@@ -3,7 +3,7 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
-use biodivine_lib_bdd::{Bdd, BddValuation};
+use biodivine_lib_bdd::{Bdd, BddValuation, BddVariable};
 use std::convert::TryFrom;
 
 impl GraphVertices {
@@ -41,6 +41,24 @@ impl GraphVertices {
         self.bdd.cardinality() / parameter_count
     }
 
+    /// Pick one vertex from this set and return it as a singleton.
+    ///
+    /// If the set is empty, return empty set.
+    pub fn pick_singleton(&self) -> GraphVertices {
+        if self.is_empty() {
+            self.clone()
+        } else {
+            /* This is faster than `bdd.pick` and still correct since state variables are unconstrained. */
+            let witness = self.bdd.sat_witness().unwrap();
+            let partial_valuation: Vec<(BddVariable, bool)> = self
+                .state_variables
+                .iter()
+                .map(|v| (*v, witness[*v]))
+                .collect();
+            self.copy(self.bdd.select(&partial_valuation))
+        }
+    }
+
     /// Create an iterable view of this vertex set.
     ///
     /// Note that sadly you have to use `set.materialize().iter()` to actually iterate over
@@ -53,6 +71,16 @@ impl GraphVertices {
             materialized_bdd: self.bdd.and(&parameters_false),
             state_variables: self.state_variables.clone(),
         }
+    }
+
+    /// Amount of storage used for this symbolic set.
+    pub fn symbolic_size(&self) -> usize {
+        self.bdd.size()
+    }
+
+    /// Convert this set to a `.dot` graph.
+    pub fn to_dot_string(&self, context: &SymbolicContext) -> String {
+        self.bdd.to_dot_string(&context.bdd, true)
     }
 }
 

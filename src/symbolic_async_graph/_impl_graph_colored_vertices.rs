@@ -16,6 +16,9 @@ impl GraphColoredVertices {
     }
 
     /// Construct a new colored vertex set by copying the context of the current set.
+    ///
+    /// The contents of the set are completely replaced using the provided `bdd`, but the
+    /// underlying `SymbolicAsyncGraph` remains the same.
     pub fn copy(&self, bdd: Bdd) -> GraphColoredVertices {
         GraphColoredVertices {
             bdd,
@@ -75,12 +78,24 @@ impl Set for GraphColoredVertices {
 
 /// Relation operations.
 impl GraphColoredVertices {
+    /// Remove every occurrence of a color form `colors` set.
     pub fn minus_colors(&self, colors: &GraphColors) -> Self {
         self.copy(self.bdd.and_not(&colors.bdd))
     }
 
+    /// Only retain colours in the supplied `colors` set.
     pub fn intersect_colors(&self, colors: &GraphColors) -> Self {
         self.copy(self.bdd.and(&colors.bdd))
+    }
+
+    /// Remove every occurrence of a vertex from `vertices`, regardless of color.
+    pub fn minus_vertices(&self, vertices: &GraphVertices) -> Self {
+        self.copy(self.bdd.and_not(&vertices.bdd))
+    }
+
+    /// Retain only occurrences of vertices from `vertices`, regardless of color.
+    pub fn intersect_vertices(&self, vertices: &GraphVertices) -> Self {
+        self.copy(self.bdd.and(&vertices.bdd))
     }
 
     /// For every color, pick exactly one vertex.
