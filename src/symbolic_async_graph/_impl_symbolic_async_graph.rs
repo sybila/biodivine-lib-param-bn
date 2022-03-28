@@ -140,16 +140,63 @@ impl SymbolicAsyncGraph {
         self.vertex_space.1.clone()
     }
 
+    /// Compute a subset of the unit vertex set that is specified using the given list
+    /// of `(variable, value)` pairs. That is, the resulting set contains only those
+    /// vertices that have all the given variables set to their respective values.
+    ///
+    /// *Note:* The reason this method takes a slice and not, e.g., a `HashMap` is that:
+    ///  - (a) If constant, slices are much easier to write in code (i.e. we can write
+    /// `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
+    ///  - (b) This is already used by the internal BDD API, so the conversion is less involved.
+    pub fn mk_subspace(&self, values: &[(VariableId, bool)]) -> GraphColoredVertices {
+        let partial_valuation: Vec<(BddVariable, bool)> = values
+            .iter()
+            .map(|(id, value)| (self.symbolic_context.state_variables[id.0], *value))
+            .collect();
+        self.select_partial_valuation(&partial_valuation)
+    }
+
+    /// This is the same as `mk_subspace`, but it allows you to specify the partial valuation
+    /// using a slice of optional Booleans instead of mapping `VariableId` objects.
+    ///
+    /// Such slice may be easier obtain for example when one is starting with a network state
+    /// (vertex) that is already represented as a `Vec<bool>`. In this case, it may be easier
+    /// to convert `Vec<bool>` to `Vec<Option<bool>>` and then simply erase the undesired values.
+    pub fn mk_partial_vertex(&self, state: &[Option<bool>]) -> GraphColoredVertices {
+        let partial_valuation: Vec<(BddVariable, bool)> = state
+            .iter()
+            .enumerate()
+            .filter_map(|(index, value)| {
+                value
+                    .as_ref()
+                    .map(|value| (self.symbolic_context.state_variables[index], *value))
+            })
+            .collect();
+        self.select_partial_valuation(&partial_valuation)
+    }
+
     /// Construct a vertex set that only contains one vertex, but all colors
+    ///
     pub fn vertex(&self, state: &ArrayBitVector) -> GraphColoredVertices {
+        assert_eq!(state.len(), self.network.num_vars());
+        // TODO: When breaking changes will be possible, this should add a `mk_` prefix.
         let partial_valuation: Vec<(BddVariable, bool)> = state
             .values()
             .into_iter()
             .enumerate()
             .map(|(i, v)| (self.symbolic_context.state_variables[i], v))
             .collect();
+        self.select_partial_valuation(&partial_valuation)
+    }
+
+    /// **(internal)** Construct a subset of the `unit_bdd` with respect to the given partial
+    /// valuation of BDD variables.
+    fn select_partial_valuation(
+        &self,
+        partial_valuation: &[(BddVariable, bool)],
+    ) -> GraphColoredVertices {
         GraphColoredVertices::new(
-            self.unit_bdd.select(&partial_valuation),
+            self.unit_bdd.select(partial_valuation),
             &self.symbolic_context,
         )
     }
@@ -247,6 +294,34 @@ mod tests {
         let network = BooleanNetwork::try_from(network).unwrap();
         let graph = SymbolicAsyncGraph::new(network);
         assert!(graph.is_err());
+    }
+
+    #[test]
+    fn test_subspace_creation() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let graph = SymbolicAsyncGraph::new(bn).unwrap();
+        let a = graph.as_network().as_graph().find_variable("A").unwrap();
+        let c = graph.as_network().as_graph().find_variable("C").unwrap();
+        let sub_space_a = graph.fix_network_variable(a, true);
+        let sub_space_c = graph.fix_network_variable(c, false);
+        let sub_space = sub_space_a.intersect(&sub_space_c);
+
+        let sub_space_1 = graph.mk_subspace(&[(a, true), (c, false)]);
+        let sub_space_2 = graph.mk_partial_vertex(&[Some(true), None, Some(false)]);
+
+        assert_eq!(sub_space_1, sub_space);
+        assert_eq!(sub_space_2, sub_space);
     }
 
     /*
