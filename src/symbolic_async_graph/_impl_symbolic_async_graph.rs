@@ -232,13 +232,13 @@ impl SymbolicAsyncGraph {
             // 1.1 Verify that the networks have the same variables.
             for var in main_network.variables() {
                 let name = main_network.get_variable_name(var);
-                if !sub_network.as_graph().find_variable(name).is_some() {
+                if sub_network.as_graph().find_variable(name).is_none() {
                     return Err(format!("Variable `{}` not found in the sub-network.", name));
                 }
             }
             for var in sub_network.variables() {
                 let name = sub_network.get_variable_name(var);
-                if !main_network.as_graph().find_variable(name).is_some() {
+                if main_network.as_graph().find_variable(name).is_none() {
                     return Err(format!(
                         "Variable `{}` not found in the main network.",
                         name

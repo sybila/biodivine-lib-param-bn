@@ -302,7 +302,7 @@ impl FnUpdate {
     /// Create a copy of this function which replaces every occurrence of every
     /// `VariableId` with a new one supplied by the provided vector (original `VariableId`
     /// is the index into the vector). Similarly replaces every `ParameterId`.
-    pub fn substitute(&self, vars: &Vec<VariableId>, params: &Vec<ParameterId>) -> FnUpdate {
+    pub fn substitute(&self, vars: &[VariableId], params: &[ParameterId]) -> FnUpdate {
         match self {
             FnUpdate::Const(_) => self.clone(),
             FnUpdate::Param(id, args) => {
