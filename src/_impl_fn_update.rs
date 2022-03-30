@@ -1,6 +1,6 @@
 use crate::FnUpdate::*;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
 /// and exhaustive pattern matching when not necessary.
@@ -182,12 +182,218 @@ impl FnUpdate {
             }
         }
     }
+
+    /// If possible, evaluate this function using the given network variable valuation.
+    ///
+    /// Note that this only works when the function output does not depend on parameters, and
+    /// all necessary variable values are part of the valuation. Otherwise, the function
+    /// returns `None`, as the value cannot be determined.
+    ///
+    /// However, note that in some cases, even a partially specified function can be evaluated.
+    /// For example, `A & f(X, Y)` is false whenever `A = false`, regardless of uninterpreted
+    /// function `f`. In such cases, this method may still output the correct result.
+    ///
+    /// In other words, the meaning of this method should be interpreted as "if it is possible
+    /// to unambiguously evaluate this function using the provided valuation, do it; otherwise
+    /// return `None`".
+    pub fn evaluate(&self, values: &HashMap<VariableId, bool>) -> Option<bool> {
+        match self {
+            FnUpdate::Const(value) => Some(*value),
+            FnUpdate::Var(id) => values.get(id).cloned(),
+            FnUpdate::Param(_, _) => None,
+            FnUpdate::Not(inner) => inner.evaluate(values).map(|it| !it),
+            FnUpdate::Binary(op, left, right) => {
+                let left = left.evaluate(values);
+                let right = right.evaluate(values);
+                match op {
+                    BinaryOp::And => match (left, right) {
+                        (Some(false), _) => Some(false),
+                        (_, Some(false)) => Some(false),
+                        (Some(true), Some(true)) => Some(true),
+                        _ => None,
+                    },
+                    BinaryOp::Or => match (left, right) {
+                        (Some(true), _) => Some(true),
+                        (_, Some(true)) => Some(true),
+                        (Some(false), Some(false)) => Some(false),
+                        _ => None,
+                    },
+                    BinaryOp::Iff => match (left, right) {
+                        (Some(left), Some(right)) => Some(left == right),
+                        _ => None,
+                    },
+                    BinaryOp::Xor => match (left, right) {
+                        (Some(left), Some(right)) => Some(left != right),
+                        _ => None,
+                    },
+                    BinaryOp::Imp => match (left, right) {
+                        (Some(false), _) => Some(true),
+                        (_, Some(true)) => Some(true),
+                        (Some(true), Some(false)) => Some(false),
+                        _ => None,
+                    },
+                }
+            }
+        }
+    }
+
+    /// Test that this update function is a syntactic specialisation of the provided `FnUpdate`.
+    ///
+    /// Syntactic specialisation is a function that has the same abstract syntax tree, except that
+    /// some occurrences of parameters can be substituted for more concrete Boolean functions.
+    ///
+    /// Note that this is not entirely bulletproof, as it does not check for usage of multiple
+    /// parameters within the same function, which could influence the semantics of the main
+    /// function, but does not influence the specialisation.
+    pub fn is_specialisation_of(&self, other: &FnUpdate) -> bool {
+        match other {
+            FnUpdate::Const(_) => self == other,
+            FnUpdate::Var(_) => self == other,
+            FnUpdate::Not(inner) => {
+                if let Some(self_inner) = self.as_not() {
+                    self_inner.is_specialisation_of(inner)
+                } else {
+                    false
+                }
+            }
+            FnUpdate::Binary(op, left, right) => {
+                if let Some((self_left, self_op, self_right)) = self.as_binary() {
+                    self_op == *op
+                        && self_left.is_specialisation_of(left)
+                        && self_right.is_specialisation_of(right)
+                } else {
+                    false
+                }
+            }
+            FnUpdate::Param(_, args) => {
+                // Every argument in this sub-tree must be declared in the parameter.
+                self.collect_arguments()
+                    .iter()
+                    .all(|arg| args.contains(arg))
+            }
+        }
+    }
+
+    /// Allows us to iterate through all nodes of the abstract syntax tree of this function
+    /// in post-order.
+    ///
+    /// Note that this is a preliminary version of the API. A more robust implementation should
+    /// provide a standard iterator interface.
+    pub fn walk_postorder<F>(&self, action: &mut F)
+    where
+        F: FnMut(&FnUpdate),
+    {
+        match self {
+            FnUpdate::Const(_) => action(self),
+            FnUpdate::Param(_, _) => action(self),
+            FnUpdate::Var(_) => action(self),
+            FnUpdate::Not(inner) => {
+                inner.walk_postorder(action);
+                action(self);
+            }
+            FnUpdate::Binary(_, left, right) => {
+                left.walk_postorder(action);
+                right.walk_postorder(action);
+                action(self);
+            }
+        }
+    }
+
+    /// Create a copy of this function which replaces every occurrence of every
+    /// `VariableId` with a new one supplied by the provided vector (original `VariableId`
+    /// is the index into the vector). Similarly replaces every `ParameterId`.
+    pub fn substitute(&self, vars: &Vec<VariableId>, params: &Vec<ParameterId>) -> FnUpdate {
+        match self {
+            FnUpdate::Const(_) => self.clone(),
+            FnUpdate::Param(id, args) => {
+                let new_args = args.iter().map(|it| vars[it.0]).collect();
+                FnUpdate::Param(params[id.0], new_args)
+            }
+            FnUpdate::Var(id) => FnUpdate::mk_var(vars[id.0]),
+            FnUpdate::Not(inner) => {
+                let inner = inner.substitute(vars, params);
+                FnUpdate::mk_not(inner)
+            }
+            FnUpdate::Binary(op, left, right) => {
+                let left = left.substitute(vars, params);
+                let right = right.substitute(vars, params);
+                FnUpdate::mk_binary(*op, left, right)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::{BinaryOp, BooleanNetwork, FnUpdate};
+    use std::collections::HashMap;
     use std::convert::TryFrom;
+
+    #[test]
+    fn fn_update_specialisation_test() {
+        let bn = BooleanNetwork::try_from(
+            r"
+                a -> c1
+                b -> c1
+                a -> c2
+                b -> c2
+                a -> c3
+                b -> c3
+                $c1: !(a => b) | f(a, b)
+                $c2: !(a => b) | ((a <=> b) & g(b))
+                $c3: (a => b) | f(a, b)
+            ",
+        )
+        .unwrap();
+
+        let c1 = bn.as_graph().find_variable("c1").unwrap();
+        let c2 = bn.as_graph().find_variable("c2").unwrap();
+        let c3 = bn.as_graph().find_variable("c3").unwrap();
+
+        let fn_c1 = bn.get_update_function(c1).as_ref().unwrap();
+        let fn_c2 = bn.get_update_function(c2).as_ref().unwrap();
+        let fn_c3 = bn.get_update_function(c3).as_ref().unwrap();
+
+        assert!(fn_c2.is_specialisation_of(fn_c1));
+        assert!(!fn_c1.is_specialisation_of(fn_c2));
+        assert!(!fn_c3.is_specialisation_of(fn_c1));
+        assert!(!fn_c3.is_specialisation_of(fn_c2));
+        assert!(fn_c3.is_specialisation_of(fn_c3));
+    }
+
+    #[test]
+    fn fn_update_eval_test() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> c
+            b -| c
+            $c: true & (!a | (a & b) | f(b))
+        ",
+        )
+        .unwrap();
+
+        // This will not test all possible branches, but should cover the decisions
+        // reasonably well...
+
+        let a = bn.as_graph().find_variable("a").unwrap();
+        let b = bn.as_graph().find_variable("b").unwrap();
+        let c = bn.as_graph().find_variable("c").unwrap();
+        let fun = bn.get_update_function(c).as_ref().unwrap();
+
+        let mut vals = HashMap::new();
+        assert_eq!(None, fun.evaluate(&vals));
+
+        vals.insert(a, false);
+        assert_eq!(Some(true), fun.evaluate(&vals));
+
+        vals.insert(a, true);
+        vals.insert(b, true);
+        assert_eq!(Some(true), fun.evaluate(&vals));
+
+        vals.insert(a, true);
+        vals.insert(b, false);
+        assert_eq!(None, fun.evaluate(&vals));
+    }
 
     #[test]
     fn basic_fn_update_test() {
@@ -198,7 +404,8 @@ mod tests {
             r"
             a -> c
             b -| c
-            # Note that this is not really a `valid` function but syntatically it is ok.
+            # Note that this is not really a `valid` function in terms of the regulatory graph.
+            # But syntatically it is ok and should go through the parser.
             $c: a & (a | (a ^ (a => (a <=> !(f(a, b) | (true | false))))))
         ",
         )

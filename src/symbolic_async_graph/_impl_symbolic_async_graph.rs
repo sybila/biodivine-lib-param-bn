@@ -6,6 +6,7 @@ use crate::symbolic_async_graph::{
 };
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, BddVariable};
+use std::collections::HashMap;
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
@@ -202,6 +203,221 @@ impl SymbolicAsyncGraph {
     }
 }
 
+impl SymbolicAsyncGraph {
+    /// Compute the set of all possible colours (instantiations) of this (*main*) network that are
+    /// represented by the supplied more specific *sub-network*.
+    ///
+    /// Note that this is a rather non-trivial theoretical problem. Consequently,
+    /// the implementation is currently limited such that it only supports the following special
+    /// case. In the future, these restrictions may be lifted as we add better equivalence
+    /// checking algorithms:
+    ///  - The two networks have the same variables.
+    ///  - All parameters used in the sub-network must also be declared in the
+    ///  main network (with the same arity).
+    ///  - The regulations are identical in both networks (including monotonicity/observability).
+    ///  - If the main network has an update function, the sub-network must have the same
+    ///  update function (tested using the abstract syntax tree, not semantics).
+    ///  - If the main network has an erased update function, the sub-network can have
+    ///  a fully specified function (no parameters) instead.
+    ///  - The sub-network and main network are consistent with the shared regulatory graph.
+    ///
+    /// If all of these conditions are met, the function returns a `ColorSet` representing all
+    /// instantiations of the sub-network represented using the main network encoding. Otherwise,
+    /// an error indicates which conditions were not met.
+    ///
+    pub fn mk_subnetwork_colors(&self, network: &BooleanNetwork) -> Result<GraphColors, String> {
+        let main_network = self.as_network();
+        let sub_network = network;
+        {
+            // 1.1 Verify that the networks have the same variables.
+            for var in main_network.variables() {
+                let name = main_network.get_variable_name(var);
+                if !sub_network.as_graph().find_variable(name).is_some() {
+                    return Err(format!("Variable `{}` not found in the sub-network.", name));
+                }
+            }
+            for var in sub_network.variables() {
+                let name = sub_network.get_variable_name(var);
+                if !main_network.as_graph().find_variable(name).is_some() {
+                    return Err(format!(
+                        "Variable `{}` not found in the main network.",
+                        name
+                    ));
+                }
+            }
+        }
+
+        // 1.2 Make mapping vectors for variable IDs. For most networks, this is just identity,
+        // but better safe than sorry.
+        let main_to_sub = main_network
+            .variables()
+            .map(|id| {
+                let name = main_network.get_variable_name(id);
+                sub_network.as_graph().find_variable(name).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        let sub_to_main = sub_network
+            .variables()
+            .map(|id| {
+                let name = sub_network.get_variable_name(id);
+                main_network.as_graph().find_variable(name).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        {
+            // 2.1 Verify that the sub-network has the same parameters as the main network.
+            for param in sub_network.parameters() {
+                let name = sub_network.get_parameter(param).get_name();
+                if let Some(main_id) = main_network.find_parameter(name) {
+                    let main_arity = main_network.get_parameter(main_id).get_arity();
+                    if sub_network.get_parameter(param).get_arity() != main_arity {
+                        return Err(format!("Arity mismatch for parameter `{}`.", name));
+                    }
+                } else {
+                    return Err(format!("Parameter `{}` missing in the main network.", name));
+                }
+            }
+        }
+
+        // 2.2 Construct a mapping vector from the sub-network parameters to the main network.
+        let param_sub_to_main = sub_network
+            .parameters()
+            .map(|id| {
+                let name = sub_network.get_parameter(id).get_name();
+                main_network.find_parameter(name).unwrap()
+            })
+            .collect::<Vec<_>>();
+
+        {
+            // 3.1 Verify that every regulation from main is in sub.
+            for main_reg in main_network.as_graph().regulations() {
+                let sub_reg = sub_network.as_graph().find_regulation(
+                    main_to_sub[main_reg.regulator.0],
+                    main_to_sub[main_reg.target.0],
+                );
+                if let Some(sub_reg) = sub_reg {
+                    if sub_reg.observable != main_reg.observable
+                        || sub_reg.monotonicity != main_reg.monotonicity
+                    {
+                        return Err(format!(
+                            "Regulation `{:?}` is different in the sub-network (`{:?}`).",
+                            main_reg, sub_reg
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "Regulation `{:?}` not found in the sub-network.",
+                        main_reg
+                    ));
+                }
+            }
+        }
+
+        {
+            // 3.2 Verify that every regulation from sub is in main.
+            for sub_reg in sub_network.as_graph().regulations() {
+                let main_reg = main_network.as_graph().find_regulation(
+                    sub_to_main[sub_reg.regulator.0],
+                    sub_to_main[sub_reg.target.0],
+                );
+                if main_reg.is_none() {
+                    return Err(format!(
+                        "Regulation `{:?} not found in the main network.`",
+                        main_reg
+                    ));
+                }
+                // We already tested that if the regulation exists, it is the same.
+            }
+        }
+
+        // 4. Verify that every function in the sub-network is either identical to the main
+        // network, or replaces an unknown function.
+        for sub_var in sub_network.variables() {
+            let main_var = sub_to_main[sub_var.0];
+            let name = main_network.get_variable_name(main_var);
+            if let Some(sub_fun) = sub_network.get_update_function(sub_var) {
+                if let Some(main_fun) = main_network.get_update_function(main_var) {
+                    let sub_fun_in_main = sub_fun.substitute(&sub_to_main, &param_sub_to_main);
+                    if &sub_fun_in_main != main_fun {
+                        return Err(format!("Functions of `{}` are different.", name));
+                    }
+                } else {
+                    // Main has a missing function and sub specialises it.
+                    if !sub_fun.collect_parameters().is_empty() {
+                        return Err(format!(
+                            "A specialised function of `{}` in the sub-network has parameters.",
+                            name
+                        ));
+                    }
+                }
+            } else {
+                let main_fun = main_network.get_update_function(main_var);
+                if main_fun.is_some() {
+                    return Err(format!(
+                        "Sub-network erases existing function of `{}`.",
+                        name
+                    ));
+                }
+            }
+        }
+
+        // 5. Check that the sub-network is valid.
+        let sub_network_graph = SymbolicAsyncGraph::new(sub_network.clone());
+        if sub_network_graph.is_err() {
+            return Err("Sub-network is not consistent with the regulatory graph.".to_string());
+        }
+
+        // 6. Now we can actually start computing the thing...
+        let mut colors = self.unit_bdd.clone();
+
+        for main_var in main_network.variables() {
+            let sub_var = main_to_sub[main_var.0];
+            let name = main_network.get_variable_name(main_var);
+
+            if main_network.get_update_function(main_var).is_some() {
+                // We already checked that the functions are the same in this case.
+                continue;
+            }
+
+            if let Some(specialised_function) = sub_network.get_update_function(sub_var) {
+                let function_table = self
+                    .symbolic_context()
+                    .get_implicit_function_table(main_var);
+                let function_args = main_network.regulators(main_var);
+                let specialised_function =
+                    specialised_function.substitute(&sub_to_main, &param_sub_to_main);
+
+                let mut valuation = main_network
+                    .variables()
+                    .map(|it| (it, false))
+                    .collect::<HashMap<_, _>>();
+                for (input, bdd_var) in function_table {
+                    function_args
+                        .iter()
+                        .zip(input.iter())
+                        .for_each(|(id, value)| {
+                            valuation.insert(*id, *value);
+                        });
+
+                    if let Some(output) = specialised_function.evaluate(&valuation) {
+                        let literal = self
+                            .symbolic_context
+                            .bdd_variable_set()
+                            .mk_literal(bdd_var, output);
+                        colors = colors.and(&literal);
+                    } else {
+                        return Err(format!("Unexpected error when evaluating `{}`.", name));
+                    }
+                }
+            }
+            // Else: The function is not specialised in the sub-network. It is safe to skip.
+        }
+
+        Ok(self.unit_colors().copy(colors))
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::bitvector::BitVector;
@@ -209,6 +425,216 @@ mod tests {
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::BooleanNetwork;
     use std::convert::TryFrom;
+
+    #[test]
+    fn test_subnetworks() {
+        let network_1 = BooleanNetwork::try_from(
+            r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+        ",
+        )
+        .unwrap();
+        let sg = SymbolicAsyncGraph::new(network_1).unwrap();
+
+        assert_eq!(
+            sg.mk_unit_colors(),
+            sg.mk_subnetwork_colors(sg.as_network()).unwrap()
+        );
+
+        // Fixes only the function of `a`, not the remaining variables:
+        let network_2 = BooleanNetwork::try_from(
+            r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            $a: a | (b & c)
+        ",
+        )
+        .unwrap();
+
+        let sub_colors = sg.mk_subnetwork_colors(&network_2).unwrap();
+        assert_eq!(4.0, sub_colors.approx_cardinality());
+        assert_eq!(36.0, sg.unit_colors().approx_cardinality());
+
+        let network_3 = BooleanNetwork::try_from(
+            r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            $a: a | (b & c)
+            $b: a & b
+        ",
+        )
+        .unwrap();
+
+        let sub_colors = sg.mk_subnetwork_colors(&network_3).unwrap();
+        assert_eq!(2.0, sub_colors.approx_cardinality());
+
+        let sg_2 = SymbolicAsyncGraph::new(network_2).unwrap();
+        let sub_colors = sg_2.mk_subnetwork_colors(&network_3).unwrap();
+        assert_eq!(2.0, sub_colors.approx_cardinality());
+
+        // Test some of the error conditions:
+
+        // Different variables:
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            a -> b
+            b -> a
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            a -> b
+            b -> a
+            a -> c
+            c -> d
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        // Different regulations:
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            a -> c
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            b -> c
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -| c
+            a -> c
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        // Inconsistent sub-network:
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            $a: c | b
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        // Mismatched update function:
+        let result = sg_2.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            $a: a | (b | c)
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        // Use of new parameters in the specialised function:
+        let result = sg.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+            $a: a | f(b, c)
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+
+        // Function erasure:
+        let result = sg_2.mk_subnetwork_colors(
+            &BooleanNetwork::try_from(
+                r"
+            b -> a
+            c -> a
+            a -> a
+            a -> b
+            b -> b
+            c -> c
+            a -> c
+        ",
+            )
+            .unwrap(),
+        );
+        assert!(result.is_err());
+    }
 
     #[test]
     fn test_constraints_1() {
