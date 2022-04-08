@@ -1,7 +1,9 @@
+use crate::symbolic_async_graph::SymbolicContext;
 use crate::{
-    BooleanNetwork, FnUpdate, Parameter, ParameterId, ParameterIdIterator, RegulatoryGraph,
-    Variable, VariableId, VariableIdIterator, ID_REGEX,
+    BooleanNetwork, FnUpdate, Monotonicity, Parameter, ParameterId, ParameterIdIterator,
+    RegulatoryGraph, Variable, VariableId, VariableIdIterator, ID_REGEX,
 };
+use biodivine_lib_bdd::bdd;
 use std::collections::HashMap;
 use std::ops::Index;
 
@@ -209,6 +211,108 @@ impl BooleanNetwork {
     }
 }
 
+impl BooleanNetwork {
+    /// Infer a regulatory graph based on the update functions of this `BooleanNetwork`.
+    ///
+    /// The resulting graph is solely based on the information that can be inferred from the
+    /// update functions. In particular, if the BN contains uninterpreted functions,
+    /// the monotonicity of variables appearing within these functions is unknown. Overall,
+    /// this method is typically only useful for fully specified networks with minor errors
+    /// in the regulatory graph.
+    ///
+    /// The BN still has to satisfy basic integrity constraints. In particular, every uninterpreted
+    /// function must be used, and must be used consistently (i.e. correct arity). Also, every
+    /// update function may only used variables declared as regulators. Otherwise, an error
+    /// is returned.
+    pub fn infer_valid_graph(&self) -> Result<BooleanNetwork, String> {
+        let ctx = SymbolicContext::new(self)?;
+
+        let var_names = self
+            .variables()
+            .map(|id| self.get_variable_name(id))
+            .cloned()
+            .collect::<Vec<_>>();
+
+        let mut new_rg = RegulatoryGraph::new(var_names);
+        for target_var in self.variables() {
+            let target_name = self.get_variable_name(target_var);
+            if let Some(function) = self.get_update_function(target_var) {
+                // If the update function exists, compute a BDD which describes all satisfying
+                // inputs to that function, and then infer function properties from this BDD.
+                let fn_is_true = ctx.mk_fn_update_true(function);
+                let fn_is_false = fn_is_true.not();
+
+                // All non-trivial code is explained in `impl_regulation_constraint`.
+
+                for regulator_var in self.as_graph().regulators(target_var) {
+                    let regulator_name = self.get_variable_name(regulator_var);
+
+                    let regulator = ctx.state_variables()[regulator_var.0];
+                    let regulator_is_true = ctx.bdd_variable_set().mk_var(regulator);
+                    let regulator_is_false = ctx.bdd_variable_set().mk_not_var(regulator);
+
+                    let observability = {
+                        let fn_x1_to_1 =
+                            bdd!(fn_is_true & regulator_is_true).var_project(regulator);
+                        let fn_x0_to_1 =
+                            bdd!(fn_is_true & regulator_is_false).var_project(regulator);
+                        bdd!(fn_x1_to_1 ^ fn_x0_to_1).project(ctx.state_variables())
+                    };
+
+                    let activation = {
+                        let fn_x1_to_0 =
+                            bdd!(fn_is_false & regulator_is_true).var_project(regulator);
+                        let fn_x0_to_1 =
+                            bdd!(fn_is_true & regulator_is_false).var_project(regulator);
+                        bdd!(fn_x0_to_1 & fn_x1_to_0).project(ctx.state_variables())
+                    }
+                    .not();
+
+                    let inhibition = {
+                        let fn_x0_to_0 =
+                            bdd!(fn_is_false & regulator_is_false).var_project(regulator);
+                        let fn_x1_to_1 =
+                            bdd!(fn_is_true & regulator_is_true).var_project(regulator);
+                        bdd!(fn_x0_to_0 & fn_x1_to_1).project(ctx.state_variables())
+                    }
+                    .not();
+
+                    let observable = !observability.is_false();
+                    let monotonicity = match (activation.is_false(), inhibition.is_false()) {
+                        (false, true) => Some(Monotonicity::Activation),
+                        (true, false) => Some(Monotonicity::Inhibition),
+                        _ => None,
+                    };
+
+                    new_rg
+                        .add_regulation(regulator_name, target_name, observable, monotonicity)
+                        .unwrap();
+                }
+            } else {
+                // If the update function is missing, just copy the existing regulators, but
+                // remove any monotonicity/observability.
+                for regulator in self.as_graph().regulators(target_var) {
+                    let regulator_name = self.get_variable_name(regulator);
+                    new_rg
+                        .add_regulation(regulator_name, target_name, false, None)
+                        .unwrap();
+                }
+            }
+        }
+
+        let mut new_bn = BooleanNetwork::new(new_rg);
+        for var in self.variables() {
+            if let Some(update) = self.get_update_function(var) {
+                new_bn
+                    .set_update_function(var, Some(update.clone()))
+                    .unwrap();
+            }
+        }
+
+        Ok(new_bn)
+    }
+}
+
 /// Allow indexing `BooleanNetwork` using `VariableId` objects.
 impl Index<VariableId> for BooleanNetwork {
     type Output = Variable;
@@ -224,5 +328,40 @@ impl Index<ParameterId> for BooleanNetwork {
 
     fn index(&self, index: ParameterId) -> &Self::Output {
         &self.parameters[index.0]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::BooleanNetwork;
+    use std::convert::TryFrom;
+
+    #[test]
+    fn test_rg_inference() {
+        let bn = BooleanNetwork::try_from_bnet(
+            r"
+        A, B | !C
+        B, B & !(A | C)
+        C, (A | !A) & (C <=> B)
+        ",
+        )
+        .unwrap();
+
+        let expected = BooleanNetwork::try_from(
+            r"
+        B -> A
+        C -| A
+        A -| B
+        B -> B
+        C -| B
+        A -?? C
+        B -? C
+        C -? C
+        ",
+        )
+        .unwrap();
+
+        let inferred = bn.infer_valid_graph().unwrap();
+        assert_eq!(expected.as_graph(), inferred.as_graph());
     }
 }
