@@ -259,34 +259,35 @@ impl BooleanNetwork {
                         bdd!(fn_x1_to_1 ^ fn_x0_to_1).project(ctx.state_variables())
                     };
 
-                    let activation = {
-                        let fn_x1_to_0 =
-                            bdd!(fn_is_false & regulator_is_true).var_project(regulator);
-                        let fn_x0_to_1 =
-                            bdd!(fn_is_true & regulator_is_false).var_project(regulator);
-                        bdd!(fn_x0_to_1 & fn_x1_to_0).project(ctx.state_variables())
+                    if !observability.is_false() {
+                        let activation = {
+                            let fn_x1_to_0 =
+                                bdd!(fn_is_false & regulator_is_true).var_project(regulator);
+                            let fn_x0_to_1 =
+                                bdd!(fn_is_true & regulator_is_false).var_project(regulator);
+                            bdd!(fn_x0_to_1 & fn_x1_to_0).project(ctx.state_variables())
+                        }
+                        .not();
+
+                        let inhibition = {
+                            let fn_x0_to_0 =
+                                bdd!(fn_is_false & regulator_is_false).var_project(regulator);
+                            let fn_x1_to_1 =
+                                bdd!(fn_is_true & regulator_is_true).var_project(regulator);
+                            bdd!(fn_x0_to_0 & fn_x1_to_1).project(ctx.state_variables())
+                        }
+                        .not();
+
+                        let monotonicity = match (activation.is_false(), inhibition.is_false()) {
+                            (false, true) => Some(Monotonicity::Activation),
+                            (true, false) => Some(Monotonicity::Inhibition),
+                            _ => None,
+                        };
+
+                        new_rg
+                            .add_regulation(regulator_name, target_name, true, monotonicity)
+                            .unwrap();
                     }
-                    .not();
-
-                    let inhibition = {
-                        let fn_x0_to_0 =
-                            bdd!(fn_is_false & regulator_is_false).var_project(regulator);
-                        let fn_x1_to_1 =
-                            bdd!(fn_is_true & regulator_is_true).var_project(regulator);
-                        bdd!(fn_x0_to_0 & fn_x1_to_1).project(ctx.state_variables())
-                    }
-                    .not();
-
-                    let observable = !observability.is_false();
-                    let monotonicity = match (activation.is_false(), inhibition.is_false()) {
-                        (false, true) => Some(Monotonicity::Activation),
-                        (true, false) => Some(Monotonicity::Inhibition),
-                        _ => None,
-                    };
-
-                    new_rg
-                        .add_regulation(regulator_name, target_name, observable, monotonicity)
-                        .unwrap();
                 }
             } else {
                 // If the update function is missing, just copy the existing regulators, but
@@ -302,10 +303,15 @@ impl BooleanNetwork {
 
         let mut new_bn = BooleanNetwork::new(new_rg);
         for var in self.variables() {
+            let name = self.get_variable_name(var);
             if let Some(update) = self.get_update_function(var) {
-                new_bn
-                    .set_update_function(var, Some(update.clone()))
-                    .unwrap();
+                // We have to run the update function through a BDD, because
+                // it may contain redundant expressions which would not be invalid.
+                let fn_bdd = ctx.mk_fn_update_true(update);
+                let fn_string = fn_bdd
+                    .to_boolean_expression(ctx.bdd_variable_set())
+                    .to_string();
+                new_bn.add_string_update_function(name, &fn_string).unwrap();
             }
         }
 
@@ -354,7 +360,6 @@ mod test {
         A -| B
         B -> B
         C -| B
-        A -?? C
         B -? C
         C -? C
         ",
