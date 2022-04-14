@@ -160,6 +160,14 @@ impl BooleanNetwork {
         self.parameters.len()
     }
 
+    /// The number of variables with erased update functions in this `BooleanNetwork`.
+    pub fn num_implicit_parameters(&self) -> usize {
+        self.update_functions
+            .iter()
+            .filter(|it| it.is_none())
+            .count()
+    }
+
     /// Return an iterator over all variable ids of this network.
     pub fn variables(&self) -> VariableIdIterator {
         self.graph.variables()
@@ -203,6 +211,15 @@ impl BooleanNetwork {
     /// Return an iterator over all parameter ids of this network.
     pub fn parameters(&self) -> ParameterIdIterator {
         (0..self.parameters.len()).map(ParameterId)
+    }
+
+    /// Iterate over all variables of this network that do not have update functions
+    /// assigned for them.
+    pub fn implicit_parameters(&self) -> Vec<VariableId> {
+        (0..self.update_functions.len())
+            .filter(|it| self.update_functions[*it].is_none())
+            .map(VariableId)
+            .collect()
     }
 
     /// A static check that allows to verify validity of a parameter or variable name.
