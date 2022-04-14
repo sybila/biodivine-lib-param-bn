@@ -4,6 +4,7 @@ use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
+use std::collections::HashSet;
 use std::convert::TryInto;
 
 impl SymbolicContext {
@@ -24,11 +25,18 @@ impl SymbolicContext {
         // The order in which we create the symbolic variables is very important, because
         // Bdd cares about this a lot (in terms of efficiency).
 
-        // The approach we take here is to first create Bdd state variable and the create all
-        // parameter variables used in the update function of the state variable.
-        // This creates "related" symbolic variables near each other.
-        // We also do this in the topological order in which the variables appear
-        // in the network, since this should make things easier as well...
+        // The approach we take here is a bit arbitrary but overall appears to be usable.
+        // 1. For every parameter, we compute a set of variables upon which it depends. These
+        // are all variables that appear in any function that uses that particular parameter.
+        // 2. Once all variables from a particular dependency set are created, we also create
+        // the symbolic variables representing the particular parameter.
+
+        // The reason for this is that in our encoding of uninterpreted functions,
+        // ordering with `(variables, parameters)` leads to approx. `2^{variables}` BDD nodes,
+        // while the reversed ordering `(parameters, variables)` leads to approx. `2^{parameters}`
+        // BDD nodes. Since an uninterpreted function with `10` inputs will create `1024`
+        // parameters, this would mean `2^{1024}` BDD nodes, which is unacceptable and must
+        // be avoided at all cost.
 
         let mut state_variables: Vec<BddVariable> = Vec::new();
         let mut implicit_function_tables: Vec<Option<FunctionTable>> =
@@ -36,41 +44,84 @@ impl SymbolicContext {
         let mut explicit_function_tables: Vec<Option<FunctionTable>> =
             vec![None; network.num_parameters()];
 
+        // Every explicit parameter with all the variables that
+        // its call-site can possibly depend on.
+        let mut pending_explicit = network
+            .parameters()
+            .map(|it| {
+                let dependencies = network
+                    .variables()
+                    .filter(|var| {
+                        if let Some(function) = network.get_update_function(*var) {
+                            function.collect_parameters().contains(&it)
+                        } else {
+                            false
+                        }
+                    })
+                    .flat_map(|var| network.as_graph().regulators(var))
+                    .collect::<HashSet<_>>();
+                (it, dependencies)
+            })
+            .collect::<Vec<_>>();
+        // Every implicit parameter with the variables that it depends on.
+        let mut pending_implicit = network
+            .implicit_parameters()
+            .into_iter()
+            .map(|it| {
+                let dependencies = network
+                    .as_graph()
+                    .regulators(it)
+                    .into_iter()
+                    .collect::<HashSet<_>>();
+                (it, dependencies)
+            })
+            .collect::<Vec<_>>();
+
+        // Note: This implementation is a bit wasteful, but it will not break if we were
+        // to chose a different ordering of variables compared to the natural one.
+
         for variable in network.variables() {
-            let variable_name = network[variable].get_name();
-            let state_variable = builder.make_variable(variable_name);
+            let state_variable = builder.make_variable(network.get_variable_name(variable));
             state_variables.push(state_variable);
-            if let Some(update_function) = network.get_update_function(variable) {
-                // For explicit function, go through all parameters used in the function.
-                for parameter in update_function.collect_parameters() {
-                    if explicit_function_tables[parameter.0].is_none() {
-                        // Only compute if not already handled...
-                        let parameter_function = &network[parameter];
-                        let arity: u16 = parameter_function.get_arity().try_into().unwrap();
-                        let function_table =
-                            FunctionTable::new(parameter_function.get_name(), arity, &mut builder);
-                        explicit_function_tables[parameter.0] = Some(function_table);
-                    }
-                }
-            } else {
-                // Implicit update function.
-                let arity: u16 = network.regulators(variable).len().try_into().unwrap();
-                let function_name = format!("f_{}", variable_name);
-                let function_table = FunctionTable::new(&function_name, arity, &mut builder);
-                implicit_function_tables[variable.0] = Some(function_table);
+
+            // Remove the variable from sets tracking dependencies.
+            for (_, dependencies) in pending_explicit.iter_mut() {
+                dependencies.remove(&variable);
             }
+            for (_, dependencies) in pending_implicit.iter_mut() {
+                dependencies.remove(&variable);
+            }
+
+            // Remove parameters for which all dependencies are already included,
+            // and create BDD variables for said parameters.
+            pending_explicit.retain(|(id, dependencies)| {
+                if !dependencies.is_empty() {
+                    true
+                } else {
+                    assert!(explicit_function_tables[id.0].is_none());
+                    let parameter = &network[*id];
+                    let arity: u16 = parameter.get_arity().try_into().unwrap();
+                    let table = FunctionTable::new(parameter.get_name(), arity, &mut builder);
+                    explicit_function_tables[id.0] = Some(table);
+                    false
+                }
+            });
+            pending_implicit.retain(|(id, dependencies)| {
+                if !dependencies.is_empty() {
+                    true
+                } else {
+                    assert!(implicit_function_tables[id.0].is_none());
+                    let arity: u16 = network.regulators(*id).len().try_into().unwrap();
+                    let name = format!("f_{}", network.get_variable_name(*id));
+                    let table = FunctionTable::new(&name, arity, &mut builder);
+                    implicit_function_tables[id.0] = Some(table);
+                    false
+                }
+            });
         }
 
-        // Check that all parameter tables are constructed - if not, raise integrity error.
-        for i_p in 0..network.num_parameters() {
-            if explicit_function_tables[i_p].is_none() {
-                let parameter_name = network[ParameterId(i_p)].get_name();
-                return Err(format!(
-                    "Integrity error: Uninterpreted function {} declared but not used.",
-                    parameter_name
-                ));
-            }
-        }
+        assert!(pending_implicit.is_empty());
+        assert!(pending_explicit.is_empty());
 
         let explicit_function_tables: Vec<FunctionTable> =
             explicit_function_tables.into_iter().flatten().collect();
