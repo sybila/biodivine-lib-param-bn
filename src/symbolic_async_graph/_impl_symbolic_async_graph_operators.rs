@@ -59,6 +59,31 @@ impl SymbolicAsyncGraph {
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
 
+    pub fn var_pre_out(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_op(
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            (&initial.bdd, None),
+            None,
+            |a, b, c| {
+                // a & b & !c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(true)) => Some(false),
+                    (Some(true), Some(true), Some(false)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
     /// Compute the subset of `set` that can perform `pre` using given `variable`.
     ///
     /// Uses a single symbolic operation.
