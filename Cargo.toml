@@ -2,7 +2,7 @@
 name = "biodivine-lib-param-bn"
 version = "0.2.0-SNAPSHOT"
 authors = ["Samuel Pastva <daemontus@gmail.com>"]
-edition = "2018"
+edition = "2021"
 description = "Library for working with parametrized Boolean networks."
 homepage = "https://github.com/sybila/biodivine-lib-param-bn"
 repository = "https://github.com/sybila/biodivine-lib-param-bn"
