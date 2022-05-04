@@ -16,7 +16,7 @@ fn main() {
         flatten_update_function(&mut model, var);
     }
 
-    println!("{}", model.to_bnet().unwrap());
+    println!("{}", model.to_bnet(false).unwrap());
 }
 
 /// Replace the update function of the given `variable` with a flattened version using only
