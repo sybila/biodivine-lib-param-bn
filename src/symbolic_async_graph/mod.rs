@@ -109,7 +109,8 @@ pub struct SymbolicAsyncGraph {
     color_space: (GraphColors, GraphColors),
     // General symbolic unit bdd.
     unit_bdd: Bdd,
-    // For every update function, store !v <=> function (used for pre/post)
+    // For every update function, stores `x_i != f_i(x)` (used for pre/post).
+    // In other words, symbolically this is the set of states where a transition is enabled.
     update_functions: Vec<Bdd>,
 }
 

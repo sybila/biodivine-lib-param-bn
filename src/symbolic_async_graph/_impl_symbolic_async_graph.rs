@@ -5,7 +5,7 @@ use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::{BooleanNetwork, FnUpdate, VariableId};
-use biodivine_lib_bdd::{bdd, BddVariable};
+use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 
 impl SymbolicAsyncGraph {
@@ -200,6 +200,49 @@ impl SymbolicAsyncGraph {
             self.unit_bdd.select(partial_valuation),
             &self.symbolic_context,
         )
+    }
+
+    /// Create a copy of this `SymbolicAsyncGraph` where the vertex space is restricted to
+    /// the given `set` (including possible transitions). The resulting graph is symbolically
+    /// compatible with this graph, so the sets of vertices and colors are interchangeable.
+    ///
+    /// However, note that in a restricted graph, it may not hold that the unit vertex set is
+    /// a product of some subset of vertices and some subset of colours (i.e. there may be
+    /// vertices that are present for some colors and not for others, and vice-versa).
+    pub fn restrict(&self, set: &GraphColoredVertices) -> SymbolicAsyncGraph {
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (self.mk_empty_vertices(), set.clone()),
+            color_space: (self.mk_empty_colors(), set.colors()),
+            unit_bdd: set.bdd.clone(),
+            update_functions: self
+                .update_functions
+                .iter()
+                .enumerate()
+                .map(|(i, function)| {
+                    let symbolic_var = self.symbolic_context().state_variables()[i];
+                    // Ensure that both source *and* target state of the transition are in the
+                    // new, restricted state space:
+                    Bdd::fused_ternary_flip_op(
+                        (function, None),
+                        (&set.bdd, None),
+                        (&set.bdd, Some(symbolic_var)),
+                        None,
+                        |a, b, c| {
+                            // a & b & c
+                            match (a, b, c) {
+                                (Some(true), Some(true), Some(true)) => Some(true),
+                                (Some(false), _, _) => Some(false),
+                                (_, Some(false), _) => Some(false),
+                                (_, _, Some(false)) => Some(false),
+                                _ => None,
+                            }
+                        },
+                    )
+                })
+                .collect(),
+        }
     }
 }
 
@@ -748,6 +791,57 @@ mod tests {
 
         assert_eq!(sub_space_1, sub_space);
         assert_eq!(sub_space_2, sub_space);
+    }
+
+    #[test]
+    fn test_restriction() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let graph = SymbolicAsyncGraph::new(bn).unwrap();
+        let a = graph.as_network().as_graph().find_variable("A").unwrap();
+        let b = graph.as_network().as_graph().find_variable("B").unwrap();
+        let c = graph.as_network().as_graph().find_variable("C").unwrap();
+
+        let original_a = graph
+            .var_can_post(a, graph.unit_colored_vertices())
+            .approx_cardinality();
+        let original_b = graph
+            .var_can_post(b, graph.unit_colored_vertices())
+            .approx_cardinality();
+        let original_c = graph
+            .var_can_post(c, graph.unit_colored_vertices())
+            .approx_cardinality();
+
+        // Subspace 1*0
+        let subspace = graph.mk_subspace(&[(a, true), (c, false)]);
+
+        let restricted = graph.restrict(&subspace);
+
+        let restricted_a = restricted
+            .var_can_post(a, restricted.unit_colored_vertices())
+            .approx_cardinality();
+        let restricted_b = restricted
+            .var_can_post(b, restricted.unit_colored_vertices())
+            .approx_cardinality();
+        let restricted_c = restricted
+            .var_can_post(c, restricted.unit_colored_vertices())
+            .approx_cardinality();
+
+        assert_eq!(restricted.mk_unit_colored_vertices(), subspace);
+
+        assert!(restricted_a < original_a && restricted_a == 0.0);
+        assert!(restricted_b < original_b && restricted_b > 0.0);
+        assert!(restricted_c < original_c && restricted_c == 0.0);
     }
 
     /*
