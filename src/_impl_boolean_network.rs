@@ -155,7 +155,8 @@ impl BooleanNetwork {
         self.graph.num_vars()
     }
 
-    /// The number of parameters in this `BooleanNetwork`.
+    /// The number of *explicit* parameters in this `BooleanNetwork` (there can be network
+    /// variables using erased functions--implicit parameters--that are not counted here).
     pub fn num_parameters(&self) -> usize {
         self.parameters.len()
     }
