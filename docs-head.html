@@ -5,7 +5,7 @@
         // Once document is loaded, we init mermaid with a specific set of html elements (since
         // we don't use standard class).
         // We also add a special class to chart parents so we can style them.
-        var charts = document.getElementsByClassName("language-mermaid");
+        var charts = document.querySelectorAll(".language-mermaid > code");
         for (var i = 0; i < charts.length; i++) {
             charts[i].parentElement.classList.add("mermaid-parent");
         }
