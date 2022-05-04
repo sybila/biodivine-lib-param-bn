@@ -3,6 +3,8 @@ use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
 use biodivine_lib_bdd::Bdd;
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -49,7 +51,20 @@ impl GraphColoredVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.bdd.cardinality()
+        let cardinality = self.bdd.cardinality();
+        if cardinality.is_infinite() || cardinality.is_nan() {
+            self.bdd
+                .exact_cardinality()
+                .to_f64()
+                .unwrap_or(f64::INFINITY)
+        } else {
+            cardinality
+        }
+    }
+
+    /// Compute exact `BigInt` cardinality of this set.
+    pub fn exact_cardinality(&self) -> BigInt {
+        self.bdd.exact_cardinality()
     }
 }
 

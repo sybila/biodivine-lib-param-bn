@@ -1,7 +1,10 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColors, SymbolicContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use std::convert::TryFrom;
+use std::ops::Shr;
 
 impl GraphColors {
     /// Make a new color set from a `bdd` and a symbolic `context`.
@@ -50,10 +53,22 @@ impl GraphColors {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
+        let cardinality = self.bdd.cardinality();
+        if cardinality.is_infinite() || cardinality.is_nan() {
+            self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        } else {
+            let state_variable_count =
+                self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
+            let state_count = (2.0f64).powi(state_variable_count.into());
+            cardinality / state_count
+        }
+    }
+
+    /// Compute exact `BigInt` cardinality of this set.
+    pub fn exact_cardinality(&self) -> BigInt {
         let state_variable_count =
             self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
-        let state_count = (2.0f64).powi(state_variable_count.into());
-        self.bdd.cardinality() / state_count
+        self.bdd.exact_cardinality().shr(state_variable_count)
     }
 
     /// Amount of storage used for this symbolic set.

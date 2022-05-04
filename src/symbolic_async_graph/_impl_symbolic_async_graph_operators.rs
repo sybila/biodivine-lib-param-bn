@@ -3,46 +3,60 @@ use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::VariableId;
 use biodivine_lib_bdd::Bdd;
 
-/// Basic symbolic graph operators.
+/// Basic symbolic graph operators. For convenience, there is a wide variety of different
+/// operators fulfilling different needs. Here, all operators only analyse transitions with
+/// respect to a single network variable and every operation implemented using one symbolic
+/// operation.
+///
+/// The general recommendation is to use `var_post` / `var_pre` for most tasks
+/// (implementing additional logic using extra symbolic operations), and once the algorithm is
+/// tested and stable, replace these functions with the more efficient "fused" operations.
+///
+/// We provide the following variable-specific operations:
+///  - `var_post` / `var_pre`: General successors or predecessors.
+///  - `var_post_out` / `var_pre_out`: Successors or predecessors, but only *outside* of the
+///     given initial set.
+///  - `var_post_within` / `var_pre_within`: Successors or predecessors, but only *inside* the
+///     given initial set.
+///  - `var_can_post` / `var_can_pre`: Subset of the initial set that has some
+///     successors / predecessors.
+///  - `var_can_post_out` / `var_can_pre_out`: Subset of the initial set that can perform
+///     a transition leading *outside* of the initial set.
+///  - `var_can_post_within` / `var_can_pre_within`: Subset of the initial set that can perform
+///     a transition leading *into* the initial set.
+///
+/// Note that the output of some of these functions is technically equivalent (e.g.
+/// `var_post_within` and `var_can_pre_within`) but we nevertheless provided all for completeness.
+///
 impl SymbolicAsyncGraph {
-    /// Compute the colored vertex set which is a result of applying the update function
-    /// of the given `variable` to the `initial` set.
+    /// Compute the `GraphColoredVertices` representing the successors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`. Formally:
     ///
-    /// Uses a single symbolic operation.
+    /// $$
+    ///    \texttt{VarPost}(v, X) = \\{~(y, c) \mid \exists x.~(x, c) \in X \land x \xrightarrow{v}_c y~\\}
+    /// $$
     pub fn var_post(
         &self,
         variable: VariableId,
         initial: &GraphColoredVertices,
     ) -> GraphColoredVertices {
         // flip(initial & can_apply_function)
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_binary_flip_op(
             (&initial.bdd, None),
             (&self.update_functions[variable.0], None),
-            Some(self.symbolic_context.state_variables[variable.0]),
+            Some(symbolic_var),
             biodivine_lib_bdd::op_function::and,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
 
-    /// Compute the subset of `set` that can perform `post` using given `variable`.
+    /// Compute the `GraphColoredVertices` representing the predecessors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`. Formally:
     ///
-    /// Uses a single symbolic operation.
-    pub fn var_can_post(
-        &self,
-        variable: VariableId,
-        set: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        // set & can_apply_function
-        GraphColoredVertices::new(
-            set.bdd.and(&self.update_functions[variable.0]),
-            &self.symbolic_context,
-        )
-    }
-
-    /// Compute the colored vertex set which can create some valuation in `initial` by
-    /// applying the update function of the given `variable`.
-    ///
-    /// Uses a single symbolic operation.
+    /// $$
+    ///    \texttt{VarPre}(v, X) = \\{~(x, c) \mid \exists y.~(y, c) \in X \land x \xrightarrow{v}_{c} y~\\}
+    /// $$
     pub fn var_pre(
         &self,
         variable: VariableId,
@@ -59,18 +73,171 @@ impl SymbolicAsyncGraph {
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
 
-    /// Compute the subset of `set` that can perform `pre` using given `variable`.
+    /// Compute the `GraphColoredVertices` representing the successors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`, but are *not* in
+    /// the `initial` set. Formally:
     ///
-    /// Uses a single symbolic operation.
+    /// $$
+    ///    \texttt{VarPostOut}(v, X) = \\{~(y, c) \mid (y, c) \notin X \land \exists x.~(x, c) \in X \land x \xrightarrow{v}_{c} y~\\}
+    /// $$
+    pub fn var_post_out(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // flip(set & !flip(set) & can_apply_function)
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            Some(symbolic_var),
+            |a, b, c| {
+                // a & !b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(true), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(false), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the predecessors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`, but are *not* in
+    /// the initial set. Formally:
+    ///
+    /// $$
+    ///    \texttt{VarPreOut}(v, X) = \\{~(x, c) \mid (x, c) \notin X \land \exists y.~(y, c) \in X \land x \xrightarrow{v}_{c} y~\\}
+    /// $$
+    pub fn var_pre_out(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // !set & flip(set) & can_apply_function
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            None,
+            |a, b, c| {
+                // !a & b & c
+                match (a, b, c) {
+                    (Some(true), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(false), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the successors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`, but are *within*
+    /// the `initial` set. Formally:
+    ///
+    /// $$
+    ///    \texttt{VarPostWithin}(v, X) = \\{~(y, c) \mid (y, c) \in X \land \exists x.~(x, c) \in X \land x \xrightarrow{v}_{c} y~\\}
+    /// $$
+    pub fn var_post_within(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // flip(set & flip(set) & can_apply_function)
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            Some(symbolic_var),
+            |a, b, c| {
+                // a & b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the predecessors of the vertices in the
+    /// given `initial` set that are reached by updating the given `variable`, but are *within*
+    /// the initial set. Formally:
+    ///
+    /// $$
+    ///    \texttt{VarPreWithin}(v, X) = \\{~(x, c) \mid (x, c) \in X \land \exists y.~(y, c) \in X \land x \xrightarrow{v}_{c} y~\\}
+    /// $$
+    pub fn var_pre_within(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // set & flip(set) & can_apply_function
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            None,
+            |a, b, c| {
+                // a & b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an outgoing transition using the given `variable`. Formally:
+    ///
+    /// $$
+    ///     \texttt{VarCanPost}(v, X) = \\{~ (x, c) \in X \mid \exists y.~ x \xrightarrow{v}_{c} y ~\\}
+    /// $$
+    pub fn var_can_post(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // set & can_apply_function
+        GraphColoredVertices::new(
+            initial.bdd.and(&self.update_functions[variable.0]),
+            &self.symbolic_context,
+        )
+    }
+
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an incoming transition using the given `variable`. Formally:
+    ///
+    /// $$
+    ///     \texttt{VarCanPre}(v, X) = \\{~ (y, c) \in X \mid \exists x.~ x \xrightarrow{v}_{c} y ~\\}
+    /// $$
     pub fn var_can_pre(
         &self,
         variable: VariableId,
-        set: &GraphColoredVertices,
+        initial: &GraphColoredVertices,
     ) -> GraphColoredVertices {
         // flip(flip(set) & can_apply_function)
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_binary_flip_op(
-            (&set.bdd, Some(symbolic_var)),
+            (&initial.bdd, Some(symbolic_var)),
             (&self.update_functions[variable.0], None),
             Some(symbolic_var),
             biodivine_lib_bdd::op_function::and,
@@ -78,104 +245,156 @@ impl SymbolicAsyncGraph {
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
 
-    /// Compute the subset of `set` that can perform `post` using the given `variable`,
-    /// such that the successor is also within `set`.
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an outgoing transition using the given `variable` that leads *outside* of the
+    /// `initial` set. Formally:
     ///
-    /// Uses two symbolic operations.
-    pub fn var_can_post_within(
-        &self,
-        variable: VariableId,
-        set: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        let symbolic_var = self.symbolic_context.state_variables[variable.0];
-        let has_dual_within_set = Bdd::fused_binary_flip_op(
-            (&set.bdd, None),
-            (&set.bdd, Some(symbolic_var)),
-            None,
-            biodivine_lib_bdd::op_function::and,
-        );
-        GraphColoredVertices::new(
-            has_dual_within_set.and(&self.update_functions[variable.0]),
-            &self.symbolic_context,
-        )
-    }
-
-    /// Compute the subset of `set` that can perform `post` using the given `variable`,
-    /// such that the successor is *not* within `set`.
-    ///
-    /// Uses two symbolic operations.
+    /// $$
+    ///     \texttt{VarCanPostOut}(v, X) = \\{~ (x, c) \in X \mid \exists y.~(y, c) \notin X \land x \xrightarrow{v}_{c} y ~\\}
+    /// $$
     pub fn var_can_post_out(
         &self,
         variable: VariableId,
-        set: &GraphColoredVertices,
+        initial: &GraphColoredVertices,
     ) -> GraphColoredVertices {
+        // set & !flip(set) & can_apply_function
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
-        // s in output if s in set, but s not in set with var flipped
-        let has_no_dual_within_set = Bdd::fused_binary_flip_op(
-            (&set.bdd, None),
-            (&set.bdd, Some(symbolic_var)),
-            None,
-            biodivine_lib_bdd::op_function::and_not,
-        );
-        GraphColoredVertices::new(
-            has_no_dual_within_set.and(&self.update_functions[variable.0]),
-            &self.symbolic_context,
-        )
-    }
-
-    /// Compute the subset of `set` that can perform `pre` using the given `variable`,
-    /// such that the predecessor is also within `set`.
-    ///
-    /// Uses two symbolic operations.
-    pub fn var_can_pre_within(
-        &self,
-        variable: VariableId,
-        set: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        let symbolic_var = self.symbolic_context.state_variables[variable.0];
-        let has_dual_within_set = Bdd::fused_binary_flip_op(
-            (&set.bdd, None),
-            (&set.bdd, Some(symbolic_var)),
-            None,
-            biodivine_lib_bdd::op_function::and,
-        );
-        let can_pre = Bdd::fused_binary_flip_op(
-            (&has_dual_within_set, Some(symbolic_var)),
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
             (&self.update_functions[variable.0], None),
-            Some(symbolic_var),
-            biodivine_lib_bdd::op_function::and,
+            None,
+            |a, b, c| {
+                // a & !b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(true), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(false), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
         );
-        GraphColoredVertices::new(can_pre, &self.symbolic_context)
+        GraphColoredVertices::new(output, &self.symbolic_context)
     }
 
-    /// Compute the subset of `set` that can perform `pre` using the given `variable`,
-    /// such that the successor is *not* within `set`.
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an incoming transition using the given `variable` that originates *outside* of the
+    /// `initial` set. Formally:
     ///
-    /// Uses two symbolic operations.
+    /// $$
+    ///     \texttt{VarCanPreOut}(v, X) = \\{~ (y, c) \in X \mid \exists x.~(x, c) \notin X \land x \xrightarrow{v}_{c} y ~\\}
+    /// $$
     pub fn var_can_pre_out(
         &self,
         variable: VariableId,
-        set: &GraphColoredVertices,
+        initial: &GraphColoredVertices,
     ) -> GraphColoredVertices {
+        // flip(!set & flip(set) & can_apply_function)
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
-        // s in output if s in set, but s not in set with var flipped
-        let has_no_dual_within_set = Bdd::fused_binary_flip_op(
-            (&set.bdd, None),
-            (&set.bdd, Some(symbolic_var)),
-            None,
-            biodivine_lib_bdd::op_function::and_not,
-        );
-        let can_pre = Bdd::fused_binary_flip_op(
-            (&has_no_dual_within_set, Some(symbolic_var)),
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
             (&self.update_functions[variable.0], None),
             Some(symbolic_var),
-            biodivine_lib_bdd::op_function::and,
+            |a, b, c| {
+                // !a & b & c
+                match (a, b, c) {
+                    (Some(true), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(false), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
         );
-        GraphColoredVertices::new(can_pre, &self.symbolic_context)
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an outgoing transition using the given `variable` that leads *into* the
+    /// `initial` set. Formally:
+    ///
+    /// $$
+    ///     \texttt{VarCanPostWithin}(v, X) = \\{~ (x, c) \in X \mid \exists y.~(y, c) \in X \land x \xrightarrow{v}_{c} y ~\\}
+    /// $$
+    pub fn var_can_post_within(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // set & flip(set) & can_apply_function
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            None,
+            |a, b, c| {
+                // a & b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+
+    /// Compute the `GraphColoredVertices` representing the subset of the `initial` set for which
+    /// there exists an incoming transition using the given `variable` that originates *inside* the
+    /// `initial` set. Formally:
+    ///
+    /// $$
+    ///     \texttt{VarCanPreWithin}(v, X) = \\{~ (y, c) \in X \mid \exists x.~(x, c) \in X \land x \xrightarrow{v}_{c} y ~\\}
+    /// $$
+    pub fn var_can_pre_within(
+        &self,
+        variable: VariableId,
+        initial: &GraphColoredVertices,
+    ) -> GraphColoredVertices {
+        // flip(set & flip(set) & can_post_function)
+        let symbolic_var = self.symbolic_context.state_variables[variable.0];
+        let output = Bdd::fused_ternary_flip_op(
+            (&initial.bdd, None),
+            (&initial.bdd, Some(symbolic_var)),
+            (&self.update_functions[variable.0], None),
+            Some(symbolic_var),
+            |a, b, c| {
+                // a & b & c
+                match (a, b, c) {
+                    (Some(false), _, _) => Some(false),
+                    (_, Some(false), _) => Some(false),
+                    (_, _, Some(false)) => Some(false),
+                    (Some(true), Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            },
+        );
+        GraphColoredVertices::new(output, &self.symbolic_context)
     }
 }
 
-/// Derived operators.
+/// Here, we give several operators derived from the variable-specific operators. These have
+/// complexity `O(|vars|)` since they are internally represented using the variable-specific
+/// operators.
+///
+/// We provide the following functions:
+///  - `post` / `pre`: General successors and predecessors functions.
+///  - `can_post` / `can_pre`: Subsets of the initial states that have some successors
+///     or predecessors.
+///  - `can_post_within` / `can_pre_within`: Subsets of initial states that have some successors
+///     / predecessors within the initial set.
+///  - `will_post_within` / `will_pre_within`: Subsets of initial states that have all successors
+///     / predecessors withing the initial set.
+///  - `can_post_out` / `can_pre_out`: Subsets of initial states that have some successors
+///     / predecessors outside of the initial set.
+///  - `will_post_out` / `will_pre_out`: Subsets of initial states that have all successors
+///     / predecessors outside of the initial set.
+///
 impl SymbolicAsyncGraph {
     /// Compute the result of applying `post` with *all* update functions to the `initial` set.
     pub fn post(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {

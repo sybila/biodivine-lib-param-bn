@@ -3,9 +3,8 @@ use std::fmt::{Debug, Display, Formatter};
 
 impl BitVector58 {
     /// **(internal)** Check if the given index is valid in this `BitVector` - panic otherwise.
-    /// Only enabled when `shields_up` is set.
     fn check_access(&self, index: usize) {
-        if cfg!(shields_up) && index >= self.len() {
+        if index >= self.len() {
             panic!(
                 "Accessing element {} in a BitVector of length {}.",
                 index,
@@ -110,7 +109,6 @@ mod tests {
 
     #[test]
     #[should_panic]
-    #[cfg(shields_up)]
     fn test_bit_vector_58_invalid_access() {
         let mut bv = BitVector58::empty(30);
         bv.flip(45);
