@@ -50,6 +50,8 @@ mod _impl_parameter_id;
 mod _impl_regulation;
 /// **(internal)** Utility methods for `RegulatoryGraph`.
 mod _impl_regulatory_graph;
+/// **(internal)** Export of `RegulatoryGraph` into a `.dot` format.
+mod _impl_regulatory_graph_to_dot;
 /// **(internal)** Utility methods for `Variable`.
 mod _impl_variable;
 /// **(internal)** Utility methods for `VariableId`.
