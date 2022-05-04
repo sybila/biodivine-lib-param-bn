@@ -26,20 +26,16 @@ pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
 mod _aeon_parser;
-/// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
-mod _bnet_parser;
-/// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
-mod _bnet_writer;
 /// **(internal)** Utility methods for `BinaryOp`.
 mod _impl_binary_op;
 /// **(internal)** Utility methods for `BooleanNetwork`.
 mod _impl_boolean_network;
 /// **(internal)** `BooleanNetwork` to `.aeon` string.
-mod _impl_display_boolean_network;
-/// **(internal)** `RegulatoryGraph` to `.aeon` string.
-mod _impl_display_regulatory_graph;
-/// **(internal)** Equivalence relation for `RegulatoryGraph`.
-mod _impl_eq_regulatory_graph;
+mod _impl_boolean_network_display;
+/// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
+mod _impl_boolean_network_from_bnet;
+/// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
+mod _impl_boolean_network_to_bnet;
 /// **(internal)** Utility methods for `FnUpdate`.
 mod _impl_fn_update;
 /// **(internal)** Utility methods for `Parameter`.
@@ -50,6 +46,10 @@ mod _impl_parameter_id;
 mod _impl_regulation;
 /// **(internal)** Utility methods for `RegulatoryGraph`.
 mod _impl_regulatory_graph;
+/// **(internal)** `RegulatoryGraph` to `.aeon` string.
+mod _impl_regulatory_graph_display;
+/// **(internal)** Equivalence relation for `RegulatoryGraph`.
+mod _impl_regulatory_graph_eq;
 /// **(internal)** Export of `RegulatoryGraph` into a `.dot` format.
 mod _impl_regulatory_graph_to_dot;
 /// **(internal)** Utility methods for `Variable`.
