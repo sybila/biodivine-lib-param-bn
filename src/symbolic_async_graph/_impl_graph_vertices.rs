@@ -4,7 +4,10 @@ use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
 use biodivine_lib_bdd::{Bdd, BddValuation, BddVariable};
+use num_bigint::BigInt;
+use num_traits::ToPrimitive;
 use std::convert::TryFrom;
+use std::ops::Shr;
 
 impl GraphVertices {
     /// Create a new set of vertices using the given `Bdd` and a symbolic `context`.
@@ -35,10 +38,22 @@ impl GraphVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
+        let cardinality = self.bdd.cardinality();
+        if cardinality.is_infinite() || cardinality.is_nan() {
+            self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        } else {
+            let parameter_variable_count =
+                self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
+            let parameter_count = 2.0f64.powi(parameter_variable_count.into());
+            cardinality / parameter_count
+        }
+    }
+
+    /// Compute exact `BigInt` cardinality of this set.
+    pub fn exact_cardinality(&self) -> BigInt {
         let parameter_variable_count =
             self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
-        let parameter_count = 2.0f64.powi(parameter_variable_count.into());
-        self.bdd.cardinality() / parameter_count
+        self.bdd.exact_cardinality().shr(parameter_variable_count)
     }
 
     /// Pick one vertex from this set and return it as a singleton.
