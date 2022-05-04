@@ -48,6 +48,8 @@ mod _impl_graph_vertices;
 mod _impl_regulation_constraint;
 /// **(internal)** Utility methods for `SymbolicAsyncGraph`.
 mod _impl_symbolic_async_graph;
+/// **(internal)** Implementation of symbolic utility algorithms.
+mod _impl_symbolic_async_graph_algorithm;
 /// **(internal)** Implement symbolic graph operators (pre/post/...).
 mod _impl_symbolic_async_graph_operators;
 /// **(internal)** Implementation of the `SymbolicContext`.

@@ -290,13 +290,13 @@ impl SymbolicAsyncGraph {
         variable: VariableId,
         initial: &GraphColoredVertices,
     ) -> GraphColoredVertices {
-        // !set & flip(set) & can_apply_function
+        // flip(!set & flip(set) & can_apply_function)
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
             (&self.update_functions[variable.0], None),
-            None,
+            Some(symbolic_var),
             |a, b, c| {
                 // !a & b & c
                 match (a, b, c) {
