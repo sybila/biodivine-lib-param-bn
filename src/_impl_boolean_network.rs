@@ -323,13 +323,19 @@ impl BooleanNetwork {
         for var in self.variables() {
             let name = self.get_variable_name(var);
             if let Some(update) = self.get_update_function(var) {
-                // We have to run the update function through a BDD, because
-                // it may contain redundant expressions which would not be invalid.
-                let fn_bdd = ctx.mk_fn_update_true(update);
-                let fn_string = fn_bdd
-                    .to_boolean_expression(ctx.bdd_variable_set())
-                    .to_string();
-                new_bn.add_string_update_function(name, &fn_string).unwrap();
+                // We first try to just copy the function. If there are no non-observable
+                // variables this should work. If there is an error, we have to copy the
+                // function using a string translation.
+                if new_bn
+                    .set_update_function(var, Some(update.clone()))
+                    .is_err()
+                {
+                    let fn_bdd = ctx.mk_fn_update_true(update);
+                    let fn_string = fn_bdd
+                        .to_boolean_expression(ctx.bdd_variable_set())
+                        .to_string();
+                    new_bn.add_string_update_function(name, &fn_string).unwrap();
+                }
             }
         }
 
