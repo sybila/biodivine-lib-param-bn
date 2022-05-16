@@ -1,5 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use crate::ParameterId;
 
 /// Here, we provide several basic symbolic algorithms for exploring the `SymbolicAsyncGraph`.
 /// This mainly includes reachability and similar fixed-point properties.
@@ -51,6 +52,101 @@ impl SymbolicAsyncGraph {
     pub fn trap_forward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
         let mut result = initial.clone();
         'fwd: loop {
+            for var in self.network.variables().rev() {
+                let step = self.var_can_post_out(var, &result);
+                if !step.is_empty() {
+                    result = result.minus(&step);
+                    continue 'fwd;
+                }
+            }
+
+            return result;
+        }
+    }
+
+
+    fn gain(a: f64, b: f64, c: f64) -> f64 {
+        a - (b * 0.5 + c * 0.5)
+    }
+
+    pub fn trap_forward_2(
+        &self,
+        initial: &GraphColoredVertices,
+        limit: usize,
+    ) -> GraphColoredVertices {
+        let mut result = initial.clone();
+        'fwd: loop {
+            if result.bdd.size() > 10_000 {
+                println!(
+                    "Progress: {} {}",
+                    result.bdd.size(),
+                    result.approx_cardinality()
+                );
+            }
+            if result.bdd.size() > limit {
+                println!("Initial size: {}.", result.bdd.size());
+                let mut best_gain = None;
+                for par in self.network.parameters() {
+                    let par_true = self
+                        .symbolic_context
+                        .mk_uninterpreted_function_is_true(par, &[]);
+
+                    let bdd_true = result.bdd.and(&par_true);
+                    let bdd_false = result.bdd.and_not(&par_true);
+                    let gain = Self::gain(
+                        result.bdd.size() as f64,
+                        bdd_true.size() as f64,
+                        bdd_false.size() as f64,
+                    );
+                    if let Some((current, _)) = best_gain {
+                        if gain > current {
+                            best_gain = Some((gain, par));
+                        }
+                    } else if gain > 0.0 {
+                        best_gain = Some((gain, par));
+                    }
+                    println!(
+                        "Split on {:?}: {} + {} = {}",
+                        par,
+                        bdd_true.size(),
+                        bdd_false.size(),
+                        bdd_true.size() + bdd_false.size()
+                    );
+                }
+
+                let mut line = String::new();
+                std::io::stdin().read_line(&mut line).unwrap();
+
+                best_gain = Some((10., ParameterId(line.trim().parse::<usize>().unwrap())));
+
+                if let Some((best, par)) = best_gain {
+                    println!("Split on parameter {:?} with gain: {}", par, best);
+
+                    let par_true = self
+                        .symbolic_context
+                        .mk_uninterpreted_function_is_true(par, &[]);
+
+                    let bdd_true = result.bdd.and(&par_true);
+                    let bdd_false = result.bdd.and_not(&par_true);
+
+                    println!(
+                        "Split into: {} / {} / {}",
+                        result.bdd.size(),
+                        bdd_true.size(),
+                        bdd_false.size()
+                    );
+
+                    let split_true = result.copy(bdd_true);
+                    let split_false = result.copy(bdd_false);
+
+                    let result_true = self.trap_forward_2(&split_true, 2 * limit);
+                    let result_false = self.trap_forward_2(&split_false, 2 * limit);
+
+                    return result_true.union(&result_false);
+                } else {
+                    println!("Cannot split.");
+                }
+            }
             for var in self.network.variables().rev() {
                 let step = self.var_can_post_out(var, &result);
                 if !step.is_empty() {
