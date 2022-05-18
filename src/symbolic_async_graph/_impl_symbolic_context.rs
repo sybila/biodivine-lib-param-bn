@@ -107,6 +107,11 @@ impl SymbolicContext {
         &self.state_variables
     }
 
+    /// Get the `BddVariable` representing the network variable with the given `VariableId`.
+    pub fn get_state_variable(&self, variable: VariableId) -> BddVariable {
+        self.state_variables[variable.0]
+    }
+
     /// Getter for the entire function table of an implicit update function.
     pub fn get_implicit_function_table(&self, variable: VariableId) -> &FunctionTable {
         let table = &self.implicit_function_tables[variable.0];
