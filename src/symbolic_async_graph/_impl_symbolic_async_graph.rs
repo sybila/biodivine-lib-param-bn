@@ -4,7 +4,7 @@ use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_c
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
 };
-use crate::{BooleanNetwork, FnUpdate, VariableId};
+use crate::{BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 
@@ -243,6 +243,94 @@ impl SymbolicAsyncGraph {
                 })
                 .collect(),
         }
+    }
+
+    /// Create a new `SymbolicAsyncGraph` where the `value` of the given zero-arity `parameter`
+    /// is restricted. This means that the parameter no longer appears in the symbolic structure
+    /// of the graph. However, the result still uses the same symbolic encoding as the original
+    /// graph, so the resulting symbolic sets remain "technically" compatible. Nevertheless,
+    /// unless you really really know what you are doing, you must then use `param_lift` to
+    /// transform the results obtained for the restricted graph to the original graph.
+    pub fn param_select(&self, restriction: (ParameterId, bool)) -> SymbolicAsyncGraph {
+        let (parameter, value) = restriction;
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (
+                self.mk_empty_vertices(),
+                self.param_select_vertices(self.unit_colored_vertices(), restriction),
+            ),
+            color_space: (
+                self.mk_empty_colors(),
+                self.param_select_colors(self.unit_colors(), restriction),
+            ),
+            unit_bdd: self.unit_bdd.var_restrict(bdd_var, value),
+            update_functions: self
+                .update_functions
+                .iter()
+                .map(|f| f.var_restrict(bdd_var, value))
+                .collect(),
+        }
+    }
+
+    fn get_constant_parameter_var(&self, parameter: ParameterId) -> BddVariable {
+        assert_eq!(self.as_network().get_parameter(parameter).get_arity(), 0);
+
+        // Since this is a zero-arity parameter, we can focus on a single BDD variable.
+        let (_, bdd_var) = self
+            .symbolic_context()
+            .get_explicit_function_table(parameter)
+            .into_iter()
+            .next()
+            .unwrap();
+
+        bdd_var
+    }
+
+    /// Produce a symbolic set that is compatible with the symbolic graph produced by
+    /// the `param_select` operation.
+    pub fn param_select_vertices(
+        &self,
+        set: &GraphColoredVertices,
+        restriction: (ParameterId, bool),
+    ) -> GraphColoredVertices {
+        let (parameter, value) = restriction;
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        self.empty_vertices()
+            .copy(set.bdd.var_restrict(bdd_var, value))
+    }
+
+    pub fn param_select_colors(
+        &self,
+        set: &GraphColors,
+        restriction: (ParameterId, bool),
+    ) -> GraphColors {
+        let (parameter, value) = restriction;
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        self.empty_colors()
+            .copy(set.bdd.var_restrict(bdd_var, value))
+    }
+
+    pub fn param_lift_vertices(
+        &self,
+        set: &GraphColoredVertices,
+        restriction: (ParameterId, bool),
+    ) -> GraphColoredVertices {
+        let (parameter, value) = restriction;
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        self.empty_vertices()
+            .copy(set.bdd.var_select(bdd_var, value))
+    }
+
+    pub fn param_lift_colors(
+        &self,
+        set: &GraphColors,
+        restriction: (ParameterId, bool),
+    ) -> GraphColors {
+        let (parameter, value) = restriction;
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        self.empty_colors().copy(set.bdd.var_select(bdd_var, value))
     }
 }
 
