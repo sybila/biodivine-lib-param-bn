@@ -332,6 +332,64 @@ impl SymbolicAsyncGraph {
         let bdd_var = self.get_constant_parameter_var(parameter);
         self.empty_colors().copy(set.bdd.var_select(bdd_var, value))
     }
+
+    pub fn param_over_approximation(&self, parameter: ParameterId) -> SymbolicAsyncGraph {
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        let new_unit = self.unit_bdd.var_project(bdd_var);
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (
+                self.mk_empty_vertices(),
+                self.unit_colored_vertices().copy(new_unit.clone()),
+            ),
+            color_space: (
+                self.mk_empty_colors(),
+                self.unit_colors().copy(new_unit.clone()),
+            ),
+            unit_bdd: new_unit,
+            update_functions: self
+                .update_functions
+                .iter()
+                .map(|it| it.var_project(bdd_var))
+                .collect(),
+        }
+    }
+
+    pub fn param_under_approximation(&self, parameter: ParameterId) -> SymbolicAsyncGraph {
+        let bdd_var = self.get_constant_parameter_var(parameter);
+        let new_unit = Bdd::fused_binary_flip_op(
+            (&self.unit_bdd, None),
+            (&self.unit_bdd, Some(bdd_var)),
+            None,
+            biodivine_lib_bdd::op_function::and,
+        );
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (
+                self.mk_empty_vertices(),
+                self.unit_colored_vertices().copy(new_unit.clone()),
+            ),
+            color_space: (
+                self.mk_empty_colors(),
+                self.unit_colors().copy(new_unit.clone()),
+            ),
+            unit_bdd: new_unit,
+            update_functions: self
+                .update_functions
+                .iter()
+                .map(|it| {
+                    Bdd::fused_binary_flip_op(
+                        (it, None),
+                        (it, Some(bdd_var)),
+                        None,
+                        biodivine_lib_bdd::op_function::and,
+                    )
+                })
+                .collect(),
+        }
+    }
 }
 
 impl SymbolicAsyncGraph {
