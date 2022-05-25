@@ -335,60 +335,56 @@ impl SymbolicAsyncGraph {
 
     pub fn param_over_approximation(&self, parameter: ParameterId) -> SymbolicAsyncGraph {
         let bdd_var = self.get_constant_parameter_var(parameter);
-        let new_unit = self.unit_bdd.var_project(bdd_var);
-        SymbolicAsyncGraph {
-            network: self.network.clone(),
-            symbolic_context: self.symbolic_context.clone(),
-            vertex_space: (
-                self.mk_empty_vertices(),
-                self.unit_colored_vertices().copy(new_unit.clone()),
-            ),
-            color_space: (
-                self.mk_empty_colors(),
-                self.unit_colors().copy(new_unit.clone()),
-            ),
-            unit_bdd: new_unit,
-            update_functions: self
-                .update_functions
-                .iter()
-                .map(|it| it.var_project(bdd_var))
-                .collect(),
-        }
+        self.bdd_var_over_approximations(bdd_var)
     }
 
     pub fn param_under_approximation(&self, parameter: ParameterId) -> SymbolicAsyncGraph {
         let bdd_var = self.get_constant_parameter_var(parameter);
-        let new_unit = Bdd::fused_binary_flip_op(
-            (&self.unit_bdd, None),
-            (&self.unit_bdd, Some(bdd_var)),
-            None,
-            biodivine_lib_bdd::op_function::and,
-        );
-        SymbolicAsyncGraph {
-            network: self.network.clone(),
-            symbolic_context: self.symbolic_context.clone(),
-            vertex_space: (
-                self.mk_empty_vertices(),
-                self.unit_colored_vertices().copy(new_unit.clone()),
-            ),
-            color_space: (
-                self.mk_empty_colors(),
-                self.unit_colors().copy(new_unit.clone()),
-            ),
-            unit_bdd: new_unit,
-            update_functions: self
-                .update_functions
-                .iter()
-                .map(|it| {
-                    Bdd::fused_binary_flip_op(
-                        (it, None),
-                        (it, Some(bdd_var)),
-                        None,
-                        biodivine_lib_bdd::op_function::and,
-                    )
-                })
-                .collect(),
-        }
+        self.bdd_var_under_approximations(bdd_var)
+    }
+
+    pub fn var_under_approximation(&self, variable: VariableId) -> SymbolicAsyncGraph {
+        let bdd_var = self.symbolic_context.get_state_variable(variable);
+        self.bdd_var_under_approximations(bdd_var)
+    }
+
+    pub fn var_over_approximation(&self, variable: VariableId) -> SymbolicAsyncGraph {
+        let bdd_var = self.symbolic_context.get_state_variable(variable);
+        self.bdd_var_over_approximations(bdd_var)
+    }
+
+    pub fn bdd_var_under_approximations(&self, bdd_var: BddVariable) -> SymbolicAsyncGraph {
+        let mut new_graph = self.clone();
+        new_graph.update_functions = new_graph
+            .update_functions
+            .iter()
+            .map(|it| {
+                Bdd::fused_binary_flip_op(
+                    (it, None),
+                    (it, Some(bdd_var)),
+                    None,
+                    biodivine_lib_bdd::op_function::and,
+                )
+            })
+            .collect();
+        new_graph
+    }
+
+    pub fn bdd_var_over_approximations(&self, bdd_var: BddVariable) -> SymbolicAsyncGraph {
+        let mut new_graph = self.clone();
+        new_graph.update_functions = new_graph
+            .update_functions
+            .iter()
+            .map(|it| {
+                Bdd::fused_binary_flip_op(
+                    (it, None),
+                    (it, Some(bdd_var)),
+                    None,
+                    biodivine_lib_bdd::op_function::or,
+                )
+            })
+            .collect();
+        new_graph
     }
 }
 
