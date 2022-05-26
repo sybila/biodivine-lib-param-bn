@@ -353,6 +353,10 @@ impl SymbolicAsyncGraph {
         self.bdd_var_over_approximations(bdd_var)
     }
 
+    pub fn get_function_bdd(&self, var: VariableId) -> &Bdd {
+        &self.update_functions[var.0]
+    }
+
     pub fn bdd_var_under_approximations(&self, bdd_var: BddVariable) -> SymbolicAsyncGraph {
         let mut new_graph = self.clone();
         new_graph.update_functions = new_graph
