@@ -44,10 +44,14 @@ impl BooleanNetwork {
         if root.children().count() == 0 {
             return Err("Document is empty.".into());
         }
-        if root.children().count() > 1 {
-            return Err("Document contains multiple top-level tags. Only SBML expected.".into());
+
+        let root_elements = root.children().filter(|it| it.is_element());
+        if root_elements.clone().count() > 1 {
+            return Err(
+                "Document contains multiple top-level tags. Only SBML tag is expected.".into(),
+            );
         }
-        let sbml = root.children().next().unwrap();
+        let sbml = root_elements.clone().next().unwrap();
         if sbml.tag_name().name() != "sbml" {
             return Err("Root element is not <sbml>.".into());
         }
@@ -246,7 +250,7 @@ fn create_regulations(
     for transition in transitions {
         if transition.outputs.len() != 1 {
             return Err(format!(
-                "Every transition can have only one output. `{}` has {}.",
+                "Every transition can have only one output. `{:?}` has {}.",
                 transition.id,
                 transition.outputs.len()
             ));
@@ -256,7 +260,7 @@ fn create_regulations(
         let out_variable = id_to_var.get(out_specie);
         if out_variable.is_none() {
             return Err(format!(
-                "Unknown output specie `{}` used in transition `{}`.",
+                "Unknown output specie `{}` used in transition `{:?}`.",
                 out_specie, transition.id
             ));
         }
@@ -267,7 +271,7 @@ fn create_regulations(
             let in_variable = id_to_var.get(in_specie);
             if in_variable.is_none() {
                 return Err(format!(
-                    "Unknown input specie `{}` used in transition `{}`.",
+                    "Unknown input specie `{}` used in transition `{:?}`.",
                     in_specie, transition.id
                 ));
             }
@@ -302,12 +306,33 @@ fn create_regulations(
                 }
             });
 
-            rg.add_regulation(
-                in_variable.unwrap(),
-                out_variable.unwrap(),
-                is_observable,
-                monotonicity,
-            )?;
+            let in_variable = in_variable.unwrap();
+            let out_variable = out_variable.unwrap();
+            let in_rg_id = rg.find_variable(in_variable).unwrap();
+            let out_rg_id = rg.find_variable(out_variable).unwrap();
+
+            // Unfortunately, some functions can declare a single variable as multiple inputs,
+            // which means we have to check if the regulation already exists, and if so if it
+            // is not contradicting.
+            if let Some(existing) = rg.find_regulation(in_rg_id, out_rg_id) {
+                if existing.is_observable() != is_observable {
+                    return Err(format!(
+                        "Variable `{}` declared as both observable and non-observable in `{}`.",
+                        in_variable, out_variable
+                    ));
+                }
+                if existing.get_monotonicity() != monotonicity {
+                    return Err(format!(
+                        "Variable `{}` declared as both {:?} and {:?} in `{}`",
+                        in_variable,
+                        existing.get_monotonicity(),
+                        monotonicity,
+                        out_variable
+                    ));
+                }
+            } else {
+                rg.add_regulation(in_variable, out_variable, is_observable, monotonicity)?;
+            }
         }
     }
     Ok(())

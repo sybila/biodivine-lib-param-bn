@@ -29,7 +29,7 @@ pub struct SbmlTransitionTerm {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SbmlTransition {
-    pub id: String,
+    pub id: Option<String>,
     pub inputs: Vec<SbmlTransitionInput>,
     pub outputs: Vec<SbmlTransitionOutput>,
     pub default_term: Option<SbmlTransitionTerm>, // Is none if the whole function is unspecified
@@ -53,9 +53,10 @@ pub fn read_transitions(model: Node) -> Result<Vec<SbmlTransition>, String> {
 }
 
 pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
+    println!("Node: {:?}", transition);
     let id = transition
         .attribute((SBML_QUAL, "id"))
-        .ok_or_else(|| "Transition with a missing id found.".to_string())?;
+        .map(|it| it.to_string());
 
     // Inputs are optional when there aren't any.
     let inputs = read_unique_child(transition, (SBML_QUAL, "listOfInputs")).ok();
@@ -72,7 +73,7 @@ pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
 
     let default_term = if let Some(terms) = terms {
         let default_term = read_unique_child(terms, (SBML_QUAL, "defaultTerm"))?;
-        Some(read_transition_term(default_term, id)?)
+        Some(read_transition_term(default_term, &id)?)
     } else {
         None
     };
@@ -84,7 +85,7 @@ pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
     };
 
     let mut transition = SbmlTransition {
-        id: id.to_string(),
+        id: id.clone(),
         inputs: Vec::new(),
         outputs: Vec::new(),
         default_term,
@@ -97,27 +98,32 @@ pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
         .map(|t| t.math.is_some())
         .unwrap_or(false)
     {
-        return Err(format!("Default term in transition {} has math.", id));
+        return Err(format!("Default term in transition {:?} has math.", id));
     }
 
     for input in inputs {
-        transition.inputs.push(read_transition_input(input, id)?);
+        transition.inputs.push(read_transition_input(input, &id)?);
     }
 
     for output in outputs {
-        transition.outputs.push(read_transition_output(output, id)?);
+        transition
+            .outputs
+            .push(read_transition_output(output, &id)?);
     }
 
     for term in terms {
         transition
             .function_terms
-            .push(read_transition_term(term, id)?);
+            .push(read_transition_term(term, &id)?);
     }
 
     Ok(transition)
 }
 
-fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransitionInput, String> {
+fn read_transition_input(
+    input: Node,
+    transition_id: &Option<String>,
+) -> Result<SbmlTransitionInput, String> {
     let species = input.attribute((SBML_QUAL, "qualitativeSpecies"));
     let effect = input.attribute((SBML_QUAL, "transitionEffect"));
     let sign = input.attribute((SBML_QUAL, "sign"));
@@ -127,7 +133,7 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransit
     let essential = input.attribute("essential");
     if species.is_none() {
         return Err(format!(
-            "Transition {} is missing an input species.",
+            "Transition {:?} is missing an input species.",
             transition_id
         ));
     }
@@ -143,14 +149,14 @@ fn read_transition_input(input: Node, transition_id: &str) -> Result<SbmlTransit
 
 fn read_transition_output(
     output: Node,
-    transition_id: &str,
+    transition_id: &Option<String>,
 ) -> Result<SbmlTransitionOutput, String> {
     let species = output.attribute((SBML_QUAL, "qualitativeSpecies"));
     let effect = output.attribute((SBML_QUAL, "transitionEffect"));
     let id = output.attribute((SBML_QUAL, "id"));
     if species.is_none() {
         return Err(format!(
-            "Transition output in {} is missing an output species.",
+            "Transition output in {:?} is missing an output species.",
             transition_id
         ));
     }
@@ -162,11 +168,14 @@ fn read_transition_output(
     })
 }
 
-fn read_transition_term(term: Node, transition_id: &str) -> Result<SbmlTransitionTerm, String> {
+fn read_transition_term(
+    term: Node,
+    transition_id: &Option<String>,
+) -> Result<SbmlTransitionTerm, String> {
     let result_level = term.attribute((SBML_QUAL, "resultLevel"));
     if result_level.is_none() {
         return Err(format!(
-            "Term result level not specified in {}.",
+            "Term result level not specified in transition {:?}.",
             transition_id
         ));
     }
@@ -174,7 +183,7 @@ fn read_transition_term(term: Node, transition_id: &str) -> Result<SbmlTransitio
     let level = result_level.parse::<u32>();
     if level.is_err() {
         return Err(format!(
-            "Term result level is not a number in {}. {} given.",
+            "Term result level is not a number in transition {:?}. {} given.",
             transition_id, result_level
         ));
     }

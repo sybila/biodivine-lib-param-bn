@@ -43,7 +43,7 @@ pub fn sbml_transition_to_update_function(
                     Ok(FnUpdate::Var(var))
                 } else {
                     Err(format!(
-                        "Identifier `{}` in transition `{}` is not an input nor a species.",
+                        "Identifier `{}` in transition `{:?}` is not an input nor a species.",
                         name, transition.id
                     ))
                 }
@@ -55,7 +55,7 @@ pub fn sbml_transition_to_update_function(
                     if let FnUpdate::Var(v) = update {
                         variables.push(v);
                     } else {
-                        return Err(format!("(Transition `{}`) Uninterpreted functions can have only variables as arguments.", transition.id));
+                        return Err(format!("(Transition `{:?}`) Uninterpreted functions can have only variables as arguments.", transition.id));
                     }
                 }
 
