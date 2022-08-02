@@ -4,7 +4,9 @@ use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
+use std::cmp::min;
 use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
 impl SymbolicContext {
     /// Create a new `SymbolicContext` that is based on the given `BooleanNetwork`.
@@ -184,6 +186,9 @@ impl SymbolicContext {
             FnUpdate::Binary(op, left, right) => {
                 let l = self.mk_fn_update_true(left);
                 let r = self.mk_fn_update_true(right);
+                if l.size() > 1000 || r.size() > 1000 {
+                    println!("Mk true: {} / {}", l.size(), r.size());
+                }
                 match op {
                     BinaryOp::And => l.and(&r),
                     BinaryOp::Or => l.or(&r),
@@ -191,6 +196,248 @@ impl SymbolicContext {
                     BinaryOp::Imp => l.imp(&r),
                     BinaryOp::Iff => l.iff(&r),
                 }
+            }
+        }
+    }
+
+    /// Create a `Bdd` object that is `true` exactly when the given `FnUpdate` evaluates to `true`.
+    pub fn mk_fn_update_true_2(&self, function: &FnUpdate) -> Bdd {
+        // It is dangerous to strictly follow the syntactic tree of the function, because
+        // the efficiency then depends on the combination of function syntax and variable
+        // ordering. Instead, this function implements a greedy approach where we build
+        // a flattened syntactic tree and evaluate the smallest subtrees first.
+        enum PartialEval {
+            Bdd(Bdd),
+            Not(Box<PartialEval>),
+            // Only AND/OR can be vectors, other operators always have length 2.
+            Op(BinaryOp, Vec<PartialEval>),
+        }
+
+        impl Debug for PartialEval {
+            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    PartialEval::Bdd(x) => write!(f, "BDD({})", x.size()),
+                    PartialEval::Not(inner) => write!(f, "NOT({:?})", inner),
+                    PartialEval::Op(op, args) => {
+                        write!(
+                            f,
+                            "OP({:?}){:?}",
+                            op,
+                            args.iter().map(|it| it).collect::<Vec<_>>()
+                        )
+                    }
+                }
+            }
+        }
+
+        impl PartialEval {
+            fn is_op(&self, op: BinaryOp) -> bool {
+                match self {
+                    PartialEval::Bdd(_) => false,
+                    PartialEval::Not(_) => false,
+                    PartialEval::Op(it, _) => *it == op,
+                }
+            }
+
+            fn args(self) -> Vec<PartialEval> {
+                match self {
+                    PartialEval::Op(_, args) => args,
+                    _ => panic!("Cannot read args of Bdd/Negation node."),
+                }
+            }
+
+            fn sort(&mut self) {
+                if let PartialEval::Op(_, args) = self {
+                    args.sort_by_cached_key(|it| match it {
+                        PartialEval::Bdd(it) => it.size(),
+                        _ => usize::MAX,
+                    });
+                    // Sort descending, so that pop returns smallest element.
+                    args.reverse();
+                }
+            }
+
+            fn distribute(self) -> (PartialEval, bool) {
+                match self {
+                    PartialEval::Bdd(x) => (PartialEval::Bdd(x), false),
+                    PartialEval::Not(x) => {
+                        let (x, c) = x.distribute();
+                        (PartialEval::Not(Box::new(x)), c)
+                    }
+                    PartialEval::Op(BinaryOp::And, mut args) if args.len() == 2 => {
+                        let (arg1, c1) = args.pop().unwrap().distribute();
+                        let (arg2, c2) = args.pop().unwrap().distribute();
+                        match (arg1, arg2) {
+                            (PartialEval::Bdd(value), PartialEval::Op(BinaryOp::Or, or_args)) => {
+                                let mut new_or_args = Vec::new();
+                                for or_arg in or_args {
+                                    new_or_args.push(PartialEval::Op(
+                                        BinaryOp::And,
+                                        vec![or_arg, PartialEval::Bdd(value.clone())],
+                                    ))
+                                }
+                                (PartialEval::Op(BinaryOp::Or, new_or_args), true)
+                            }
+                            (PartialEval::Op(BinaryOp::Or, or_args), PartialEval::Bdd(value)) => {
+                                let mut new_or_args = Vec::new();
+                                for or_arg in or_args {
+                                    new_or_args.push(PartialEval::Op(
+                                        BinaryOp::And,
+                                        vec![or_arg, PartialEval::Bdd(value.clone())],
+                                    ))
+                                }
+                                (PartialEval::Op(BinaryOp::Or, new_or_args), true)
+                            }
+                            (arg1, arg2) => {
+                                (PartialEval::Op(BinaryOp::And, vec![arg1, arg2]), c1 | c2)
+                            }
+                        }
+                    }
+                    PartialEval::Op(op, args) => {
+                        let mut new_args = Vec::new();
+                        let mut changed = false;
+                        for arg in args {
+                            let (arg, c) = arg.distribute();
+                            if arg.is_op(op) && (op == BinaryOp::Or || op == BinaryOp::And) {
+                                new_args.append(&mut arg.args());
+                                changed = true;
+                            } else {
+                                new_args.push(arg);
+                                changed = changed | c;
+                            }
+                        }
+                        (PartialEval::Op(op, new_args), changed)
+                    }
+                }
+            }
+
+            fn eval_up_to(self, limit: usize) -> (PartialEval, bool) {
+                match self {
+                    PartialEval::Bdd(x) => (PartialEval::Bdd(x), false),
+                    PartialEval::Not(inner) => {
+                        // There is no point in delaying negation.
+                        if let PartialEval::Bdd(inner) = *inner {
+                            (PartialEval::Bdd(inner.not()), true)
+                        } else {
+                            let (inner, changed) = inner.eval_up_to(limit);
+                            (PartialEval::Not(Box::new(inner)), changed)
+                        }
+                    }
+                    PartialEval::Op(op, args) => {
+                        assert!(args.len() >= 2);
+                        // First, eval every child node in the AST, keeping track of changes.
+                        let mut changed = false;
+                        let mut new_args = Vec::new();
+                        for arg in args {
+                            let (a, c) = arg.eval_up_to(limit);
+                            changed = changed | c;
+                            new_args.push(a);
+                        }
+                        // Then inspect last two arguments.
+                        let mut args = new_args;
+                        let arg1 = &args[args.len() - 1];
+                        let arg2 = &args[args.len() - 2];
+                        match (arg1, arg2) {
+                            (PartialEval::Bdd(x), PartialEval::Bdd(y))
+                                if x.size() + y.size() < limit =>
+                            {
+                                // If the last two args are BDDs and they are small enough,
+                                // we can evaluate them and mark the result as changed.
+                                let bdd = match op {
+                                    BinaryOp::And => x.and(y),
+                                    BinaryOp::Or => x.or(y),
+                                    BinaryOp::Xor => x.xor(y),
+                                    BinaryOp::Iff => x.iff(y),
+                                    BinaryOp::Imp => x.imp(y),
+                                };
+                                if bdd.size() > 1000 {
+                                    println!("{} + {} = {}", x.size(), y.size(), bdd.size());
+                                }
+                                args.pop();
+                                args.pop();
+                                args.push(PartialEval::Bdd(bdd));
+                                changed = true;
+                            }
+                            _ => {
+                                // Else do nothing.
+                            }
+                        }
+                        let partial = if args.len() < 2 {
+                            // If only one arg is remaining, this arg is the result.
+                            assert!(args.len() > 0);
+                            args.pop().unwrap()
+                        } else {
+                            let mut partial = PartialEval::Op(op, args);
+                            partial.sort();
+                            partial
+                        };
+
+                        (partial, changed)
+                    }
+                }
+            }
+        }
+
+        fn mk_partial_eval(ctx: &SymbolicContext, function: &FnUpdate) -> PartialEval {
+            match function {
+                FnUpdate::Const(value) => PartialEval::Bdd(ctx.mk_constant(*value)),
+                FnUpdate::Var(id) => PartialEval::Bdd(ctx.mk_state_variable_is_true(*id)),
+                FnUpdate::Param(id, args) => {
+                    PartialEval::Bdd(ctx.mk_uninterpreted_function_is_true(*id, args))
+                }
+                FnUpdate::Not(inner) => PartialEval::Not(Box::new(mk_partial_eval(ctx, inner))),
+                FnUpdate::Binary(op, left, right) => {
+                    let mut partial = if *op == BinaryOp::And || *op == BinaryOp::Or {
+                        // Try to flatten And/Or operations
+                        let mut args = Vec::new();
+                        let left = mk_partial_eval(ctx, left);
+                        if left.is_op(*op) {
+                            args.append(&mut left.args());
+                        } else {
+                            args.push(left);
+                        }
+                        let right = mk_partial_eval(ctx, right);
+                        if right.is_op(*op) {
+                            args.append(&mut right.args());
+                        } else {
+                            args.push(right);
+                        }
+
+                        PartialEval::Op(*op, args)
+                    } else {
+                        let left = mk_partial_eval(ctx, left);
+                        let right = mk_partial_eval(ctx, right);
+                        PartialEval::Op(*op, vec![left, right])
+                    };
+                    partial.sort();
+                    partial
+                }
+            }
+        }
+
+        let mut eval = mk_partial_eval(&self, function);
+
+        let mut limit = 1024;
+        loop {
+            let (r, changed) = eval.eval_up_to(limit);
+            eval = r;
+            if !changed {
+                let (r, changed) = eval.distribute();
+                eval = r;
+                if !changed {
+                    limit = 2 * limit;
+                    println!("New limit: {}", limit);
+                } else {
+                    println!("Distribute as {:?}", eval);
+                }
+            }
+            println!("Eval: {:?}", eval);
+            if let PartialEval::Bdd(x) = eval {
+                println!("Result size: {}", x.size());
+                /*if limit > 1_000_000 {
+                    panic!("");
+                }*/
+                return x;
             }
         }
     }

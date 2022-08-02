@@ -9,7 +9,7 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let buffer = std::fs::read_to_string(&args[1]).unwrap();
 
-    let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let model = BooleanNetwork::try_from_bnet(buffer.as_str()).unwrap();
     let stg = SymbolicAsyncGraph::new(model.clone()).unwrap();
 
     let mut universe = stg.mk_unit_colored_vertices();

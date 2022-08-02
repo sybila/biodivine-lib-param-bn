@@ -19,16 +19,26 @@ pub(crate) fn apply_regulation_constraints(
         .variables()
         .map(|variable| {
             if let Some(function) = network.get_update_function(variable) {
-                context.mk_fn_update_true(function)
+                println!(
+                    "Creating {} ({:?}).",
+                    network.get_variable_name(variable),
+                    variable
+                );
+                let fun = context.mk_fn_update_true_2(function);
+                println!("Created function: {}.", fun.size());
+                fun
             } else {
                 context.mk_implicit_function_is_true(variable, &network.regulators(variable))
             }
         })
         .collect();
 
+    println!("Functions ready.");
+
     let mut error_message = String::new();
     let mut unit_bdd = initial;
     for regulation in &network.graph.regulations {
+        println!("Process regulation {:?}", regulation);
         let regulator = context.state_variables[regulation.regulator.0];
         let regulator_is_true = context.bdd.mk_var(regulator);
         let regulator_is_false = context.bdd.mk_not_var(regulator);
