@@ -1,9 +1,7 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
-use crate::symbolic_async_graph::{
-    GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
-};
+use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext};
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
@@ -65,6 +63,18 @@ impl SymbolicAsyncGraph {
         GraphColoredVertices::new(
             self.unit_bdd.var_select(bdd_variable, value),
             &self.symbolic_context,
+        )
+    }
+
+    /// Create a vertex set with a fixed value of the given variable.
+    ///
+    /// Note that if you only need the vertices, this can be faster than `fix_network_variable`,
+    /// since it does not involve the BDD of color contraints.
+    pub fn fix_vertices_with_network_variable(&self, variable: VariableId, value: bool) -> GraphVertices {
+        let bdd_variable = self.symbolic_context.state_variables[variable.0];
+        GraphVertices::new(
+            self.symbolic_context.bdd.mk_literal(bdd_variable, value),
+            &self.symbolic_context
         )
     }
 
@@ -155,6 +165,29 @@ impl SymbolicAsyncGraph {
             .map(|(id, value)| (self.symbolic_context.state_variables[id.0], *value))
             .collect();
         self.select_partial_valuation(&partial_valuation)
+    }
+
+    /// Find the smallest subspace (hypercube) that contains the given set of vertices.
+    pub fn find_subspace(&self, set: &GraphVertices) -> Vec<(VariableId, bool)> {
+        let mut result = Vec::new();
+        for var in self.network.variables() {
+            let is_true = self.fix_vertices_with_network_variable(var, true);
+            let is_false = self.fix_vertices_with_network_variable(var, false);
+
+            if set.is_subset(&is_true) {
+                result.push((var, true));
+            }
+            if set.is_subset(&is_false) {
+                result.push((var, false));
+            }
+        }
+        result
+    }
+
+    /// Return true of the given set is a trap set (also invariant set; set with no outgoing
+    /// transitions).
+    pub fn is_trap(&self, set: &GraphColoredVertices) -> bool {
+        self.can_post_out(set).is_empty()
     }
 
     /// This is the same as `mk_subspace`, but it allows you to specify the partial valuation

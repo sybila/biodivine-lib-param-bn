@@ -5,6 +5,7 @@ use crate::symbolic_async_graph::{
 use biodivine_lib_bdd::Bdd;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use crate::VariableId;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -65,6 +66,23 @@ impl GraphColoredVertices {
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
         self.bdd.exact_cardinality()
+    }
+
+    /// Return `true` if the set can be described by a single conjunction of literals. That is,
+    /// the set is a hypercube in the $\mathbb{B}^n$ space.
+    pub fn is_subspace(&self) -> bool {
+        self.bdd.is_clause()
+    }
+
+    /// Return `true` if the set represents a single vertex-color pair.
+    pub fn is_singleton(&self) -> bool {
+        self.bdd.is_valuation()
+    }
+
+
+    pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_select(var, value))
     }
 }
 

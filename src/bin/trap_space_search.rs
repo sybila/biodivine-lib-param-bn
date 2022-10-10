@@ -40,7 +40,7 @@ fn main() {
 fn trap_branch(stg: &SymbolicAsyncGraph, candidate: &GraphColoredVertices) -> GraphColoredVertices {
     let mut traps = stg.mk_empty_vertices();
     let mut traps_bwd = stg.mk_empty_vertices();
-    for var in stg.as_network().variables() {
+    for var in stg.as_network().variables().rev() {
         let is_true = stg.fix_network_variable(var, true);
 
         let true_subspace = candidate.intersect(&is_true);
@@ -105,9 +105,9 @@ fn trap_branch(stg: &SymbolicAsyncGraph, candidate: &GraphColoredVertices) -> Gr
         }
 
         traps_bwd = traps_bwd.union(&traps);
-        traps_bwd = backward(&stg, &traps_bwd);
+        traps_bwd = backward(&stg, &traps_bwd, &candidate);
         if candidate.is_subset(&traps_bwd) {
-            //println!("Everything covered...");
+            println!("Everything covered...");
             break;
         }
     }
@@ -397,6 +397,7 @@ pub fn forward_closed(
 pub fn backward(
     graph: &SymbolicAsyncGraph,
     initial: &GraphColoredVertices,
+    superset: &GraphColoredVertices,
 ) -> GraphColoredVertices {
     let mut result = initial.clone();
 
@@ -404,7 +405,7 @@ pub fn backward(
         let mut stop = true;
         // The order is important to update Bdd based on the "easiest" variables first.
         for var in graph.as_network().variables().rev() {
-            let step = graph.var_pre(var, &result).minus(&result);
+            let step = graph.var_pre(var, &result).minus(&result).intersect(&superset);
 
             if !step.is_empty() {
                 result = result.union(&step);

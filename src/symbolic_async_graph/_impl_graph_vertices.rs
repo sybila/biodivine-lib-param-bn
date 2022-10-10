@@ -8,6 +8,7 @@ use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::convert::TryFrom;
 use std::ops::Shr;
+use crate::VariableId;
 
 impl GraphVertices {
     /// Create a new set of vertices using the given `Bdd` and a symbolic `context`.
