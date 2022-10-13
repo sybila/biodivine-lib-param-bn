@@ -11,6 +11,7 @@
 //!
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use regex::Regex;
 use std::collections::HashMap;
@@ -44,18 +45,16 @@ mod _impl_parameter;
 mod _impl_parameter_id;
 /// **(internal)** Utility methods for `Regulation`.
 mod _impl_regulation;
-/// **(internal)** Utility methods for `RegulatoryGraph`.
+/// **(internal)** All methods for analysing and manipulating `RegulatoryGraph`.
 mod _impl_regulatory_graph;
-/// **(internal)** `RegulatoryGraph` to `.aeon` string.
-mod _impl_regulatory_graph_display;
-/// **(internal)** Equivalence relation for `RegulatoryGraph`.
-mod _impl_regulatory_graph_eq;
-/// **(internal)** Export of `RegulatoryGraph` into a `.dot` format.
-mod _impl_regulatory_graph_to_dot;
 /// **(internal)** Utility methods for `Variable`.
 mod _impl_variable;
 /// **(internal)** Utility methods for `VariableId`.
 mod _impl_variable_id;
+
+// Re-export data structures used for advanced graph algorithms on `RegulatoryGraph`.
+pub use _impl_regulatory_graph::signed_directed_graph::SdGraph;
+pub use _impl_regulatory_graph::signed_directed_graph::Sign;
 
 /// **(internal)** A regex string of an identifier which we currently allow to appear
 /// as a variable or parameter name.

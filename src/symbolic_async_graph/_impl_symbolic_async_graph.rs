@@ -1,7 +1,9 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
-use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext};
+use crate::symbolic_async_graph::{
+    GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
+};
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
@@ -66,15 +68,19 @@ impl SymbolicAsyncGraph {
         )
     }
 
-    /// Create a vertex set with a fixed value of the given variable.
+    /// Create a vertex set with a fixed value of the given network variable.
     ///
     /// Note that if you only need the vertices, this can be faster than `fix_network_variable`,
-    /// since it does not involve the BDD of color contraints.
-    pub fn fix_vertices_with_network_variable(&self, variable: VariableId, value: bool) -> GraphVertices {
+    /// since it does not involve the BDD of color constraints.
+    pub fn fix_vertices_with_network_variable(
+        &self,
+        variable: VariableId,
+        value: bool,
+    ) -> GraphVertices {
         let bdd_variable = self.symbolic_context.state_variables[variable.0];
         GraphVertices::new(
             self.symbolic_context.bdd.mk_literal(bdd_variable, value),
-            &self.symbolic_context
+            &self.symbolic_context,
         )
     }
 

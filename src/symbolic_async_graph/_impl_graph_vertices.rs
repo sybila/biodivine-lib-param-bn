@@ -3,12 +3,12 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
+use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddValuation, BddVariable};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::convert::TryFrom;
 use std::ops::Shr;
-use crate::VariableId;
 
 impl GraphVertices {
     /// Create a new set of vertices using the given `Bdd` and a symbolic `context`.
@@ -97,6 +97,13 @@ impl GraphVertices {
     /// Convert this set to a `.dot` graph.
     pub fn to_dot_string(&self, context: &SymbolicContext) -> String {
         self.bdd.to_dot_string(&context.bdd, true)
+    }
+
+    /// Compute a subset of this set where the given network variable is always fixed to the
+    /// given value.
+    pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_select(var, value))
     }
 }
 

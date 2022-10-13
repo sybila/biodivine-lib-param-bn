@@ -2,10 +2,10 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
+use crate::VariableId;
 use biodivine_lib_bdd::Bdd;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
-use crate::VariableId;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -79,7 +79,8 @@ impl GraphColoredVertices {
         self.bdd.is_valuation()
     }
 
-
+    /// Compute a subset of this set where the given network variable is always fixed to the
+    /// given value.
     pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_select(var, value))
