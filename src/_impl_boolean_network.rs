@@ -4,7 +4,7 @@ use crate::{
     RegulatoryGraph, Variable, VariableId, VariableIdIterator, ID_REGEX,
 };
 use biodivine_lib_bdd::bdd;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 
 /// Basic methods for safely building `BooleanNetwork`s.
@@ -340,6 +340,56 @@ impl BooleanNetwork {
         }
 
         Ok(new_bn)
+    }
+
+    pub fn inline_inputs(&self) -> BooleanNetwork {
+        let inputs: HashSet<VariableId> = self
+            .variables()
+            .filter(|it| self.as_graph().regulators(*it).is_empty())
+            .collect();
+        let variables: HashSet<VariableId> =
+            self.variables().filter(|it| !inputs.contains(it)).collect();
+        let mut variable_names: Vec<String> = variables
+            .iter()
+            .map(|it| self.get_variable_name(*it))
+            .cloned()
+            .collect();
+
+        variable_names.sort();
+
+        let mut new_rg = RegulatoryGraph::new(variable_names);
+        for reg in self.as_graph().regulations() {
+            if variables.contains(&reg.get_regulator()) {
+                let source_name = self.get_variable_name(reg.get_regulator());
+                let target_name = self.get_variable_name(reg.get_target());
+                new_rg
+                    .add_regulation(
+                        source_name.as_str(),
+                        target_name.as_str(),
+                        false, // necessary for this to work...
+                        reg.get_monotonicity(),
+                    )
+                    .unwrap();
+            }
+        }
+
+        let mut new_bn = BooleanNetwork::new(new_rg);
+        for var in &inputs {
+            let name = self.get_variable_name(*var);
+            new_bn.add_parameter(name.as_str(), 0).unwrap();
+        }
+
+        for var in &variables {
+            let update = self.get_update_function(*var);
+            let name = self.get_variable_name(*var);
+            if let Some(update) = update {
+                new_bn
+                    .add_string_update_function(name.as_str(), update.to_string(self).as_str())
+                    .unwrap();
+            }
+        }
+
+        new_bn
     }
 }
 

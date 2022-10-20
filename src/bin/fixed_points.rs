@@ -9,7 +9,13 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let buffer = std::fs::read_to_string(&args[1]).unwrap();
 
-    let mut model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let model = model.inline_inputs();
+    println!(
+        "Loaded model with {} variables and {} inputs.",
+        model.num_vars(),
+        model.num_parameters()
+    );
     // Fix inputs to true.
     /*for var in model.variables() {
         if model.get_update_function(var).is_none() {
