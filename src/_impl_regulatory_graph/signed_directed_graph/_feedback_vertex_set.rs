@@ -28,7 +28,7 @@ impl SdGraph {
         while let Some(mut scc) = components.pop() {
             let mut best_candidate = (VariableId::from_index(0), usize::MAX, 0usize);
             // Not particularly efficient but keeps the procedure deterministic.
-            // However, by some luck coincidence, it also seems to on average improve the results :O
+            // However, by a lucky coincidence, it also seems to on average improve the results :O
             let mut scc_iter: Vec<VariableId> = scc.iter().cloned().collect();
             scc_iter.sort();
             for x in &scc_iter {
@@ -81,7 +81,7 @@ impl SdGraph {
         while let Some(mut scc) = components.pop() {
             let mut best_candidate = (VariableId::from_index(0), usize::MAX, 0usize);
             // Not particularly efficient but keeps the procedure deterministic.
-            // However, by some luck coincidence, it also seems to on average improve the results :O
+            // However, by a lucky coincidence, it also seems to on average improve the results :O
             let mut scc_iter: Vec<VariableId> = scc.iter().cloned().collect();
             scc_iter.sort();
             for x in &scc_iter {
@@ -120,8 +120,12 @@ impl SdGraph {
         result
     }
 
-    /// **(internal)** Compute the dregree of a vertex within the given set.
-    fn approx_degree(&self, vertex: VariableId, universe: &HashSet<VariableId>) -> usize {
+    /// **(internal)** Compute the degree of a vertex within the given set.
+    pub(crate) fn approx_degree(
+        &self,
+        vertex: VariableId,
+        universe: &HashSet<VariableId>,
+    ) -> usize {
         let in_degree = self.predecessors[vertex.to_index()]
             .iter()
             .filter(|(x, _)| universe.contains(x))

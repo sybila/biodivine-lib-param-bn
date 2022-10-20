@@ -13,7 +13,9 @@ fn main() {
     // Fix inputs to true.
     for var in model.variables() {
         if model.get_update_function(var).is_none() {
-            model.set_update_function(var, Some(FnUpdate::Const(true))).unwrap();
+            model
+                .set_update_function(var, Some(FnUpdate::Const(true)))
+                .unwrap();
         }
     }
 
@@ -57,8 +59,10 @@ fn trap_branch(stg: &SymbolicAsyncGraph, candidate: &GraphColoredVertices) -> Gr
         let mut false_trap_candidate = false_subspace.clone();
 
         for var in stg.as_network().variables() {
-            true_trap_candidate = true_trap_candidate.minus(&stg.var_can_post_out(var, &true_trap_candidate));
-            false_trap_candidate = false_trap_candidate.minus(&stg.var_can_post_out(var, &false_trap_candidate));
+            true_trap_candidate =
+                true_trap_candidate.minus(&stg.var_can_post_out(var, &true_trap_candidate));
+            false_trap_candidate =
+                false_trap_candidate.minus(&stg.var_can_post_out(var, &false_trap_candidate));
         }
 
         true_trap_candidate = expand_to_cube(stg, &true_trap_candidate);
@@ -93,13 +97,19 @@ fn trap_branch(stg: &SymbolicAsyncGraph, candidate: &GraphColoredVertices) -> Gr
         let false_trap = forward_closed(&stg, &false_subspace.minus(&traps_bwd));
 
         if !true_trap.is_empty() {
-            println!("Found true trap set of size {}", true_trap.approx_cardinality());
+            println!(
+                "Found true trap set of size {}",
+                true_trap.approx_cardinality()
+            );
             let true_traps = trap_branch(stg, &expand_to_cube(stg, &true_trap));
             traps = traps.union(&true_traps);
         }
 
         if !false_trap.is_empty() {
-            println!("Found false trap set of size {}", false_trap.approx_cardinality());
+            println!(
+                "Found false trap set of size {}",
+                false_trap.approx_cardinality()
+            );
             let false_traps = trap_branch(stg, &expand_to_cube(stg, &false_trap));
             traps = traps.union(&false_traps);
         }
@@ -130,7 +140,7 @@ fn branch(
     universe: GraphColoredVertices,
     candidate: GraphColoredVertices,
     branch_on: &[VariableId],
-    results: &mut Vec<GraphColoredVertices>
+    results: &mut Vec<GraphColoredVertices>,
 ) -> bool {
     if universe.is_empty() || candidate.is_empty() {
         println!("Skip empty.");
@@ -161,7 +171,6 @@ fn branch(
 
     println!("  After percolation: ");
     print_space(stg, &candidate);
-
 
     if branch_on.is_empty() {
         println!("  Nothing more to branch on.");
@@ -217,7 +226,7 @@ fn branch(
             trapped.intersect(&var_true),
             candidate.intersect(&var_true),
             &branch_on[(i_var + 1)..],
-            results
+            results,
         );
 
         let has_trap_in_false = branch(
@@ -225,7 +234,7 @@ fn branch(
             trapped.intersect(&var_false),
             candidate.intersect(&var_false),
             &branch_on[(i_var + 1)..],
-            results
+            results,
         );
 
         let has_trap_in_free = if !(has_trap_in_true || has_trap_in_false) {
@@ -234,7 +243,7 @@ fn branch(
                 trapped.clone(),
                 candidate.clone(),
                 &branch_on[(i_var + 1)..],
-                results
+                results,
             )
         } else {
             false
@@ -252,10 +261,7 @@ fn branch(
     }
 }
 
-fn is_trap_space(
-    stg: &SymbolicAsyncGraph,
-    candidate: &GraphColoredVertices
-) -> bool {
+fn is_trap_space(stg: &SymbolicAsyncGraph, candidate: &GraphColoredVertices) -> bool {
     for var in stg.as_network().variables() {
         if !stg.var_can_post_out(var, &candidate).is_empty() {
             return false;
@@ -351,7 +357,11 @@ fn expand_to_cube(stg: &SymbolicAsyncGraph, set: &GraphColoredVertices) -> Graph
     result
 }
 
-fn make_variable_free(stg: &SymbolicAsyncGraph, var: VariableId, cube: &GraphColoredVertices) -> GraphColoredVertices {
+fn make_variable_free(
+    stg: &SymbolicAsyncGraph,
+    var: VariableId,
+    cube: &GraphColoredVertices,
+) -> GraphColoredVertices {
     let bdd_var = stg.symbolic_context().get_state_variable(var);
     let relaxed_bdd = cube.as_bdd().var_project(bdd_var);
     stg.empty_vertices().copy(relaxed_bdd)
@@ -405,7 +415,10 @@ pub fn backward(
         let mut stop = true;
         // The order is important to update Bdd based on the "easiest" variables first.
         for var in graph.as_network().variables().rev() {
-            let step = graph.var_pre(var, &result).minus(&result).intersect(&superset);
+            let step = graph
+                .var_pre(var, &result)
+                .minus(&result)
+                .intersect(&superset);
 
             if !step.is_empty() {
                 result = result.union(&step);

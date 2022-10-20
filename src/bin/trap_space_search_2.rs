@@ -1,7 +1,7 @@
-use std::collections::HashSet;
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
-use biodivine_lib_param_bn::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_param_bn::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use biodivine_lib_param_bn::{BooleanNetwork, FnUpdate, VariableId};
+use std::collections::HashSet;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
@@ -12,7 +12,9 @@ fn main() {
     for var in model.variables() {
         if model.get_update_function(var).is_none() {
             println!("Fix variable {:?}", var);
-            model.set_update_function(var, Some(FnUpdate::Const(true))).unwrap();
+            model
+                .set_update_function(var, Some(FnUpdate::Const(true)))
+                .unwrap();
         }
     }
 
@@ -27,23 +29,32 @@ fn main() {
     //branch_search(&stg, stg.unit_colored_vertices(), variables);
 
     let variables: Vec<VariableId> = stg.as_network().variables().collect();
-    branch_search_2(&stg, stg.unit_colored_vertices(), stg.unit_colored_vertices(), variables);
+    branch_search_2(
+        &stg,
+        stg.unit_colored_vertices(),
+        stg.unit_colored_vertices(),
+        variables,
+    );
 }
 
 /// Remove a variable from a vector, creating a copy.
 fn remove_variable(variables: &[VariableId], variable: VariableId) -> Vec<VariableId> {
-    variables.iter().filter(|it| **it != variable).cloned().collect()
+    variables
+        .iter()
+        .filter(|it| **it != variable)
+        .cloned()
+        .collect()
 }
 
 fn branch_search_2(
     stg: &SymbolicAsyncGraph,
     space_candidate: &GraphColoredVertices,
     trap_candidate: &GraphColoredVertices,
-    mut free_variables: Vec<VariableId>
+    mut free_variables: Vec<VariableId>,
 ) {
     // First, percolate the candidate
     print_space(stg, space_candidate);
-    let ref space_candidate = constant_propagation(stg, space_candidate);//, &mut free_variables);
+    let ref space_candidate = constant_propagation(stg, space_candidate); //, &mut free_variables);
     let ref trap_candidate = trap_candidate.intersect(&space_candidate);
     print_space(stg, space_candidate);
     println!("{:?}", free_variables);
@@ -53,13 +64,13 @@ fn branch_search_2(
         let true_subspace = space_candidate.fix_network_variable(var, true);
         let false_subspace = space_candidate.fix_network_variable(var, false);
 
-        let true_subspace = constant_propagation(stg, &true_subspace);//, &mut remove_variable(&free_variables, var));
+        let true_subspace = constant_propagation(stg, &true_subspace); //, &mut remove_variable(&free_variables, var));
         print_space(stg, &true_subspace);
         let true_subspace = tail_elimination(stg, &true_subspace);
         print_space(stg, &true_subspace);
-        let true_subspace = constant_propagation(stg, &true_subspace);//, &mut remove_variable(&free_variables, var));
+        let true_subspace = constant_propagation(stg, &true_subspace); //, &mut remove_variable(&free_variables, var));
         print_space(stg, &true_subspace);
-        let false_subspace = constant_propagation(stg, &false_subspace);//, &mut remove_variable(&free_variables, var));
+        let false_subspace = constant_propagation(stg, &false_subspace); //, &mut remove_variable(&free_variables, var));
         print_space(stg, &false_subspace);
         let false_subspace = tail_elimination(stg, &false_subspace);
         print_space(stg, &false_subspace);
@@ -89,18 +100,15 @@ fn tail_elimination(
         //print!("Iteration: ");
         //print_space(stg, &result);
     }
-
 }
 
 fn tail_elimination_2(
     stg: &SymbolicAsyncGraph,
     space: &GraphColoredVertices,
 ) -> GraphColoredVertices {
-
     let mut result = space.clone();
 
     'tail: loop {
-
         //println!("Result: {} / {}", result.approx_cardinality(), result.as_bdd().size());
         for var in stg.as_network().variables().rev() {
             let not_trapped = stg.var_can_post_out(var, &result);
@@ -112,7 +120,9 @@ fn tail_elimination_2(
                     return new_result;
                 }
 
-                if stg.find_subspace(&result.vertices()) != stg.find_subspace(&new_result.vertices()) {
+                if stg.find_subspace(&result.vertices())
+                    != stg.find_subspace(&new_result.vertices())
+                {
                     result = stg.mk_subspace(&stg.find_subspace(&new_result.vertices()));
                     //print!(" ----- ");
                     //print_space(stg, &result);
@@ -126,7 +136,6 @@ fn tail_elimination_2(
 
         return result;
     }
-
 }
 
 fn constant_propagation(
@@ -339,7 +348,7 @@ fn branch_search(
 pub fn bwd(
     stg: &SymbolicAsyncGraph,
     initial: &GraphColoredVertices,
-    space: &GraphColoredVertices
+    space: &GraphColoredVertices,
 ) -> GraphColoredVertices {
     // TODO: Instead of intersection, find which variables in space are constant and ignore
     // those, since there's no way that they can be updated.

@@ -21,8 +21,10 @@ use std::ops::Range;
 pub mod async_graph;
 pub mod bdd_params;
 pub mod biodivine_std;
+pub mod fixed_points;
 pub mod sbml;
 pub mod symbolic_async_graph;
+pub mod trap_spaces;
 pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.

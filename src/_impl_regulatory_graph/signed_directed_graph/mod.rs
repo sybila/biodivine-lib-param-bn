@@ -13,6 +13,10 @@ mod _reachability;
 /// into strongly connected components.
 mod _strongly_connected_components;
 
+/// **(internal)** Perform decomposition of the signed directed graph (or its subgraph)
+/// into weakly connected components.
+mod _weakly_connected_components;
+
 /// **(internal)** Algorithms for detecting smallest cycles, including positive/negative
 /// variants for each algorithms.
 mod _cycle_detection;
