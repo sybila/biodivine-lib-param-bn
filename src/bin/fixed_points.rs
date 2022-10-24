@@ -10,7 +10,7 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let buffer = std::fs::read_to_string(&args[1]).unwrap();
 
-    let mut model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let mut model = BooleanNetwork::try_from_bnet(buffer.as_str()).unwrap();
     let model = model.inline_inputs();
     println!(
         "Loaded model with {} variables and {} inputs.",
@@ -34,11 +34,13 @@ fn main() {
     }*/
 
     let stg = SymbolicAsyncGraph::new(model).unwrap();
+
+    FixedPoints::naive_greedy_bdd(&stg, stg.unit_colored_vertices());
     //let variables: Vec<VariableId> = stg.as_network().variables().rev().collect();
-    println!("{}",
+    /*println!("{}",
              FixedPoints::greedy_recursive_2(&stg, stg.unit_colored_vertices())
                  .approx_cardinality()
-    );
+    );*/
     //println!("{}", stg.fixed_points_2().approx_cardinality());
 
     /*let mut remaining = stg.mk_unit_colors();
@@ -110,6 +112,43 @@ fn main() {
     solver.assert(&check_star.try_into().unwrap());
     println!("{:?}", solver.check());
     println!("{:?}", solver.get_model());*/
+}
+
+
+/// Compute the largest forward closed subset of the `initial` set. That is, the states that can
+/// only reach states inside `initial`.
+///
+/// In particular, if the initial set is a weak basin, the result is a strong basin.
+pub fn forward_closed(
+    graph: &SymbolicAsyncGraph,
+    initial: &GraphColoredVertices,
+) -> GraphColoredVertices {
+    let mut i = 0;
+    let mut basin = initial.clone();
+    loop {
+        i += 1;
+        let mut stop = true;
+        for var in graph.as_network().variables().rev() {
+            let can_go_out = graph.var_can_post_out(var, &basin);
+            //let outside_successors = graph.var_post(var, &basin).minus(&basin);
+            //let can_go_out = graph.var_pre(var, &outside_successors).intersect(&basin);
+
+            if !can_go_out.is_empty() {
+                basin = basin.minus(&can_go_out);
+                stop = false;
+                break;
+            }
+        }
+        if basin.as_bdd().size() > 10_000 {
+            //println!("Skip");
+            //return graph.mk_empty_vertices();
+            println!("Forward closed progress: {}", basin.as_bdd().size())
+        }
+        if stop {
+            //println!("I: {}", i);
+            return basin;
+        }
+    }
 }
 
 struct MyContext<'ctx> {
