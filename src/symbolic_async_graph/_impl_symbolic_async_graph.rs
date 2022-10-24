@@ -7,6 +7,7 @@ use crate::symbolic_async_graph::{
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
+use crate::trap_spaces::{ExtendedBoolean, Space};
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
@@ -283,6 +284,66 @@ impl SymbolicAsyncGraph {
                 .collect(),
         }
     }
+
+
+    /// Fined the smallest subspace (hypercube) that encapsulates all the vertices
+    /// within this set (colors are not affected).
+    pub fn expand_to_cube(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        // I'm not quite ready to make this method public...
+        fn make_variable_free(
+            stg: &SymbolicAsyncGraph,
+            var: VariableId,
+            cube: &GraphColoredVertices,
+        ) -> GraphColoredVertices {
+            let bdd_var = stg.symbolic_context().get_state_variable(var);
+            let relaxed_bdd = cube.as_bdd().var_project(bdd_var);
+            stg.empty_vertices().copy(relaxed_bdd)
+        }
+
+        let mut result = set.clone();
+        for var in self.as_network().variables() {
+            let var_true = self.fix_network_variable(var, true);
+            let var_false = self.fix_network_variable(var, false);
+            if !(result.is_subset(&var_true) || result.is_subset(&var_false)) {
+                result = make_variable_free(self, var, &result);
+            }
+        }
+        result
+    }
+
+    /// The same as `expand_to_cube`, but the result is a `Space` object.
+    pub fn expand_to_space(&self, set: &GraphVertices) -> Space {
+        let clause = set.bdd.necessary_clause().unwrap();
+        let mut result = Space::new(self.as_network());
+        for var in self.as_network().variables() {
+            let bdd_var = self.symbolic_context.state_variables[var.to_index()];
+            if let Some(value) = clause.get_value(bdd_var) {
+                if value {
+                    result[var] = ExtendedBoolean::One;
+                } else {
+                    result[var] = ExtendedBoolean::Zero;
+                }
+            }
+        }
+        result
+    }
+
+    pub fn fix_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
+        let bdd_var = self.symbolic_context.state_variables[var.0];
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (self.mk_empty_vertices(), self.unit_colored_vertices().restrict_network_variable(var, value)),
+            color_space: (self.mk_empty_colors(), self.mk_unit_colors()),
+            unit_bdd: self.unit_bdd.var_restrict(bdd_var, value),
+            update_functions: self.update_functions.iter()
+                .map(|f| {
+                    f.var_restrict(bdd_var, value)
+                })
+                .collect()
+        }
+    }
+
 }
 
 impl SymbolicAsyncGraph {

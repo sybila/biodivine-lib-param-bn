@@ -345,7 +345,11 @@ impl BooleanNetwork {
     pub fn inline_inputs(&self) -> BooleanNetwork {
         let inputs: HashSet<VariableId> = self
             .variables()
-            .filter(|it| self.as_graph().regulators(*it).is_empty())
+            .filter(|it| {
+                let is_free_input = self.as_graph().regulators(*it).is_empty();
+                let is_identity_input = self.get_update_function(*it).clone() == Some(FnUpdate::Var(*it));
+                is_free_input || is_identity_input
+            })
             .collect();
         let variables: HashSet<VariableId> =
             self.variables().filter(|it| !inputs.contains(it)).collect();

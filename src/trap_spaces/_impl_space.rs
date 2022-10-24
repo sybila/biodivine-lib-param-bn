@@ -3,6 +3,8 @@ use crate::{BooleanNetwork, VariableId};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
+use ExtendedBoolean::{One, Zero};
+use crate::trap_spaces::ExtendedBoolean::Any;
 
 impl Index<VariableId> for Space {
     type Output = ExtendedBoolean;
@@ -51,6 +53,34 @@ impl PartialOrd for Space {
 }
 
 impl Space {
+
+    /// Create a new space tracking the variables of the given network, where all values are
+    /// initially assigned as `Any`.
+    pub fn new(network: &BooleanNetwork) -> Space {
+        Space(vec![Any; network.num_vars()])
+    }
+
+    pub fn intersect(&self, other: &Space) -> Option<Space> {
+        let mut result = self.clone();
+        for i in 0..self.0.len() {
+            match (self.0[i], other.0[i]) {
+                (One, Zero) | (Zero, One) => {
+                    return None;
+                }
+                (One, Any) | (Any, One) => {
+                    result.0[i] = One;
+                }
+                (Zero, Any) | (Any, Zero) => {
+                    result.0[i] = Zero;
+                }
+                (Zero, Zero) | (One, One) | (Any, Any) => {
+                    // Do nothing.
+                }
+            }
+        }
+        Some(result)
+    }
+
     pub fn count_any(&self) -> usize {
         self.0
             .iter()
@@ -63,8 +93,8 @@ impl Space {
             self.0
                 .into_iter()
                 .map(|it| match it {
-                    ExtendedBoolean::One => OptionalExtendedBoolean::One,
-                    ExtendedBoolean::Zero => OptionalExtendedBoolean::Zero,
+                    One => OptionalExtendedBoolean::One,
+                    Zero => OptionalExtendedBoolean::Zero,
                     ExtendedBoolean::Any => OptionalExtendedBoolean::Any,
                 })
                 .collect(),

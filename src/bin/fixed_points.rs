@@ -1,21 +1,29 @@
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
-use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::{BinaryOp, BooleanNetwork, FnUpdate};
+use biodivine_lib_param_bn::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use biodivine_lib_param_bn::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
 use z3::ast;
 use z3::ast::{Ast, Dynamic};
 use z3::{Context, FuncDecl, Solver, Sort};
+use biodivine_lib_param_bn::biodivine_std::traits::Set;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let buffer = std::fs::read_to_string(&args[1]).unwrap();
 
-    let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let mut model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
     let model = model.inline_inputs();
     println!(
         "Loaded model with {} variables and {} inputs.",
         model.num_vars(),
         model.num_parameters()
     );
+
+    /*let ig = model.as_graph().independent_cycles();
+    println!("Cycles: {}", ig.len());
+    for it in &ig {
+        println!("{}", it.len());
+    }*/
+
     // Fix inputs to true.
     /*for var in model.variables() {
         if model.get_update_function(var).is_none() {
@@ -26,11 +34,33 @@ fn main() {
     }*/
 
     let stg = SymbolicAsyncGraph::new(model).unwrap();
-    //println!("{}", stg.fixed_points_2().approx_cardinality());
-    println!(
-        "{}",
-        FixedPoints::naive_greedy_bdd(&stg, stg.unit_colored_vertices()).approx_cardinality()
+    //let variables: Vec<VariableId> = stg.as_network().variables().rev().collect();
+    println!("{}",
+             FixedPoints::greedy_recursive_2(&stg, stg.unit_colored_vertices())
+                 .approx_cardinality()
     );
+    //println!("{}", stg.fixed_points_2().approx_cardinality());
+
+    /*let mut remaining = stg.mk_unit_colors();
+    while !remaining.is_empty() {
+        let restrict = remaining.pick_singleton();
+        let restrict = stg.unit_colored_vertices().intersect_colors(&restrict);
+        let fixed = FixedPoints::naive_greedy_bdd(&stg, &restrict);
+        println!("{}", fixed.approx_cardinality());
+
+        let vertices = fixed.vertices().pick_singleton();
+        let restrict = stg.unit_colored_vertices().intersect_vertices(&vertices);
+        let fixed_2 = FixedPoints::naive_greedy_bdd(&stg, &restrict);
+        println!("{}", fixed_2.approx_cardinality());
+
+        let colors = fixed_2.colors();
+        println!("{}/{}", colors.approx_cardinality(), stg.unit_colors().approx_cardinality());
+        let restrict = stg.unit_colored_vertices().intersect_colors(&colors);
+        let fixed_3 = FixedPoints::naive_greedy_bdd(&stg, &restrict);
+        println!("{}", fixed_3.approx_cardinality());
+        remaining = remaining.minus(&colors);
+        println!(" >>>>>>>>>>> REMAINING: {}/{}", remaining.approx_cardinality(), stg.unit_colors().approx_cardinality());
+    }*/
 
     /*let z3_config = z3::Config::new();
     let z3 = z3::Context::new(&z3_config);

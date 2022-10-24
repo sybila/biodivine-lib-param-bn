@@ -85,6 +85,11 @@ impl GraphColoredVertices {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_select(var, value))
     }
+
+    pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_restrict(var, value))
+    }
 }
 
 /// Set operations.
