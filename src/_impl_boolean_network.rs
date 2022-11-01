@@ -6,6 +6,7 @@ use crate::{
 use biodivine_lib_bdd::bdd;
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
+use std::path::Path;
 
 /// Basic methods for safely building `BooleanNetwork`s.
 impl BooleanNetwork {
@@ -16,6 +17,31 @@ impl BooleanNetwork {
             graph,
             parameters: Vec::new(),
             parameter_to_index: HashMap::new(),
+        }
+    }
+
+    pub fn try_from_file<T: AsRef<Path>>(path: T) -> Result<BooleanNetwork, String> {
+        let path: &Path = path.as_ref();
+        let extension = path.extension().and_then(|it| it.to_str());
+        let is_aeon = extension == Some("aeon");
+        let is_bnet = extension == Some("bnet");
+        let is_sbml = extension == Some("sbml");
+        if is_aeon || is_bnet || is_sbml {
+            let content = std::fs::read_to_string(path);
+            match content {
+                Ok(content) => {
+                    if is_aeon {
+                        Self::try_from(content.as_str())
+                    } else if is_bnet {
+                        Self::try_from_bnet(content.as_str())
+                    } else {
+                        Self::try_from_sbml(content.as_str()).map(|(x, _)| x)
+                    }
+                }
+                Err(e) => Err(format!("File not readable: {}", e)),
+            }
+        } else {
+            Err("Unknown file format.".to_string())
         }
     }
 
@@ -227,6 +253,19 @@ impl BooleanNetwork {
     pub fn is_valid_name(name: &str) -> bool {
         ID_REGEX.is_match(name)
     }
+
+    /// Compute the set of network variables which depend (syntactically) on the
+    /// given `parameter`.
+    pub fn parameter_appears_in(&self, parameter: ParameterId) -> HashSet<VariableId> {
+        self.variables()
+            .filter(|var| {
+                self.get_update_function(*var)
+                    .as_ref()
+                    .map(|it| it.contains_parameter(parameter))
+                    .unwrap_or(false)
+            })
+            .collect()
+    }
 }
 
 impl BooleanNetwork {
@@ -240,7 +279,7 @@ impl BooleanNetwork {
     ///
     /// The BN still has to satisfy basic integrity constraints. In particular, every uninterpreted
     /// function must be used, and must be used consistently (i.e. correct arity). Also, every
-    /// update function may only used variables declared as regulators. Otherwise, an error
+    /// update function may only use variables declared as regulators. Otherwise, an error
     /// is returned.
     pub fn infer_valid_graph(&self) -> Result<BooleanNetwork, String> {
         let ctx = SymbolicContext::new(self)?;
@@ -342,15 +381,69 @@ impl BooleanNetwork {
         Ok(new_bn)
     }
 
+    /// Try to inline the input nodes (variables) of the network as logical parameters
+    /// (uninterpreted functions of arity 0).
+    ///
+    /// This often reduces the overall symbolic complexity of working with the network, as
+    /// fewer symbolic variables are necessary. However, note that at the moment, not all input
+    /// nodes can be correctly inlined. In particular, in order for a node to be inlined,
+    /// the following must hold:
+    ///
+    ///  - Either it has no regulators and its update function is unknown, or it has exactly one
+    ///    regulator and its update function is the identity function (update(x) = x). That is,
+    ///    constant source nodes are not inlined.
+    ///  - Every variable that depends on it has an explicit update function, the source node
+    ///    does appear in this function (syntactically; we do not check for observability), and
+    ///    it does not appear as an argument to any of the nested uninterpreted functions.
+    ///
+    /// The second requirement is necessary to ensure that the newly created parameter will still
+    /// appear in the network, and that we are not losing any information about its effect in the
+    /// downstream functions. However, note that we are still technically losing the
+    /// monotonicity/observability requirements. You should thus always check the integrity of
+    /// both the original and transformed network.
     pub fn inline_inputs(&self) -> BooleanNetwork {
         let inputs: HashSet<VariableId> = self
             .variables()
             .filter(|it| {
-                let is_free_input = self.as_graph().regulators(*it).is_empty();
-                let is_identity_input = self.get_update_function(*it).clone() == Some(FnUpdate::Var(*it));
+                // Check if the variable is an input.
+                let has_no_regulators = self.as_graph().regulators(*it).is_empty();
+                let has_update_function = self.get_update_function(*it).is_some();
+                let is_free_input = has_no_regulators && !has_update_function;
+
+                let has_identity_update =
+                    self.get_update_function(*it) == &Some(FnUpdate::Var(*it));
+                let is_only_regulator = self.as_graph().regulators(*it) == vec![*it];
+                let is_identity_input = has_identity_update && is_only_regulator;
                 is_free_input || is_identity_input
             })
+            .filter(|input| {
+                // Only retain inputs that are safe to remove.
+                let mut is_ok = true;
+                for target in self.targets(*input) {
+                    if let Some(update) = self.get_update_function(target) {
+                        // If the input does not appear in the function at all, we can't remove
+                        // it, because we'd lose information about that input.
+                        is_ok = is_ok && update.contains_variable(*input);
+                        update.walk_postorder(&mut |it: &FnUpdate| {
+                            match it {
+                                FnUpdate::Param(_, args) => {
+                                    // If the input appears as function argument, we can't remove
+                                    // it because we don't have a way of substituting the argument.
+                                    is_ok = is_ok && !args.contains(input)
+                                }
+                                _ => (),
+                            };
+                        })
+                    } else {
+                        // The target variable does not have an update function - we'd lose
+                        // one implicit argument if we just delete this input variable.
+                        is_ok = false;
+                    }
+                }
+                is_ok
+            })
             .collect();
+
         let variables: HashSet<VariableId> =
             self.variables().filter(|it| !inputs.contains(it)).collect();
         let mut variable_names: Vec<String> = variables
@@ -378,11 +471,25 @@ impl BooleanNetwork {
         }
 
         let mut new_bn = BooleanNetwork::new(new_rg);
+
+        // Copy old parameters.
+        for param in self.parameters() {
+            let param = self.get_parameter(param);
+            new_bn
+                .add_parameter(param.get_name().as_str(), param.get_arity())
+                .unwrap();
+        }
+
+        // Add new inlined parameters.
+        // Note that integrity of the original BN ensures that there is no parameter
+        // with the same name already.
         for var in &inputs {
             let name = self.get_variable_name(*var);
             new_bn.add_parameter(name.as_str(), 0).unwrap();
         }
 
+        // Copy update functions. Technically, they should still be syntactically correct, so
+        // we just have to re-parse them in the new context.
         for var in &variables {
             let update = self.get_update_function(*var);
             let name = self.get_variable_name(*var);
@@ -421,6 +528,12 @@ mod test {
     use std::convert::TryFrom;
 
     #[test]
+    fn test_try_from_file() {
+        assert!(BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").is_ok());
+        assert!(BooleanNetwork::try_from_file("sbml_models/g2a.sbml").is_ok())
+    }
+
+    #[test]
     fn test_rg_inference() {
         let bn = BooleanNetwork::try_from_bnet(
             r"
@@ -446,5 +559,51 @@ mod test {
 
         let inferred = bn.infer_valid_graph().unwrap();
         assert_eq!(expected.as_graph(), inferred.as_graph());
+    }
+
+    #[test]
+    fn test_input_inlining() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> x
+            b -> x
+            c -> x
+
+            # a has no regulators and is unknown
+            # b has identity function
+            # c is a constant
+            b -> b
+            $b: b
+            $c: true
+
+            # All three have a known function in x
+            $x: a | b | c
+
+            d ->? y
+            e ->? y
+
+            # Both d and e appear in y, but only e can be erased as d appears in an uninterpreted
+            # function.
+            $y: fun(d) | e
+
+            f ->? z
+            z ->? z
+            # f cannot be erased because it does not appear in z
+            $z: z
+
+            g ->? w
+            # g cannot be erased because w does not have a function
+        ",
+        )
+        .unwrap();
+
+        let inlined = bn.inline_inputs();
+
+        assert_eq!(inlined.num_parameters(), 4);
+        assert_eq!(inlined.num_vars(), 8);
+        assert!(inlined.find_parameter("a").is_some());
+        assert!(inlined.find_parameter("b").is_some());
+        assert!(inlined.find_parameter("e").is_some());
+        assert!(inlined.find_parameter("fun").is_some());
     }
 }
