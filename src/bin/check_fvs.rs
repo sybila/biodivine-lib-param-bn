@@ -11,9 +11,7 @@ use biodivine_lib_param_bn::{BooleanNetwork, SdGraph};
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
-    let buffer = std::fs::read_to_string(&args[1]).unwrap();
-
-    let model = BooleanNetwork::try_from(buffer.as_str()).unwrap();
+    let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
 
     // First, compute the feedback vertex set.
     let fvs = model.as_graph().feedback_vertex_set();
