@@ -321,6 +321,29 @@ impl FnUpdate {
             }
         }
     }
+
+    /// Returns true if this update function uses the given parameter.
+    pub fn contains_parameter(&self, parameter: ParameterId) -> bool {
+        let mut result = false;
+        let mut is_param = |it: &FnUpdate| match it {
+            Param(id, _) => result = result || (*id == parameter),
+            _ => {}
+        };
+        self.walk_postorder(&mut is_param);
+        result
+    }
+
+    /// Returns true if this update function uses the given variable.
+    pub fn contains_variable(&self, variable: VariableId) -> bool {
+        let mut result = false;
+        let mut is_var = |it: &FnUpdate| match it {
+            Var(id) => result = result || (*id == variable),
+            Param(_, args) => result = result || args.contains(&variable),
+            _ => {}
+        };
+        self.walk_postorder(&mut is_var);
+        result
+    }
 }
 
 #[cfg(test)]
@@ -407,6 +430,9 @@ mod tests {
             # Note that this is not really a `valid` function in terms of the regulatory graph.
             # But syntatically it is ok and should go through the parser.
             $c: a & (a | (a ^ (a => (a <=> !(f(a, b) | (true | false))))))
+            # Another function just for comparisons.
+            c -| b
+            $b: !c
         ",
         )
         .unwrap();
@@ -414,6 +440,7 @@ mod tests {
         let a = bn.as_graph().find_variable("a").unwrap();
         let b = bn.as_graph().find_variable("b").unwrap();
         let c = bn.as_graph().find_variable("c").unwrap();
+        let f = bn.find_parameter("f").unwrap();
         let fun = bn.get_update_function(c).as_ref().unwrap();
         let fun_string = fun.to_string(&bn);
 
@@ -422,6 +449,17 @@ mod tests {
             vec![bn.find_parameter("f").unwrap()],
             fun.collect_parameters()
         );
+
+        assert!(fun.contains_variable(a));
+        assert!(fun.contains_variable(b));
+        assert!(!fun.contains_variable(c));
+        assert!(fun.contains_parameter(f));
+
+        let fun_b = bn.get_update_function(b).as_ref().unwrap();
+        assert!(!fun_b.contains_variable(a));
+        assert!(!fun_b.contains_variable(b));
+        assert!(fun_b.contains_variable(c));
+        assert!(!fun_b.contains_parameter(f));
 
         let mut bn = BooleanNetwork::try_from(
             r"
