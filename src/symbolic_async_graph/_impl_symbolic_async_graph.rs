@@ -4,10 +4,10 @@ use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_c
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
+use crate::trap_spaces::{ExtendedBoolean, Space};
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
-use crate::trap_spaces::{ExtendedBoolean, Space};
 
 impl SymbolicAsyncGraph {
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
@@ -285,7 +285,6 @@ impl SymbolicAsyncGraph {
         }
     }
 
-
     /// Fined the smallest subspace (hypercube) that encapsulates all the vertices
     /// within this set (colors are not affected).
     pub fn expand_to_cube(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
@@ -328,22 +327,27 @@ impl SymbolicAsyncGraph {
         result
     }
 
+    /// Similar to `restrict`, but you can specify a single variable that should be restricted,
+    /// which results in an operation that is often faster.
     pub fn fix_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
         let bdd_var = self.symbolic_context.state_variables[var.0];
         SymbolicAsyncGraph {
             network: self.network.clone(),
             symbolic_context: self.symbolic_context.clone(),
-            vertex_space: (self.mk_empty_vertices(), self.unit_colored_vertices().restrict_network_variable(var, value)),
+            vertex_space: (
+                self.mk_empty_vertices(),
+                self.unit_colored_vertices()
+                    .restrict_network_variable(var, value),
+            ),
             color_space: (self.mk_empty_colors(), self.mk_unit_colors()),
             unit_bdd: self.unit_bdd.var_restrict(bdd_var, value),
-            update_functions: self.update_functions.iter()
-                .map(|f| {
-                    f.var_restrict(bdd_var, value)
-                })
-                .collect()
+            update_functions: self
+                .update_functions
+                .iter()
+                .map(|f| f.var_restrict(bdd_var, value))
+                .collect(),
         }
     }
-
 }
 
 impl SymbolicAsyncGraph {
