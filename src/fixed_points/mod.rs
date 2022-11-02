@@ -14,31 +14,25 @@
 
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::{BooleanNetwork, ParameterId, SdGraph, Sign, VariableId};
 use crate::symbolic_async_graph::{GraphColors, GraphVertices};
-use crate::{BinaryOp, FnUpdate};
-use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet};
+use crate::BooleanNetwork;
+use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
-use std::slice::SliceIndex;
 use z3::ast::{Ast, Dynamic};
 use z3::{ast, FuncDecl, Sort};
 
-pub use symbolic_iterator::SymbolicIterator;
+pub use raw_symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
-mod symbolic_iterator;
+mod raw_symbolic_iterator;
 
+/// Aggregates algorithms for computing fixed point states of the given state-transition graph.
+/// Typically, the operation can be also restricted to a particular subset of candidate states.
 pub struct FixedPoints {
     _dummy: (),
 }
 
-/// Aggregates algorithms for computing fixed point states of the given state-transition graph.
-/// Typically, the operation can be also restricted to a particular subset of candidate states.
-pub struct FixedPoints2 {
-    _dummy: (),
-}
-
-impl FixedPoints2 {
+impl FixedPoints {
     /// A naive symbolic algorithm that computes the fixed points by gradual elimination of
     /// all states with outgoing transitions.
     ///
@@ -243,7 +237,7 @@ impl FixedPoints2 {
            projections? But even this is not an entirely clear win.
         */
 
-        'merge: while !to_merge.is_empty() || !project.is_empty() {
+        while !to_merge.is_empty() || !project.is_empty() {
             for p_var in project.clone() {
                 let dependencies = dependency_map.get(&p_var).unwrap();
                 if dependencies.is_subset(&merged) {
@@ -367,7 +361,7 @@ impl FixedPoints2 {
             to_merge.push(restriction.as_bdd().clone());
         }
 
-        let mut project: HashSet<BddVariable> = stg
+        let project: HashSet<BddVariable> = stg
             .symbolic_context()
             .parameter_variables()
             .iter()
@@ -426,7 +420,7 @@ impl FixedPoints2 {
             to_merge.push(restriction.as_bdd().clone());
         }
 
-        let mut project: HashSet<BddVariable> = stg
+        let project: HashSet<BddVariable> = stg
             .symbolic_context()
             .state_variables()
             .iter()
@@ -491,12 +485,12 @@ impl FixedPoints2 {
     /// limit too low. If you only want to find *some* fixed point for *some* parametrisation,
     /// it is recommended that you either use the solver-based approach (`Self::solver_iterator`),
     /// or one of the projection methods (`Self::symbolic_vertices` or `Self::symbolic_colors`).
-    pub fn symbolic_iterator(
-        stg: &SymbolicAsyncGraph,
+    pub fn symbolic_iterator<'a>(
+        stg: &'a SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
         size_limit: usize,
-    ) {
-        todo!()
+    ) -> SymbolicIterator<'a> {
+        SymbolicIterator::new(stg, restriction, size_limit)
     }
 
     /// Constructs an iterator that enumerates all fixed-points within the given
@@ -512,184 +506,9 @@ impl FixedPoints2 {
     ///
     /// However, you can use it to sample the space of possible fixed-points using various
     /// values for the `restriction` set.
-    pub fn solver_iterator(stg: &SymbolicAsyncGraph, restriction: &GraphColoredVertices) {
+    pub fn solver_iterator(_stg: &SymbolicAsyncGraph, _restriction: &GraphColoredVertices) {
         todo!()
     }
-}
-
-impl FixedPoints {
-    pub fn conflict_clause(stg: &SymbolicAsyncGraph, restriction: &GraphColoredVertices) {
-        let mut clauses: Vec<BddPartialValuation> = stg
-            .as_network()
-            .variables()
-            .flat_map(|it| {
-                let can_step = stg.var_can_post(it, restriction);
-                let is_stable = restriction.minus(&can_step);
-                let clauses = is_stable
-                    .as_bdd()
-                    .sat_clauses()
-                    .take(100)
-                    .collect::<Vec<_>>()
-                    .into_iter();
-                clauses
-            })
-            .collect();
-
-        fn has_conflict(
-            stg: &SymbolicAsyncGraph,
-            cx: &BddPartialValuation,
-            cy: &BddPartialValuation,
-        ) -> bool {
-            for var in stg.symbolic_context().bdd_variable_set().variables() {
-                if cx.has_value(var) && cy.has_value(var) && cx.get_value(var) != cy.get_value(var)
-                {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        let cloned = clauses.clone();
-        println!("There are {} clauses.", clauses.len());
-        // Sort clauses such that the most conflicting one is the last.
-        clauses.sort_by_cached_key(|clause| {
-            /*cloned.iter()
-            .filter(|it| has_conflict(stg, clause, it))
-            .count()*/
-            //clause.to_values()[0].0
-            //clause.last_fixed_variable().unwrap()
-            clause.cardinality()
-        });
-        clauses.reverse();
-        /*for clause in &clauses {
-            let conflicts = clauses.iter()
-                .filter(|it| has_conflict(stg, clause, it))
-                .count();
-            println!("Clause of card. {} has {} conflicts.", clause.cardinality(), conflicts);
-        }*/
-
-        let mut is_stable: Vec<GraphColoredVertices> = stg
-            .as_network()
-            .variables()
-            .map(|it| {
-                let can_step = stg.var_can_post(it, restriction);
-                restriction.minus(&can_step)
-            })
-            .collect();
-
-        fn rec(
-            stg: &SymbolicAsyncGraph,
-            mut is_stable: Vec<GraphColoredVertices>,
-            clauses: &[BddPartialValuation],
-        ) {
-            while is_stable.len() > 1 {
-                is_stable.sort_by_key(|it| it.symbolic_size());
-                is_stable.reverse();
-
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for x in &is_stable {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                    //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                }
-                let average = total_size / is_stable.len();
-
-                println!(
-                    " > [{}] Remaining states: {}[nodes:{}]; avr. {}",
-                    is_stable.len(),
-                    total_cardinality,
-                    total_size,
-                    average
-                );
-
-                if average > 200_000 {
-                    println!("Start splitting.");
-                    let mut clause_index = 0;
-                    while clause_index < clauses.len() {
-                        let clause = &clauses[clause_index];
-                        let clause_bdd = stg
-                            .symbolic_context()
-                            .bdd_variable_set()
-                            .mk_conjunctive_clause(&clause);
-                        let clause_set = stg.unit_colored_vertices().copy(clause_bdd);
-
-                        let with_clause: Vec<GraphColoredVertices> = is_stable
-                            .iter()
-                            .map(|it| it.intersect(&clause_set))
-                            .collect();
-
-                        let with_clause_has_empty = with_clause.iter().any(|it| it.is_empty());
-                        if with_clause_has_empty {
-                            //println!("No fixed-point has this clause. Continue without it.");
-                            clause_index += 1;
-                            continue;
-                            //return rec(stg, minus_clause, &clauses[clause_index+1..]);
-                        }
-
-                        let minus_clause: Vec<GraphColoredVertices> =
-                            is_stable.iter().map(|it| it.minus(&clause_set)).collect();
-
-                        let minus_clause_has_empty = minus_clause.iter().any(|it| it.is_empty());
-                        if minus_clause_has_empty {
-                            //println!("All fixed-points have this clause. Continue with it.");
-                            //return rec(stg, with_clause, &clauses[clause_index+1..]);
-                            clause_index += 1;
-                            continue;
-                        }
-
-                        let with_clause_total = with_clause
-                            .iter()
-                            .map(|it| it.symbolic_size())
-                            .sum::<usize>();
-                        let minus_clause_total = minus_clause
-                            .iter()
-                            .map(|it| it.symbolic_size())
-                            .sum::<usize>();
-                        let with_clause_average = with_clause_total / with_clause.len();
-                        let minus_clause_average = minus_clause_total / minus_clause.len();
-                        println!("Split to {} / {}", with_clause_total, minus_clause_total);
-
-                        //if with_clause_average > 150_000 || minus_clause_average > 150_000 || with_clause_total + minus_clause_total > total_size + total_size {
-                        if with_clause_average > 200_000
-                            || minus_clause_average > 200_000
-                            || with_clause_total + minus_clause_total > total_size + total_size
-                        {
-                            println!("Split is bigger than current result. Skip clause. Remaining clauses: {}", clauses.len() - clause_index - 1);
-                        } else {
-                            println!("Split is useful... start with clause.");
-                            rec(stg, with_clause, &clauses[clause_index + 1..]);
-                            println!("Continue split without clause...");
-                            rec(stg, minus_clause, &clauses[clause_index + 1..]);
-                            return;
-                        }
-                        clause_index += 1;
-                    }
-                    panic!("Nothing to split on.");
-                } else {
-                    let item = is_stable.pop().unwrap();
-                    if item.is_empty() {
-                        println!("Empty.");
-                        return;
-                    }
-                    is_stable = is_stable
-                        .into_iter()
-                        .map(|it| it.intersect(&item))
-                        .collect();
-                }
-            }
-
-            let sinks = is_stable.pop().unwrap();
-            println!(
-                "Found fixed points: {} / {}",
-                sinks.approx_cardinality(),
-                sinks.symbolic_size()
-            );
-        }
-
-        rec(stg, is_stable, &clauses);
-    }
-
 }
 
 struct Context {
@@ -704,7 +523,11 @@ struct MyContext<'ctx> {
 
 impl<'ctx> MyContext<'ctx> {
     pub fn new(z3: &'ctx Context, network: &BooleanNetwork) -> Self {
-        let sort = Sort::enumeration(&z3.z3, "ebool".into(), &["0".into(), "1".into(), "*".into()]);
+        let sort = Sort::enumeration(
+            &z3.z3,
+            "ebool".into(),
+            &["0".into(), "1".into(), "*".into()],
+        );
         let constructors = network
             .variables()
             .map(|it| {
@@ -795,5 +618,50 @@ impl<'ctx> MyContext<'ctx> {
 
     pub fn check_eq(&self, left: &ast::Datatype<'ctx>, right: &ast::Datatype<'ctx>) -> ast::Bool {
         left._eq(right)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::FixedPoints;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::BooleanNetwork;
+
+    #[test]
+    pub fn simple_fixed_point_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").unwrap();
+        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+
+        let naive = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
+        let symbolic = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
+        let vertices = FixedPoints::symbolic_vertices(&stg, stg.unit_colored_vertices());
+        let colors = FixedPoints::symbolic_colors(&stg, stg.unit_colored_vertices());
+
+        assert!(naive.is_subset(&symbolic));
+        assert!(symbolic.is_subset(&naive));
+
+        let symbolic_colors = symbolic.colors();
+        let symbolic_vertices = symbolic.vertices();
+
+        assert!(symbolic_colors.is_subset(&colors));
+        assert!(colors.is_subset(&symbolic_colors));
+        assert!(symbolic_vertices.is_subset(&vertices));
+        assert!(vertices.is_subset(&symbolic_vertices));
+
+        let iterator = FixedPoints::symbolic_iterator(
+            &stg,
+            stg.unit_colored_vertices(),
+            usize::from(stg.symbolic_context().bdd_variable_set().num_vars()) + 2,
+        );
+
+        let mut expected = symbolic;
+
+        for set in iterator {
+            assert!(set.is_subset(&expected));
+            expected = expected.minus(&set);
+        }
+
+        assert!(expected.is_empty());
     }
 }

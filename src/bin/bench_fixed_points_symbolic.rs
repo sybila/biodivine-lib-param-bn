@@ -1,4 +1,4 @@
-use biodivine_lib_param_bn::fixed_points::FixedPoints2;
+use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::BooleanNetwork;
 
@@ -16,7 +16,7 @@ fn main() {
 
     let stg = SymbolicAsyncGraph::new(model).unwrap();
 
-    let fixed_points = FixedPoints2::symbolic(&stg, stg.unit_colored_vertices());
+    let fixed_points = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
     println!(
         "Fixed-points: {}[nodes:{}]",
         fixed_points.approx_cardinality(),

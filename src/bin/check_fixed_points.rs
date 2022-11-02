@@ -11,7 +11,7 @@
 */
 
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
-use biodivine_lib_param_bn::fixed_points::FixedPoints2;
+use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::{BooleanNetwork, SdGraph};
 use std::time::SystemTime;
@@ -30,7 +30,7 @@ fn main() {
 
     let start = SystemTime::now();
     println!("Search for fixed-point colors...");
-    let colors = FixedPoints2::symbolic_colors(&stg, stg.unit_colored_vertices());
+    let colors = FixedPoints::symbolic_colors(&stg, stg.unit_colored_vertices());
     println!(
         "Finished `colors` in {}ms.",
         start.elapsed().unwrap().as_millis()
@@ -43,7 +43,7 @@ fn main() {
 
     let start = SystemTime::now();
     println!("Search for fixed-point vertices...");
-    let vertices = FixedPoints2::symbolic_vertices(&stg, stg.unit_colored_vertices());
+    let vertices = FixedPoints::symbolic_vertices(&stg, stg.unit_colored_vertices());
     println!(
         "Finished `vertices` in {}ms.",
         start.elapsed().unwrap().as_millis()
@@ -56,7 +56,7 @@ fn main() {
 
     let start = SystemTime::now();
     println!("Search for fixed-points (symbolic)...");
-    let symbolic = FixedPoints2::symbolic(&stg, stg.unit_colored_vertices());
+    let symbolic = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
     println!(
         "Finished `symbolic` in {}ms.",
         start.elapsed().unwrap().as_millis()
@@ -81,7 +81,7 @@ fn main() {
 
     let start = SystemTime::now();
     println!("Search for fixed-points (naive)...");
-    let naive = FixedPoints2::naive_symbolic(&stg, stg.unit_colored_vertices());
+    let naive = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
     println!(
         "Finished `naive` in {}ms.",
         start.elapsed().unwrap().as_millis()
