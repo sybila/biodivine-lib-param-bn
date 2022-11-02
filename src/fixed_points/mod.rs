@@ -3,866 +3,588 @@
 //!
 //! There are two main approaches one can use to obtain the fixed-points:
 //!
-//!     1. A solver based method (relying on Z3). This method works well for enumerating
-//!     small batches of fixed-points, but does not scale very well for very high numbers
+//! 1. A solver based method (relying on Z3). This method works well for enumerating
+//!     small batches of fixed-points, but does not scale very well for high numbers
 //!     of fixed-points, as each of them has to be explicitly returned by the solver.
 //!
-//!     2. A symbolic BDD-based method. This approach generally suffers more from the state space
+//! 2. A symbolic BDD-based method. This approach generally suffers more from the state space
 //!     explosion (it can take a long time for large networks), but if the number of results
-//!     if very high, it can still outperform enumeration based on solvers.
+//!     if very high, it can still outperform enumeration based on solvers. Also, it can be
+//!     easily restricted to arbitrary symbolic sets,
 
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::{BooleanNetwork, ParameterId, SdGraph, Sign, VariableId};
+use crate::symbolic_async_graph::{GraphColors, GraphVertices};
+use crate::{BinaryOp, FnUpdate};
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
-use crate::trap_spaces::{ExtendedBoolean, Space};
+use std::slice::SliceIndex;
+use z3::ast::{Ast, Dynamic};
+use z3::{ast, FuncDecl, Sort};
 
-/// Aggregates algorithms for computing fixed point states of the given state-transition graph.
-/// Typically, the operation can be also restricted to a particular subset of candidate states.
+pub use symbolic_iterator::SymbolicIterator;
+
+/// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
+mod symbolic_iterator;
+
 pub struct FixedPoints {
     _dummy: (),
 }
 
-impl FixedPoints {
-    /// A naive algorithm that simply performs symbolic elimination of successor states in the
-    /// reverse order of variable ordering.
+/// Aggregates algorithms for computing fixed point states of the given state-transition graph.
+/// Typically, the operation can be also restricted to a particular subset of candidate states.
+pub struct FixedPoints2 {
+    _dummy: (),
+}
+
+impl FixedPoints2 {
+    /// A naive symbolic algorithm that computes the fixed points by gradual elimination of
+    /// all states with outgoing transitions.
     ///
-    /// This is largely a "baseline" algorithm for symbolic computation and cannot really scale
-    /// well to large networks.
-    pub fn naive_bdd(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        let mut candidates = restriction.clone();
-        if cfg!(feature = "print-progress") {
-            println!(
-                "Start naive fixed-point search with {}[nodes:{}] candidates.",
-                candidates.approx_cardinality(),
-                candidates.symbolic_size()
-            );
-        }
-        for var in stg.as_network().variables().rev() {
-            let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
-            candidates = candidates.minus(&can_step);
-
-            if cfg!(feature = "print-progress") {
-                println!(
-                    " > [{}] Remaining: {}[nodes:{}] candidates.",
-                    var.to_index(),
-                    candidates.approx_cardinality(),
-                    candidates.symbolic_size()
-                );
-            }
-        }
-        candidates
-    }
-
-    pub fn only_states(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices
-    ) -> GraphColoredVertices {
-        let mut result = restriction.clone();
-
-        let mut is_stable: Vec<GraphColoredVertices> = stg
-            .as_network()
-            .variables()
-            .map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                let mut item = restriction.minus(&item);
-                for p in stg.symbolic_context().parameter_variables() {
-                    item = item.copy(item.as_bdd().var_project(*p));
-                }
-                /*if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Initial candidates for variable {}[id:{}]: {}[nodes:{}].",
-                        stg.as_network().get_variable_name(it),
-                        it.to_index(),
-                        item.approx_cardinality(),
-                        item.symbolic_size()
-                    );
-                }*/
-                item
-            })
-            .collect();
-
-        while is_stable.len() > 1 {
-            is_stable.sort_by_key(|it| it.symbolic_size());
-            is_stable.reverse();
-
-            let item = is_stable.pop().unwrap();
-            is_stable = is_stable
-                .into_iter()
-                .map(|it| it.intersect(&item))
-                .collect();
-
-            if cfg!(feature = "print-progress") {
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for x in &is_stable {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                    //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                }
-
-                println!(
-                    " > [{}] Remaining states: {}[nodes:{}]",
-                    is_stable.len(),
-                    total_cardinality,
-                    total_size
-                );
-            }
-        }
-
-        //let only_states = is_stable.pop().unwrap();
-
-        let mut to_process = Vec::new();
-
-        'expand: while !is_stable.is_empty() {
-            let item = is_stable.pop().unwrap();
-
-            let original_size = item.symbolic_size();
-            //println!("Total: {}", only_states.symbolic_size());
-            for var in stg.as_network().variables() {
-                let positive_size = item.fix_network_variable(var ,true).symbolic_size();
-                let negative_size = item.fix_network_variable(var, false).symbolic_size();
-                if positive_size < 10 || negative_size < 10 {
-                    continue;
-                }
-                //println!("Split by {:?}: {} / {}", var, positive_size, negative_size);
-                let gain = (original_size as f64) / ((positive_size as f64 / 2.0) + (negative_size as f64 / 2.0));
-                //println!("Split by {:?}: {} / {}. Gain: {}", var, positive_size, negative_size, gain);
-                if gain > 2.0 {
-                    is_stable.push(item.fix_network_variable(var, true));
-                    is_stable.push(item.fix_network_variable(var, false));
-                    println!("Expanding: {}", is_stable.len());
-                    continue 'expand;
-                }
-            }
-
-            println!("Forwarding..");
-            to_process.push(item);
-        }
-
-
-        println!("Separated into {} partial results.", to_process.len());
-        for (i, item) in to_process.into_iter().enumerate() {
-            println!("Start partial item {}", i);
-            let partial = Self::naive_bdd(stg, &item);
-            println!("Partial: {} / {}", partial.approx_cardinality(), partial.symbolic_size());
-        }
-
-        stg.mk_empty_vertices()
-    }
-
-    /// Another "naive" algorithm that instead selects the "best" variable for transition
-    /// elimination based on the size of the eliminated BDD.
+    /// Only fixed-points from the `restriction` set are returned. However, the state has to
+    /// be a *global* fixed point, not just a fixed-point within the `restriction` set.
     ///
-    /// This often works surprisingly well for moderately sized networks, but the approach is
-    /// "accidentally quadratic" and thus quickly becomes infeasible once the variable count
-    /// is too large.
-    pub fn naive_greedy_bdd(
+    /// **Characteristics:** As the name suggests, this algorithm is not really suited for
+    /// processing complex networks. However, we provide it as a "baseline" for testing other
+    /// algorithms. In theory, due to its simplicity, it could be faster on some of the smaller
+    /// networks where the symbolic explosion is not severe.
+    pub fn naive_symbolic(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphColoredVertices {
         if cfg!(feature = "print-progress") {
             println!(
-                "Start naive greedy fixed-point search with {}[nodes:{}] candidates.",
+                "Start naive symbolic fixed-point search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
                 restriction.symbolic_size()
             );
         }
 
-        let mut is_stable: Vec<GraphColoredVertices> = stg
+        let mut to_merge: Vec<GraphColoredVertices> = stg
             .as_network()
             .variables()
-            .map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                let item = restriction.minus(&item);
-                /*if cfg!(feature = "print-progress") {
+            .map(|var| {
+                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+                let is_stable = restriction.minus(&can_step);
+                if cfg!(feature = "print-progress") {
                     println!(
-                        " > Initial candidates for variable {}[id:{}]: {}[nodes:{}].",
-                        stg.as_network().get_variable_name(it),
-                        it.to_index(),
-                        item.approx_cardinality(),
-                        item.symbolic_size()
+                        " > Created initial set for {:?} using {} BDD nodes.",
+                        var,
+                        is_stable.symbolic_size()
                     );
-                }*/
-                item
+                }
+                is_stable
             })
             .collect();
-
-        while is_stable.len() > 1 {
-            is_stable.sort_by_key(|it| it.symbolic_size());
-            is_stable.reverse();
-
-            let item = is_stable.pop().unwrap();
-            is_stable = is_stable
-                .into_iter()
-                .map(|it| it.intersect(&item))
-                .collect();
-
-            if cfg!(feature = "print-progress") {
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for x in &is_stable {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                    //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                }
-
-                println!(
-                    " > [{}] Remaining states: {}[nodes:{}]",
-                    is_stable.len(),
-                    total_cardinality,
-                    total_size
-                );
-            }
-        }
-
-        is_stable.pop().unwrap()
-    }
-
-    pub fn greedy_recursive_2(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-
-        fn rec(
-            stg: &SymbolicAsyncGraph,
-            mut to_merge: Vec<GraphColoredVertices>,
-            depth: usize,
-            mut split_vars: HashSet<VariableId>
-        ) -> GraphColoredVertices {
-            println!("Start iteration with {} nodes.", to_merge.iter().map(|it| it.symbolic_size()).sum::<usize>());
-            let mut split_iter = Vec::from_iter(split_vars.iter().cloned());
-            split_iter.sort();
-            //let mut fixed_variables = HashSet::new();
-
-            /*let mut subspaces: Vec<Space> = to_merge.iter()
-                .map(|it| {
-                    let space = stg.expand_to_space(&it.vertices());
-                    println!(" >> {}", space);
-                    space
-                })
-                .collect();
-
-            while subspaces.len() > 1 {
-                let x = subspaces.pop().unwrap();
-                let y = subspaces.pop().unwrap();
-                if let Some(x) = x.intersect(&y) {
-                    subspaces.push(x);
-                } else {
-                    return stg.mk_empty_vertices();
-                }
-            }
-
-            let subspace = subspaces.pop().unwrap();
-            println!("Subspace: {}", subspace);*/
-            if to_merge[0].is_empty() {
-                return stg.mk_empty_vertices();
-            }
-
-            /*let subspace = stg.expand_to_space(&to_merge[0].vertices());
-
-            for var in split_iter {
-                if subspace[var] == ExtendedBoolean::One {
-                    fixed_variables.insert((var, true));
-                } else if subspace[var] == ExtendedBoolean::Zero {
-                    fixed_variables.insert((var, false));
-                }
-            }*/
-
-            /*for var in split_iter {
-                let var_true = stg.fix_network_variable(var, true);
-                let var_false = stg.fix_network_variable(var, false);
-                for set in &to_merge {
-                    if set.is_subset(&var_true) {
-                        fixed_variables.insert((var, true));
-                        //println!("Fixing {} to 1.", var.to_index());
-                        /*let tt_merge: Vec<GraphColoredVertices> = to_merge.into_iter()
-                            .map(|it| it.restrict_network_variable(var, true))
-                            .collect();
-                        let tt_stg = stg.fix_variable_in_graph(var, true);
-                        split_vars.remove(&var);
-                        return rec(&tt_stg, tt_merge, depth, split_vars)
-                            .fix_network_variable(var, true);*/
-                    }
-                    if set.is_subset(&var_false) {
-                        fixed_variables.insert((var, false));
-                        //println!("Fixing {} to 0.", var.to_index());
-                        /*let ff_merge: Vec<GraphColoredVertices> = to_merge.into_iter()
-                            .map(|it| it.restrict_network_variable(var, false))
-                            .collect();
-                        let ff_stg = stg.fix_variable_in_graph(var, false);
-                        split_vars.remove(&var);
-                        return rec(&ff_stg, ff_merge, depth, split_vars)
-                            .fix_network_variable(var, false);*/
-                    }
-                }
-                println!("Done {}.", var.to_index());
-            }*/
-
-            /*println!("Fix {} variables.", fixed_variables.len());
-            if !fixed_variables.is_empty() {
-                let mut stg = stg.clone();
-                for (var, value) in fixed_variables.clone() {
-                    to_merge = to_merge.into_iter()
-                        .map(|it| it.restrict_network_variable(var, value))
-                        .collect();
-                    stg = stg.fix_variable_in_graph(var, value);
-                    split_vars.remove(&var);
-                    println!("Fixed {}={}.", var.to_index(), value);
-                }
-                let mut result = rec(&stg, to_merge, depth, split_vars);
-
-                if result.is_empty() {
-                    return result;
-                }
-
-                println!("Result: {}", result.symbolic_size());
-                for (var, value) in fixed_variables.clone() {
-                    result = result.fix_network_variable(var, value);
-                    println!("Result: {}", result.symbolic_size());
-                }
-
-                return result;
-            }*/
-
-            while to_merge.len() > 1 {
-                to_merge.sort_by_key(|it| it.symbolic_size());
-                to_merge.reverse();
-
-                let total_size: usize = to_merge.iter().map(|it| it.symbolic_size()).sum();
-
-                println!("Bound: {} > {}", total_size/to_merge.len(), 10_000 * (depth * depth * depth * depth));
-                if total_size/to_merge.len() > 10_000 * (depth * depth * depth * depth) && split_vars.len() > 0 && to_merge.len() > 2 {
-                    let mut sizes = vec![0usize; stg.symbolic_context().bdd_variable_set().num_vars() as usize];
-                    for x in &to_merge {
-                        let size = x.as_bdd().size_per_variable();
-                        for i in 0..size.len() {
-                            sizes[i] += size[i]
-                        }
-                    }
-                    println!("Size: {:?}", sizes);
-                    let all_variables = stg.symbolic_context().bdd_variable_set().variables();
-                    let (_, split_var) = stg.symbolic_context().state_variables()
-                        .iter()
-                        .zip(stg.as_network().variables())
-                        .max_by_key(|(it, _)| {
-                            let index: usize = all_variables.iter().position(|x| *it == x).unwrap();
-                            sizes[index]
-                        })
-                        .unwrap();
-                    //let mut split_vec: Vec<VariableId> = split_vars.iter().cloned().collect();
-                    //split_vec.sort();
-                    //let split_var = split_vec[split_vec.len() / 2];
-                    //let split_var = split_vars.iter().max().cloned().unwrap();
-                    split_vars.remove(&split_var);
-
-                    println!("Branching {} to 1.", split_var.to_index());
-                    let tt_merge: Vec<GraphColoredVertices> = to_merge.iter()
-                        .map(|it| it.restrict_network_variable(split_var, true))
-                        .collect();
-                    let tt_stg = stg.fix_variable_in_graph(split_var, true);
-                    let _tt_result = rec(&tt_stg, tt_merge, depth + 1, split_vars.clone())
-                        .fix_network_variable(split_var, true);
-
-                    println!("Branching {} to 0.", split_var.to_index());
-                    let ff_merge: Vec<GraphColoredVertices> = to_merge.iter()
-                        .map(|it| it.restrict_network_variable(split_var, false))
-                        .collect();
-                    let ff_stg = stg.fix_variable_in_graph(split_var, false);
-                    let _ff_result = rec(&ff_stg, ff_merge, depth + 1, split_vars.clone())
-                        .fix_network_variable(split_var, false);
-
-                    return stg.mk_empty_vertices();//tt_result.union(&ff_result);
-                }
-
-                let item = to_merge.pop().unwrap();
-
-                if item.is_empty() {
-                    println!("Empty.");
-                    return item;
-                }
-
-                to_merge = to_merge
-                    .into_iter()
-                    .map(|it| it.intersect(&item))
-                    .collect();
-
-                if cfg!(feature = "print-progress") {
-                    let mut total_cardinality = 0.0;
-                    let mut total_size = 0;
-                    for x in &to_merge {
-                        total_cardinality += x.approx_cardinality();
-                        total_size += x.symbolic_size();
-                        //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                    }
-
-                    println!(
-                        " > [{}] Remaining states: {}[nodes:{}]",
-                        to_merge.len(),
-                        total_cardinality,
-                        total_size
-                    );
-                }
-            }
-
-            let result = to_merge.pop().unwrap();
-            println!("Result: {}", result.symbolic_size());
-            result
-        }
-
-        let mut to_merge = stg
-            .as_network()
-            .variables()
-            .filter_map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                if item.is_empty() {
-                    None
-                } else {
-                    let item = restriction.minus(&item);
-                    let clauses = item.as_bdd().sat_clauses().count();
-                    println!("Clauses: {}", clauses);
-                    Some((item, clauses))
-                }
-            })
-            .collect::<Vec<_>>();
-
-        to_merge.sort_by_key(|(_,x)| *x);
 
         while to_merge.len() > 1 {
-            let (x, cx) = to_merge.pop().unwrap();
-            to_merge = to_merge.into_iter()
-                .map(|(y, _)| {
-                    let z = x.intersect(&y);
-                    let cz = z.as_bdd().sat_clauses().count();
-                    (z, cz)
-                })
-                .collect();
-            //let (y, cy) = to_merge.pop().unwrap();
-            //let z = x.intersect(&y);
-            //let cz = z.as_bdd().sat_clauses().count();
-            //println!("Clauses: {} + {} = {}", cx, cy, cz);
-            //to_merge.push((z, cz));
-            to_merge.sort_by_key(|(_,x)| *x);
-            to_merge.reverse();
-            let sizes = to_merge.iter().map(|(x, it)| (x.symbolic_size(), *it)).collect::<Vec<_>>();
-            println!("Sizes: {:?}", sizes);
-            let total_clauses = sizes.iter().map(|(_, x)| *x).sum::<usize>();
-            let total_nodes = sizes.iter().map(|(x, _)| *x).sum::<usize>();
-            println!("[{}] Total nodes {}, total clauses {}", to_merge.len(),total_nodes, total_clauses);
-            if total_clauses > 10_000_000 {
-                break;
-            }
-        }
-
-
-        let mut to_merge: Vec<GraphColoredVertices> = to_merge.into_iter().map(|(it, _)| it).collect();
-
-        /*while to_merge.len() > 1 {
-            to_merge.sort_by_key(|it| it.symbolic_size());
-            to_merge.reverse();
-
-            let item = to_merge.pop().unwrap();
-            to_merge = to_merge
-                .into_iter()
-                .map(|it| it.intersect(&item))
-                .collect();
+            to_merge.sort_by_key(|it| -(it.symbolic_size() as isize));
 
             if cfg!(feature = "print-progress") {
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for x in &to_merge {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                    //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                }
-
+                let total = to_merge.iter().map(|it| it.symbolic_size()).sum::<usize>();
                 println!(
-                    " > [{}] Remaining states: {}[nodes:{}]",
+                    " > Merging {} sets using {} BDD nodes.",
                     to_merge.len(),
-                    total_cardinality,
-                    total_size
+                    total
                 );
-
-                if total_size > 10_000_000 {
-                    let mut sizes = vec![0usize; stg.symbolic_context().bdd_variable_set().num_vars() as usize];
-                    for x in &to_merge {
-                        let size = x.as_bdd().size_per_variable();
-                        for i in 0..size.len() {
-                            sizes[i] += size[i]
-                        }
-                    }
-                    println!("Size: {:?}", sizes);
-                    let all_variables = stg.symbolic_context().bdd_variable_set().variables();
-                    let (_, split_var) = stg.symbolic_context().state_variables()
-                        .iter()
-                        .zip(stg.as_network().variables())
-                        .max_by_key(|(it, _)| {
-                            let index: usize = all_variables.iter().position(|x| *it == x).unwrap();
-                            sizes[index]
-                        })
-                        .unwrap();
-
-                    let item = stg.var_can_post(split_var, restriction);
-                    let item = restriction.minus(&item);
-                    println!("Original: {:?}", to_merge.iter().map(|it| it.symbolic_size()).collect::<Vec<_>>());
-                    for clause in item.as_bdd().sat_clauses() {
-                        let clause_bdd = stg.symbolic_context().bdd_variable_set().mk_conjunctive_clause(&clause);
-                        let transformed: Vec<usize> = to_merge.iter()
-                            .map(|it| {
-                                let mut result = it.as_bdd().clone();
-                                for x in clause.clone().to_values() {
-                                    result = result.var_restrict(x.0, x.1);
-                                }
-                                result = result.var_project(stg.symbolic_context().get_state_variable(split_var));
-                                //it.as_bdd().and(&clause).size()
-                                result.size()
-                            })
-                            .collect();
-                        println!("Sizes: {:?} / {}", transformed, transformed.iter().cloned().sum::<usize>());
-                    }
-
-                    panic!();
-                }
             }
-        }*/
 
-        let variables = HashSet::from_iter(stg.as_network().variables());
+            let x = to_merge.pop().unwrap();
+            let y = to_merge.pop().unwrap();
+            to_merge.push(x.intersect(&y));
+        }
 
-        return rec(stg, to_merge, 1, variables);
+        let fixed_points = to_merge.pop().unwrap();
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] fixed-points.",
+                fixed_points.approx_cardinality(),
+                fixed_points.symbolic_size(),
+            );
+        }
+
+        fixed_points
     }
 
-    pub fn greedy_recursive(
+    /// A better version of the `Self::naive_symbolic` algorithm that can actually scale to
+    /// reasonably sized networks (e.g. 100-200 variables + parameters).
+    ///
+    /// Only fixed-points from the `restriction` set are returned. However, the state has to
+    /// be a *global* fixed point, not just a fixed-point within the `restriction` set.
+    ///
+    /// **Characteristics:** Instead of merging individual constraints one by one, this algorithm
+    /// greedily selects the constraint that leads to the smallest intermediate BDD. This requires
+    /// more symbolic operations, but can work better as the intermediate BDDs tend to be smaller.
+    ///
+    /// In particular, this tends to work better for cases where no fixed points exist, because
+    /// the process will often quickly find a combination on constraints that prevent
+    /// the fixed point from existing (whereas for `naive_symbolic`, this process is much more
+    /// random).
+    ///
+    /// Also note that the algorithm can benefit from parallelization, but we do not implement
+    /// it here, as it is a bit problematic to implement in a platform-independent manner.
+    ///
+    /// You can often scale the algorithm to very large networks as well, but the hardest
+    /// bottleneck seems to be the total number of fixed points. As such, if the network is large
+    /// (e.g. 1000 variables) but has only a few fixed points, it can often still be solved by this
+    /// method. However, if there are many parameters (e.g. >50) and the number of fixed points
+    /// is proportional to the number of parameters, you will be bounded by the inherent
+    /// combinatorial complexity of the resulting set of states.
+    pub fn symbolic(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
-        branch_variables: &[VariableId],
-        depth: usize,
     ) -> GraphColoredVertices {
         if cfg!(feature = "print-progress") {
             println!(
-                "Start naive greedy fixed-point search with {}[nodes:{}] candidates.",
+                "Start symbolic fixed-point search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
                 restriction.symbolic_size()
             );
-            println!("{}", stg.expand_to_space(&restriction.vertices()));
         }
 
-        let mut is_stable: Vec<GraphColoredVertices> = stg
+        let mut to_merge: Vec<Bdd> = stg
             .as_network()
             .variables()
-            .filter_map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                if item.is_empty() {
-                    None
-                } else {
-                    Some(restriction.minus(&item))
-                }
-            })
-            /*.map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                let item = restriction.minus(&item);
-                /*if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Initial candidates for variable {}[id:{}]: {}[nodes:{}].",
-                        stg.as_network().get_variable_name(it),
-                        it.to_index(),
-                        item.approx_cardinality(),
-                        item.symbolic_size()
-                    );
-                }*/
-                item
-            })
-            .filter(|it| !restriction.is_subset(it))
-             */
-            .collect();
-
-        if is_stable.is_empty() {
-            return restriction.clone();
-        }
-
-        while is_stable.len() > 1 {
-
-            is_stable.sort_by_key(|it| it.symbolic_size());
-            is_stable.reverse();
-
-            let max_size: usize = is_stable[0].symbolic_size();
-            let total_size: usize = is_stable.iter().map(|it| it.symbolic_size()).sum();
-
-            //if (max_size > 1_00_000 && total_size > 10_000_000) && branch_variables.len() > 0 {
-            println!("Bound: {} > {}", total_size/is_stable.len(), 100_000 * (depth * depth));
-            if total_size/is_stable.len() > 100_000 * (depth * depth) && branch_variables.len() > 0 {
-                let new_restriction = is_stable.pop().unwrap();
-                let split_var = branch_variables[0];
-
-                println!("Splitting on {:?}", split_var);
-
-                //let tt_set = new_restriction.fix_network_variable(split_var, true);
-                let tt_set = new_restriction.restrict_network_variable(split_var, true);
-                let tt_stg = stg.fix_variable_in_graph(split_var, true);
-
-                let tt = if !tt_set.is_empty() {
-                    Self::greedy_recursive(
-                        &tt_stg,
-                        &tt_set,
-                        &branch_variables[1..],
-                        depth + 1
-                    ).fix_network_variable(split_var, true)
-                } else {
-                    stg.mk_empty_vertices()
-                };
-
-                //let ff_set = new_restriction.fix_network_variable(split_var, false);
-                let ff_set = new_restriction.restrict_network_variable(split_var, false);
-                let ff_stg = stg.fix_variable_in_graph(split_var, false);
-
-                let ff = if !ff_set.is_empty() {
-                    Self::greedy_recursive(
-                        &ff_stg,
-                        &ff_set,
-                        &branch_variables[1..],
-                        depth + 1
-                    ).fix_network_variable(split_var, false)
-                } else {
-                    stg.mk_empty_vertices()
-                };
-
-                return tt.union(&ff);
-            }
-
-            let item = is_stable.pop().unwrap();
-
-            if item.is_empty() {
-                return item;
-            }
-
-            is_stable = is_stable
-                .into_iter()
-                .map(|it| it.intersect(&item))
-                .collect();
-
-            if cfg!(feature = "print-progress") {
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for x in &is_stable {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                    //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
-                }
-
-                println!(
-                    " > [{}] Remaining states: {}[nodes:{}]",
-                    is_stable.len(),
-                    total_cardinality,
-                    total_size
-                );
-            }
-        }
-
-        is_stable.pop().unwrap()
-    }
-
-    pub fn greedy(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices
-    ) -> GraphColoredVertices {
-        let mut candidates: HashMap<VariableId, GraphColoredVertices> = stg.as_network()
-            .variables()
-            .map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                let item = stg.unit_colored_vertices().minus(&item);
-                (it, item)
-            })
-            .collect();
-
-        while candidates.len() > 1 {
-            let mut best_var = VariableId::from_index(0);
-            let mut best_size = usize::MAX;
-            for (var, set) in &candidates {
-                if set.symbolic_size() < best_size {
-                    best_var = *var;
-                    best_size = set.symbolic_size();
-                }
-            }
-
-            let item = candidates.remove(&best_var).unwrap();
-
-            for target in stg.as_network().targets(best_var) {
-                if let Some(set) = candidates.get_mut(&target) {
-                    *set = set.intersect(&item);
-                }
-            }
-
-            if cfg!(feature = "print-progress") {
-                let mut total_cardinality = 0.0;
-                let mut total_size = 0;
-                for (_, x) in &candidates {
-                    total_cardinality += x.approx_cardinality();
-                    total_size += x.symbolic_size();
-                }
-
-                println!(
-                    " > [{}] Remaining states: {}[nodes:{}]",
-                    candidates.len(),
-                    total_cardinality,
-                    total_size
-                );
-            }
-        }
-
-        candidates.into_iter().next().unwrap().1
-    }
-
-    /// Structural symbolic algorithm picks variables for elimination based on the regulatory
-    /// graph of the network.
-    ///
-    /// In particular, it first tries to perform "constant propagation" on as many variables
-    /// as possible. Then, it picks one of the remaining cycles and resolves it completely,
-    /// potentially resulting in more variables that can be resolved through constant propagation.
-    ///
-    /// This algorithm seems to actually perform reasonably well even on networks that are quite
-    /// large or that have a non-trivial amount of inputs. At the very least, it is better than
-    /// naive solver-based approaches when dealing with large number of parameters.
-    pub fn structural_bdd(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices,
-    ) -> GraphColoredVertices {
-        let sd_graph = SdGraph::from(stg.as_network().as_graph());
-        let unit_set = stg.unit_colored_vertices();
-
-        let mut candidates = restriction.clone();
-        let mut candidate_vars = HashSet::from_iter(stg.as_network().variables());
-
-        /// Tests whether the variable (`var`) has some regulators within the `restriction`
-        /// subset of `network` variables.
-        fn has_regulator(
-            network: &BooleanNetwork,
-            restriction: &HashSet<VariableId>,
-            var: VariableId,
-        ) -> bool {
-            network
-                .as_graph()
-                .regulators(var)
-                .into_iter()
-                .any(|it| restriction.contains(&it))
-        }
-
-        while !candidate_vars.is_empty() {
-            // Find all variables where every regulator is already resolved.
-            let input_variables: Vec<VariableId> = candidate_vars
-                .iter()
-                .filter(|it| !has_regulator(stg.as_network(), &candidate_vars, **it))
-                .cloned()
-                .collect();
-
-            if !input_variables.is_empty() {
-                // If the set is not empty, try to propagate the values of these "constant"
-                // variables to their successors.
-                let mut steps = stg.mk_empty_vertices();
-                for x in input_variables {
-                    steps = steps.union(&stg.var_can_post(x, unit_set));
-                    candidate_vars.remove(&x);
-                }
-                candidates = candidates.minus(&steps);
-            } else {
-                // If there are no variables that can do constant propagation, find the shortest
-                // cycle and eliminate all variables on that cycle.
-                unimplemented!()
-            }
-        }
-
-        candidates
-    }
-
-    pub fn trap_2(
-        stg: &SymbolicAsyncGraph,
-        candidates: &GraphColoredVertices
-    ) {
-        let mut ratios: Vec<(VariableId, f64)> = stg.as_network().variables()
             .map(|var| {
-                let true_trap = candidates.fix_network_variable(var, true);
-                let true_trap = forward_closed(stg, &true_trap);
-
-                let false_trap = candidates.fix_network_variable(var, false);
-                let false_trap = forward_closed(stg, &false_trap);
-
-                let ratio = true_trap.approx_cardinality() / false_trap.approx_cardinality();
-                println!("Variable {} ratio = {}", var.to_index(), ratio);
-                (var, ratio)
-            })
-            .collect();
-
-        ratios.sort_by(|(_,x), (_,y)| x.total_cmp(y));
-
-        let (best, _) = ratios.pop().unwrap();
-
-        println!("Branch {} = true", best);
-        Self::trap_2(stg, &candidates.fix_network_variable(best, true));
-        println!("Branch {} = false", best);
-        Self::trap_2(stg, &candidates.fix_network_variable(best, false));
-    }
-
-    pub fn trap_recursive(
-        stg: &SymbolicAsyncGraph,
-        restriction: &GraphColoredVertices
-    ) {
-        let mut ratios: Vec<(VariableId, f64)> = stg.as_network().variables()
-            .map(|var| {
-                let true_trap = stg.fix_network_variable(var, true);
-                let true_trap = forward_closed(stg, &true_trap);
-
-                let false_trap = stg.fix_network_variable(var, false);
-                let false_trap = forward_closed(stg, &false_trap);
-
-                let ratio = true_trap.approx_cardinality() / false_trap.approx_cardinality();
-                println!("Variable {} ratio = {}", var.to_index(), ratio);
-                (var, ratio)
-            })
-            .collect();
-
-        ratios.sort_by(|(_,x), (_,y)| x.total_cmp(y));
-
-        let mut is_stable: Vec<GraphColoredVertices> = stg
-            .as_network()
-            .variables()
-            .map(|it| {
-                let item = stg.var_can_post(it, restriction);
-                let item = restriction.minus(&item);
+                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+                let is_stable = stg.unit_colored_vertices().minus(&can_step);
                 if cfg!(feature = "print-progress") {
                     println!(
-                        " > Initial candidates for variable {}[id:{}]: {}[nodes:{}].",
-                        stg.as_network().get_variable_name(it),
-                        it.to_index(),
-                        item.approx_cardinality(),
-                        item.symbolic_size()
+                        " > Created initial set for {:?} using {} BDD nodes.",
+                        var,
+                        is_stable.symbolic_size()
                     );
                 }
-                item
+                is_stable.into_bdd()
+            })
+            .collect();
+
+        /*
+           Note to self: There is actually a marginally faster version of this algorithm that
+           does not throw away the intermediate results but instead carries them over to the
+           next iteration. Nevertheless, this version also wastes much more memory, as all
+           results have to be preserved, so I ultimately decided not to use it.
+        */
+
+        // Finally add the global requirement on the whole state space, if it is relevant.
+        if !stg.unit_colored_vertices().is_subset(&restriction) {
+            to_merge.push(restriction.as_bdd().clone());
+        }
+
+        let fixed_points = Self::symbolic_merge(
+            stg.symbolic_context().bdd_variable_set(),
+            to_merge,
+            HashSet::default(),
+        );
+
+        let fixed_points = stg.unit_colored_vertices().copy(fixed_points);
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] fixed-points.",
+                fixed_points.approx_cardinality(),
+                fixed_points.symbolic_size(),
+            );
+        }
+
+        fixed_points
+    }
+
+    /// This is a helper method that is used by `Self::symbolic_vertices` and
+    /// `Self::symbolic_colors`.
+    ///
+    /// It greedily performs a conjunction of the given BDDs, but eliminates the symbolic
+    /// variables given in `project`. Using this method, you can implement arbitrary projected
+    /// fixed-point detection. However, the method is inherently unsafe because currently
+    /// there is no way to give a type-safe result for operations other than `symbolic_vertices`
+    /// and `symbolic_colors`, so it is up to you to understand whether the result is
+    /// actually what you wanted.
+    pub fn symbolic_merge(
+        universe: &BddVariableSet,
+        to_merge: Vec<Bdd>,
+        // The set of variables that will be eliminated from the result.
+        mut project: HashSet<BddVariable>,
+    ) -> Bdd {
+        // First, assign each merge item a unique integer identifier.
+        let mut to_merge: HashMap<usize, Bdd> = to_merge.into_iter().enumerate().collect();
+
+        // And compute the support set for each of them.
+        let support_sets: HashMap<usize, HashSet<BddVariable>> = to_merge
+            .iter()
+            .map(|(id, set)| (*id, set.support_set()))
+            .collect();
+
+        // Now, for every projection variable, determine which merge items depend on said variable.
+        // Once all of these items appear in the final result, the variable can be removed.
+        let dependency_map: HashMap<BddVariable, HashSet<usize>> = project
+            .iter()
+            .map(|bdd_var| {
+                let dependencies = support_sets
+                    .iter()
+                    .filter(|(_, set)| set.contains(&bdd_var))
+                    .map(|(id, _)| *id)
+                    .collect::<HashSet<usize>>();
+                (*bdd_var, dependencies)
+            })
+            .collect();
+
+        let mut result = universe.mk_true();
+        let mut merged = HashSet::new();
+
+        /*
+           Note to self: It seems that not all projections are always beneficial to the BDD size.
+           At the same time, a non-optimal merge may enable a very useful projection. It is
+           not entirely clear how to greedily apply these two observations. Ideally, we'd like
+           to prioritize merges that lead to projections, but this is not universally true.
+
+           Maybe we could at least greedily prefer merging sets that will immediately lead to
+           projections? But even this is not an entirely clear win.
+        */
+
+        'merge: while !to_merge.is_empty() || !project.is_empty() {
+            for p_var in project.clone() {
+                let dependencies = dependency_map.get(&p_var).unwrap();
+                if dependencies.is_subset(&merged) {
+                    result = result.var_project(p_var);
+                    project.remove(&p_var);
+
+                    if cfg!(feature = "print-progress") {
+                        println!(" > Projection. New result has {} BDD nodes. Remaining projections: {}.",
+                                 result.size(),
+                                 project.len()
+                        );
+                    }
+                }
+            }
+
+            let mut best_result = universe.mk_true();
+            let mut best_result_size = usize::MAX;
+            let mut best_index = 0;
+
+            // Ensure deterministic iteration of results.
+            let mut merge_iter: Vec<usize> = to_merge.keys().cloned().collect();
+            merge_iter.sort_by_cached_key(|it| to_merge[it].size());
+            merge_iter.reverse();
+
+            for i in merge_iter {
+                let set = &to_merge[&i];
+                let bdd = Bdd::binary_op_with_limit(
+                    best_result_size,
+                    set,
+                    &result,
+                    biodivine_lib_bdd::op_function::and,
+                );
+                if let Some(bdd) = bdd {
+                    // At this point, the size of the BDD should be smaller or equal to the
+                    // best result, so we can just update it.
+                    assert!(bdd.size() <= best_result_size);
+                    best_result = bdd;
+                    best_result_size = best_result.size();
+                    best_index = i;
+                }
+            }
+
+            // This may not be true in the last iteration if the only thing left to do
+            // are projections.
+            if best_result_size != usize::MAX {
+                result = best_result;
+                to_merge.remove(&best_index);
+                merged.insert(best_index);
+
+                if result.is_false() {
+                    return universe.mk_false();
+                }
+
+                if cfg!(feature = "print-progress") {
+                    println!(
+                        " > Merge. New result has {} BDD nodes. Remaining constraints: {}.",
+                        result.size(),
+                        to_merge.len(),
+                    );
+                }
+            }
+        }
+
+        if cfg!(feature = "print-progress") {
+            println!("Merge finished with {} BDD nodes.", result.size(),);
+        }
+
+        // All projection variables are indeed gone.
+        assert!(project.is_empty());
+        // And everything was merged.
+        assert_eq!(merged.len(), support_sets.len());
+
+        result
+    }
+
+    /// The result of the function are all vertices that can appear as fixed-points for **some**
+    /// parameter valuation. That is, for every returned vertex, there is at least one color
+    /// for which the vertex is a fixed-point.
+    ///
+    /// **Characteristics:** If the network has no parameters, the result is equivalent to the
+    /// result of `Self::symbolic`. However, if there are parameters in the network, the result
+    /// is often much smaller and can be computed much faster.
+    ///
+    /// In particular, it is possible to use the result (or subsets of the result) as `restriction`
+    /// sets for `Self::symbolic` to obtain the full information later. In some cases, this is also
+    /// faster than running `Self::symbolic` directly.
+    ///
+    /// If you are only interested in certain combinations of variables within the fixed-points,
+    /// you can also write a custom projection query using `Self::symbolic_merge`.
+    pub fn symbolic_vertices(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+    ) -> GraphVertices {
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Start symbolic fixed-point vertex search with {}[nodes:{}] candidates.",
+                restriction.approx_cardinality(),
+                restriction.symbolic_size()
+            );
+        }
+
+        let mut to_merge: Vec<Bdd> = stg
+            .as_network()
+            .variables()
+            .map(|var| {
+                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+                let is_stable = stg.unit_colored_vertices().minus(&can_step);
+                if cfg!(feature = "print-progress") {
+                    println!(
+                        " > Created initial set for {:?} using {} BDD nodes.",
+                        var,
+                        is_stable.symbolic_size()
+                    );
+                }
+                is_stable.into_bdd()
+            })
+            .collect();
+
+        // Finally add the global requirement on the whole state space, if it is relevant.
+        if !stg.unit_colored_vertices().is_subset(&restriction) {
+            to_merge.push(restriction.as_bdd().clone());
+        }
+
+        let mut project: HashSet<BddVariable> = stg
+            .symbolic_context()
+            .parameter_variables()
+            .iter()
+            .cloned()
+            .collect();
+
+        let bdd =
+            Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
+
+        let vertices = stg.empty_vertices().vertices().copy(bdd);
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] fixed-point vertices.",
+                vertices.approx_cardinality(),
+                vertices.symbolic_size(),
+            );
+        }
+
+        vertices
+    }
+
+    /// Similar to `Self::symbolic_vertices`, but only returns colors for which there exists
+    /// at least one fixed-point within `restriction`.
+    pub fn symbolic_colors(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+    ) -> GraphColors {
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Start symbolic fixed-point color search with {}[nodes:{}] candidates.",
+                restriction.approx_cardinality(),
+                restriction.symbolic_size()
+            );
+        }
+
+        let mut to_merge: Vec<Bdd> = stg
+            .as_network()
+            .variables()
+            .map(|var| {
+                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+                let is_stable = restriction.minus(&can_step);
+                if cfg!(feature = "print-progress") {
+                    println!(
+                        " > Created initial set for {:?} using {} BDD nodes.",
+                        var,
+                        is_stable.symbolic_size()
+                    );
+                }
+                is_stable.into_bdd()
+            })
+            .collect();
+
+        // Finally add the global requirement on the whole state space, if it is relevant.
+        if !stg.unit_colored_vertices().is_subset(&restriction) {
+            to_merge.push(restriction.as_bdd().clone());
+        }
+
+        let mut project: HashSet<BddVariable> = stg
+            .symbolic_context()
+            .state_variables()
+            .iter()
+            .cloned()
+            .collect();
+
+        let bdd =
+            Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
+
+        let colors = stg.empty_vertices().colors().copy(bdd);
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] fixed-point colors.",
+                colors.approx_cardinality(),
+                colors.symbolic_size(),
+            );
+        }
+
+        colors
+    }
+
+    /// This function creates an iterator that yields symbolic sets of fixed-point states, such
+    /// that eventually, all fixed-points are returned (and there are no duplicates).
+    ///
+    /// As with `Self::symbolic`, you can use the `restriction` set to limit the search to
+    /// a particular subset of states. Furthermore, you can use `size_limit` to give the algorithm
+    /// a hint as to how large (in terms of BDD nodes) you want the resulting sets to be.
+    /// This value depends on how much memory and time you have, but a good starting value
+    /// tends to be somewhere between `1_000_000` and `10_000_000`. If you'd rather want more
+    /// smaller sets, but get them quickly, you can go as low as `10_000` or `100_000` (given
+    /// the model is not too large).
+    ///
+    /// It is not strictly guaranteed that the results are within this size limit, but the
+    /// algorithm makes a reasonable effort to achieve this.
+    ///
+    /// **Characteristics:** The algorithm is based on `Self::symbolic`, but once the expected
+    /// size of the result exceeds the given `size_limit`, it will try to fork the computation
+    /// based on one of the constraint clauses into two branches that can be completed
+    /// independently. As long as there are still clauses to fork on, this should result in
+    /// sets that are within the given size limit.
+    ///
+    /// Note that computing the result like this is almost always slower than just using
+    /// `Self::symbolic`. However, there are possible advantages to this approach:
+    ///
+    /// 1. Depending on the chosen `size_limit`, the algorithm might use less memory to
+    ///     compute the result than `Self::symbolic` (assuming you actually free the yielded
+    ///     results or store them outside of the main memory).
+    ///
+    /// 2. While the runtime of the whole algorithm is typically longer, it should usually
+    ///     take less time to get the *first* item than fully running `Self::symbolic`. Also,
+    ///     you can often "tune" this time-to-first-answer using the `size_limit`, as smaller
+    ///     results tend to be faster to find (iterating over all of them is longer though).
+    ///
+    /// Furthermore, it is relatively easy to extend this implementation to incorporate even
+    /// more parallelism than in `Self::symbolic`. Also, we could decrease memory
+    /// usage by storing some of the intermediate results on disk instead of RAM.
+    ///
+    /// Finally, note that there is a certain minimal value of `size_limit` below which the
+    /// algorithm cannot really fork effectively, because the sets are simply too large for the
+    /// limit. For truly large networks (>1000 nodes), it is not always a good idea to set the
+    /// limit too low. If you only want to find *some* fixed point for *some* parametrisation,
+    /// it is recommended that you either use the solver-based approach (`Self::solver_iterator`),
+    /// or one of the projection methods (`Self::symbolic_vertices` or `Self::symbolic_colors`).
+    pub fn symbolic_iterator(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+        size_limit: usize,
+    ) {
+        todo!()
+    }
+
+    /// Constructs an iterator that enumerates all fixed-points within the given
+    /// `restriction` subset using the Z3 solver.
+    ///
+    /// Similar notes on the `restriction` set as for `Self::symbolic_iterator` apply.
+    /// However, also note that the set has to be translated to a Boolean expression for
+    /// use in Z3, so try to avoid using too complicated BDDs here.
+    ///
+    /// Note that this method works very well for finding small numbers of fixed-points,
+    /// but since the fixed-points are computed individually, it cannot really enumerate
+    /// all fixed-points of models with a lot of parameters.
+    ///
+    /// However, you can use it to sample the space of possible fixed-points using various
+    /// values for the `restriction` set.
+    pub fn solver_iterator(stg: &SymbolicAsyncGraph, restriction: &GraphColoredVertices) {
+        todo!()
+    }
+}
+
+impl FixedPoints {
+    pub fn conflict_clause(stg: &SymbolicAsyncGraph, restriction: &GraphColoredVertices) {
+        let mut clauses: Vec<BddPartialValuation> = stg
+            .as_network()
+            .variables()
+            .flat_map(|it| {
+                let can_step = stg.var_can_post(it, restriction);
+                let is_stable = restriction.minus(&can_step);
+                let clauses = is_stable
+                    .as_bdd()
+                    .sat_clauses()
+                    .take(100)
+                    .collect::<Vec<_>>()
+                    .into_iter();
+                clauses
+            })
+            .collect();
+
+        fn has_conflict(
+            stg: &SymbolicAsyncGraph,
+            cx: &BddPartialValuation,
+            cy: &BddPartialValuation,
+        ) -> bool {
+            for var in stg.symbolic_context().bdd_variable_set().variables() {
+                if cx.has_value(var) && cy.has_value(var) && cx.get_value(var) != cy.get_value(var)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        let cloned = clauses.clone();
+        println!("There are {} clauses.", clauses.len());
+        // Sort clauses such that the most conflicting one is the last.
+        clauses.sort_by_cached_key(|clause| {
+            /*cloned.iter()
+            .filter(|it| has_conflict(stg, clause, it))
+            .count()*/
+            //clause.to_values()[0].0
+            //clause.last_fixed_variable().unwrap()
+            clause.cardinality()
+        });
+        clauses.reverse();
+        /*for clause in &clauses {
+            let conflicts = clauses.iter()
+                .filter(|it| has_conflict(stg, clause, it))
+                .count();
+            println!("Clause of card. {} has {} conflicts.", clause.cardinality(), conflicts);
+        }*/
+
+        let mut is_stable: Vec<GraphColoredVertices> = stg
+            .as_network()
+            .variables()
+            .map(|it| {
+                let can_step = stg.var_can_post(it, restriction);
+                restriction.minus(&can_step)
             })
             .collect();
 
         fn rec(
             stg: &SymbolicAsyncGraph,
             mut is_stable: Vec<GraphColoredVertices>,
-            mut ratios: Vec<(VariableId, f64)>,
-            depth: usize,
+            clauses: &[BddPartialValuation],
         ) {
             while is_stable.len() > 1 {
                 is_stable.sort_by_key(|it| it.symbolic_size());
                 is_stable.reverse();
-
-                let item = is_stable.pop().unwrap();
-
-                if item.is_empty() {
-                    println!("Empty branch.");
-                    return;
-                }
-
-                is_stable = is_stable
-                    .into_iter()
-                    .map(|it| it.intersect(&item))
-                    .collect();
 
                 let mut total_cardinality = 0.0;
                 let mut total_size = 0;
@@ -871,246 +593,207 @@ impl FixedPoints {
                     total_size += x.symbolic_size();
                     //println!(" >>> {}", stg.expand_to_space(&x.vertices()));
                 }
+                let average = total_size / is_stable.len();
 
-                if total_size >= 100_000_000 && is_stable.len() > 2 {
+                println!(
+                    " > [{}] Remaining states: {}[nodes:{}]; avr. {}",
+                    is_stable.len(),
+                    total_cardinality,
+                    total_size,
+                    average
+                );
 
-                    println!(
-                        " > [{}] Remaining states: {}[nodes:{}]",
-                        is_stable.len(),
-                        total_cardinality,
-                        total_size
-                    );
+                if average > 200_000 {
+                    println!("Start splitting.");
+                    let mut clause_index = 0;
+                    while clause_index < clauses.len() {
+                        let clause = &clauses[clause_index];
+                        let clause_bdd = stg
+                            .symbolic_context()
+                            .bdd_variable_set()
+                            .mk_conjunctive_clause(&clause);
+                        let clause_set = stg.unit_colored_vertices().copy(clause_bdd);
 
-                    let (split_var, ratio) = ratios.pop().unwrap();
+                        let with_clause: Vec<GraphColoredVertices> = is_stable
+                            .iter()
+                            .map(|it| it.intersect(&clause_set))
+                            .collect();
 
-                    println!("[{}] Branch {}=false with ratio {}.", depth, split_var.to_index(), ratio);
-                    let ff_stable = is_stable.iter()
-                        .map(|it| it.fix_network_variable(split_var, false))
+                        let with_clause_has_empty = with_clause.iter().any(|it| it.is_empty());
+                        if with_clause_has_empty {
+                            //println!("No fixed-point has this clause. Continue without it.");
+                            clause_index += 1;
+                            continue;
+                            //return rec(stg, minus_clause, &clauses[clause_index+1..]);
+                        }
+
+                        let minus_clause: Vec<GraphColoredVertices> =
+                            is_stable.iter().map(|it| it.minus(&clause_set)).collect();
+
+                        let minus_clause_has_empty = minus_clause.iter().any(|it| it.is_empty());
+                        if minus_clause_has_empty {
+                            //println!("All fixed-points have this clause. Continue with it.");
+                            //return rec(stg, with_clause, &clauses[clause_index+1..]);
+                            clause_index += 1;
+                            continue;
+                        }
+
+                        let with_clause_total = with_clause
+                            .iter()
+                            .map(|it| it.symbolic_size())
+                            .sum::<usize>();
+                        let minus_clause_total = minus_clause
+                            .iter()
+                            .map(|it| it.symbolic_size())
+                            .sum::<usize>();
+                        let with_clause_average = with_clause_total / with_clause.len();
+                        let minus_clause_average = minus_clause_total / minus_clause.len();
+                        println!("Split to {} / {}", with_clause_total, minus_clause_total);
+
+                        //if with_clause_average > 150_000 || minus_clause_average > 150_000 || with_clause_total + minus_clause_total > total_size + total_size {
+                        if with_clause_average > 200_000
+                            || minus_clause_average > 200_000
+                            || with_clause_total + minus_clause_total > total_size + total_size
+                        {
+                            println!("Split is bigger than current result. Skip clause. Remaining clauses: {}", clauses.len() - clause_index - 1);
+                        } else {
+                            println!("Split is useful... start with clause.");
+                            rec(stg, with_clause, &clauses[clause_index + 1..]);
+                            println!("Continue split without clause...");
+                            rec(stg, minus_clause, &clauses[clause_index + 1..]);
+                            return;
+                        }
+                        clause_index += 1;
+                    }
+                    panic!("Nothing to split on.");
+                } else {
+                    let item = is_stable.pop().unwrap();
+                    if item.is_empty() {
+                        println!("Empty.");
+                        return;
+                    }
+                    is_stable = is_stable
+                        .into_iter()
+                        .map(|it| it.intersect(&item))
                         .collect();
-                    rec(&stg, ff_stable, ratios.clone(), depth+1);
-                    println!("[{}] Branch {}=true with ratio {}.", depth, split_var.to_index(), ratio);
-                    let tt_stable = is_stable.iter()
-                        .map(|it| it.fix_network_variable(split_var, true))
-                        .collect();
-                    rec(&stg, tt_stable, ratios.clone(), depth+1);
-                    return;
                 }
             }
 
             let sinks = is_stable.pop().unwrap();
-            println!("Found {} sinks with {} nodes.", sinks.approx_cardinality(), sinks.symbolic_size());
-        }
-
-        rec(stg, is_stable, ratios, 0);
-
-        unimplemented!()
-    }
-}
-
-impl SymbolicAsyncGraph {
-    pub fn fixed_points_2(&self) -> GraphColoredVertices {
-        let sd_graph = SdGraph::from(self.as_network().as_graph());
-        let mut candidate_states = self.mk_unit_colored_vertices();
-        let mut remaining_vars: HashSet<VariableId> = self.as_network().variables().collect();
-        while !remaining_vars.is_empty() {
-            let initial: Vec<VariableId> = remaining_vars
-                .iter()
-                .filter(|it| {
-                    // Retain only initial states (with respect to remaining_vars).
-                    !self
-                        .as_network()
-                        .regulators(**it)
-                        .into_iter()
-                        .any(|it| remaining_vars.contains(&it))
-                })
-                .cloned()
-                .collect();
-            if !initial.is_empty() {
-                let mut initial_steps = self.mk_empty_vertices();
-                for x in initial {
-                    let step = self.var_can_post(x, self.unit_colored_vertices());
-                    initial_steps = initial_steps.union(&step);
-                    remaining_vars.remove(&x);
-                    println!("Initial BDD: {}", initial_steps.symbolic_size());
-                }
-                candidate_states = candidate_states.minus(&initial_steps);
-                println!(
-                    "New candidates[{}]: {} / {}",
-                    remaining_vars.len(),
-                    candidate_states.symbolic_size(),
-                    candidate_states.approx_cardinality()
-                );
-            } else {
-                let mut best_cycle = Vec::new();
-                let mut best_cycle_length = usize::MAX;
-
-                // Ensures determinism.
-                let mut remaining_iter: Vec<VariableId> = remaining_vars.iter().cloned().collect();
-                remaining_iter.sort();
-                for pivot in remaining_iter {
-                    if let Some(cycle) =
-                        sd_graph.shortest_cycle(&remaining_vars, pivot, best_cycle_length)
-                    {
-                        best_cycle_length = cycle.len();
-                        best_cycle = cycle;
-                    }
-                }
-
-                println!("Found cycle: {:?}", best_cycle);
-                let mut cycle_steps = self.mk_empty_vertices();
-                for x in best_cycle {
-                    let step = self.var_can_post(x, self.unit_colored_vertices());
-                    cycle_steps = cycle_steps.union(&step);
-                    remaining_vars.remove(&x);
-                    println!("Cycle BDD: {}", cycle_steps.symbolic_size());
-                }
-                candidate_states = candidate_states.minus(&cycle_steps);
-                println!(
-                    "New candidates[{}]: {} / {}",
-                    remaining_vars.len(),
-                    candidate_states.symbolic_size(),
-                    candidate_states.approx_cardinality()
-                );
-            }
-        }
-        return candidate_states;
-    }
-
-    pub fn fixed_points(&self) -> GraphColoredVertices {
-        fn fixed_points_recursive(
-            stg: &SymbolicAsyncGraph,
-            sd_graph: &SdGraph,
-            mut var_restriction: HashSet<VariableId>,
-        ) -> GraphColoredVertices {
-            let mut best_pivot = VariableId::from_index(0);
-            let mut best_cycle_length = usize::MAX;
-            for var in &var_restriction {
-                let best_cycle_in_var =
-                    sd_graph.shortest_cycle_length(&var_restriction, *var, best_cycle_length);
-                if let Some(length) = best_cycle_in_var {
-                    best_pivot = *var;
-                    best_cycle_length = length;
-                }
-            }
-
             println!(
-                "Weak components: {}",
-                sd_graph
-                    .restricted_weakly_connected_components(&var_restriction)
-                    .len()
+                "Found fixed points: {} / {}",
+                sinks.approx_cardinality(),
+                sinks.symbolic_size()
             );
-            if best_cycle_length == usize::MAX {
-                // There are no more cycles within `var_restriction`. Let's just
-                // try to evaluate the fixed-points symbolically.
-                let mut candidates = stg.mk_unit_colored_vertices();
-                'propagation: while !var_restriction.is_empty() {
-                    let mut initial = HashSet::new();
-                    for var in var_restriction.clone() {
-                        let remaining_regulators = stg
-                            .as_network()
-                            .as_graph()
-                            .regulators(var)
-                            .into_iter()
-                            .filter(|it| var_restriction.contains(it))
-                            .count();
-                        if remaining_regulators == 0 {
-                            initial.insert(var);
-                        }
-                    }
-
-                    println!("Total initial variables: {}", initial.len());
-                    /*let mut best_candidate = initial.iter().next().cloned().unwrap();
-                    let mut best_candidate_size = usize::MAX;
-                    for x in &initial {
-                        let can_step = stg.var_can_post(*x, &candidates);
-                        candidates = candidates.minus(&can_step);
-                        if candidates.symbolic_size() < best_candidate_size {
-                            best_candidate = *x;
-                            best_candidate_size = candidates.symbolic_size();
-                        }
-                    }*/
-
-                    let best_candidate = initial.into_iter().max().unwrap();
-
-                    let can_step = stg.var_can_post(best_candidate, &candidates);
-                    candidates = candidates.minus(&can_step);
-                    println!(
-                        "Candidates[{}]: {}/{}",
-                        var_restriction.len(),
-                        candidates.symbolic_size(),
-                        candidates.approx_cardinality()
-                    );
-                    var_restriction.remove(&best_candidate);
-                    //continue 'propagation;
-                }
-                /*for var in &var_restriction {
-                    let can_step = stg.var_can_post(*var, &candidates);
-                    candidates = candidates.minus(&can_step);
-                    println!("Candidates: {}/{}", candidates.symbolic_size(), candidates.approx_cardinality());
-                }*/
-                return candidates;
-            }
-
-            var_restriction.remove(&best_pivot);
-
-            println!("Branch on: {:?}", best_pivot);
-
-            let inner_candidates = fixed_points_recursive(stg, sd_graph, var_restriction);
-
-            println!(
-                "Inner candidates: {}/{}",
-                inner_candidates.symbolic_size(),
-                inner_candidates.approx_cardinality()
-            );
-
-            let can_step = stg.var_can_post(best_pivot, &inner_candidates);
-            return inner_candidates.minus(&can_step);
         }
 
-        let variables: HashSet<VariableId> = self.as_network().variables().collect();
-        let sd_graph = SdGraph::from(self.as_network().as_graph());
-        return fixed_points_recursive(self, &sd_graph, variables);
+        rec(stg, is_stable, &clauses);
     }
+
 }
-
-
-/// Compute the largest forward closed subset of the `initial` set. That is, the states that can
-/// only reach states inside `initial`.
-///
-/// In particular, if the initial set is a weak basin, the result is a strong basin.
-pub fn forward_closed(
-    graph: &SymbolicAsyncGraph,
-    initial: &GraphColoredVertices,
-) -> GraphColoredVertices {
-    let mut i = 0;
-    let mut basin = initial.clone();
-    loop {
-        i += 1;
-        let mut stop = true;
-        for var in graph.as_network().variables().rev() {
-            let can_go_out = graph.var_can_post_out(var, &basin);
-            //let outside_successors = graph.var_post(var, &basin).minus(&basin);
-            //let can_go_out = graph.var_pre(var, &outside_successors).intersect(&basin);
-
-            if !can_go_out.is_empty() {
-                basin = basin.minus(&can_go_out);
-                stop = false;
-                break;
-            }
-        }
-        if basin.as_bdd().size() > 10_000 {
-            //println!("Skip");
-            //return graph.mk_empty_vertices();
-            println!("Forward closed progress: {}", basin.as_bdd().size())
-        }
-        if stop {
-            //println!("I: {}", i);
-            return basin;
-        }
-    }
-}
-
 
 struct Context {
     z3: z3::Context,
+}
+
+struct MyContext<'ctx> {
+    pub ctx: &'ctx Context,
+    pub e_bool: (Sort<'ctx>, Vec<FuncDecl<'ctx>>, Vec<FuncDecl<'ctx>>),
+    pub variables: Vec<FuncDecl<'ctx>>,
+}
+
+impl<'ctx> MyContext<'ctx> {
+    pub fn new(z3: &'ctx Context, network: &BooleanNetwork) -> Self {
+        let sort = Sort::enumeration(&z3.z3, "ebool".into(), &["0".into(), "1".into(), "*".into()]);
+        let constructors = network
+            .variables()
+            .map(|it| {
+                let name = network.get_variable_name(it);
+                FuncDecl::new::<&str>(&z3.z3, name.as_str(), &[], &sort.0)
+            })
+            .collect();
+        MyContext {
+            ctx: z3,
+            e_bool: sort,
+            variables: constructors,
+        }
+    }
+
+    pub fn is_zero(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
+        self.e_bool.2[0].apply(&[x]).as_bool().unwrap()
+    }
+
+    pub fn is_one(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
+        self.e_bool.2[1].apply(&[x]).as_bool().unwrap()
+    }
+
+    pub fn is_star(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
+        self.e_bool.2[2].apply(&[x]).as_bool().unwrap()
+    }
+
+    pub fn mk_zero(&self) -> Dynamic {
+        self.e_bool.1[0].apply(&[])
+    }
+
+    pub fn mk_one(&self) -> Dynamic {
+        self.e_bool.1[1].apply(&[])
+    }
+
+    pub fn mk_star(&self) -> Dynamic {
+        self.e_bool.1[2].apply(&[])
+    }
+
+    pub fn e_bool_and(&self, left: &dyn ast::Ast<'ctx>, right: &dyn ast::Ast<'ctx>) -> Dynamic {
+        let left_is_one = self.is_one(left);
+        let right_is_one = self.is_one(right);
+        let left_is_zero = self.is_zero(left);
+        let right_is_zero = self.is_zero(right);
+        let left_and_right_is_zero = left_is_zero & right_is_zero;
+        let left_or_right_is_one = left_is_one | right_is_one;
+        /*
+           if left == One or right == One {
+               One
+           } else if left == Zero and right == Zero {
+               Zero
+           } else {
+               Star
+           }
+        */
+        let x = left_and_right_is_zero.ite(&self.mk_zero(), &self.mk_star());
+        let x = left_or_right_is_one.ite(&self.mk_one(), &x);
+        x
+    }
+
+    pub fn e_bool_or(&self, left: &dyn ast::Ast<'ctx>, right: &dyn ast::Ast<'ctx>) -> Dynamic {
+        let left_is_one = self.is_one(left);
+        let right_is_one = self.is_one(right);
+        let left_is_zero = self.is_zero(left);
+        let right_is_zero = self.is_zero(right);
+        let left_or_right_is_zero = left_is_zero | right_is_zero;
+        let left_and_right_is_one = left_is_one & right_is_one;
+        /*
+           if left == Zero or right == Zero {
+               Zero
+           } else if left == One and right == One {
+               One
+           } else {
+               Star
+           }
+        */
+        let x = left_and_right_is_one.ite(&self.mk_one(), &self.mk_star());
+        let x = left_or_right_is_zero.ite(&self.mk_zero(), &x);
+        x
+    }
+
+    pub fn e_bool_not(&self, inner: &dyn ast::Ast<'ctx>) -> Dynamic {
+        let inner_is_one = self.is_one(inner);
+        let inner_is_zero = self.is_zero(inner);
+        let x = inner_is_zero.ite(&self.mk_one(), &self.mk_star());
+        let x = inner_is_one.ite(&self.mk_zero(), &x);
+        x
+    }
+
+    pub fn check_eq(&self, left: &ast::Datatype<'ctx>, right: &ast::Datatype<'ctx>) -> ast::Bool {
+        left._eq(right)
+    }
 }

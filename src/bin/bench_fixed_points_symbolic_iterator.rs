@@ -25,8 +25,8 @@ fn main() {
     for set in iterator {
         println!(
             "Fixed-point vertices: {}[nodes:{}]",
-            fixed_points.approx_cardinality(),
-            fixed_points.symbolic_size()
+            set.approx_cardinality(),
+            set.symbolic_size()
         );
     }
 }
