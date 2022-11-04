@@ -1,10 +1,10 @@
+use crate::trap_spaces::ExtendedBoolean::Any;
 use crate::trap_spaces::{ExtendedBoolean, OptionalExtendedBoolean, PartialSpace, Space};
 use crate::{BooleanNetwork, VariableId};
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
 use ExtendedBoolean::{One, Zero};
-use crate::trap_spaces::ExtendedBoolean::Any;
 
 impl Index<VariableId> for Space {
     type Output = ExtendedBoolean;
@@ -53,7 +53,6 @@ impl PartialOrd for Space {
 }
 
 impl Space {
-
     /// Create a new space tracking the variables of the given network, where all values are
     /// initially assigned as `Any`.
     pub fn new(network: &BooleanNetwork) -> Space {

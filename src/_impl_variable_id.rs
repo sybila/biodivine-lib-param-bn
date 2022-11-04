@@ -22,9 +22,7 @@ impl VariableId {
     pub fn from_index(value: usize) -> VariableId {
         VariableId(value)
     }
-}
 
-impl VariableId {
     /// Convert the `VariableId` to the corresponding numeric identifier.
     pub fn to_index(self) -> usize {
         self.into()

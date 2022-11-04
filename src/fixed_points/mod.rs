@@ -15,16 +15,16 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::symbolic_async_graph::{GraphColors, GraphVertices};
-use crate::BooleanNetwork;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
-use z3::ast::{Ast, Dynamic};
-use z3::{ast, FuncDecl, Sort};
 
 pub use raw_symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
 mod raw_symbolic_iterator;
+
+/// **(internal)** Implements the iterator used by `FixedPoints::solver_iterator`.
+pub mod solver_iterator;
 
 /// Aggregates algorithms for computing fixed point states of the given state-transition graph.
 /// Typically, the operation can be also restricted to a particular subset of candidate states.
@@ -508,116 +508,6 @@ impl FixedPoints {
     /// values for the `restriction` set.
     pub fn solver_iterator(_stg: &SymbolicAsyncGraph, _restriction: &GraphColoredVertices) {
         todo!()
-    }
-}
-
-struct Context {
-    z3: z3::Context,
-}
-
-struct MyContext<'ctx> {
-    pub ctx: &'ctx Context,
-    pub e_bool: (Sort<'ctx>, Vec<FuncDecl<'ctx>>, Vec<FuncDecl<'ctx>>),
-    pub variables: Vec<FuncDecl<'ctx>>,
-}
-
-impl<'ctx> MyContext<'ctx> {
-    pub fn new(z3: &'ctx Context, network: &BooleanNetwork) -> Self {
-        let sort = Sort::enumeration(
-            &z3.z3,
-            "ebool".into(),
-            &["0".into(), "1".into(), "*".into()],
-        );
-        let constructors = network
-            .variables()
-            .map(|it| {
-                let name = network.get_variable_name(it);
-                FuncDecl::new::<&str>(&z3.z3, name.as_str(), &[], &sort.0)
-            })
-            .collect();
-        MyContext {
-            ctx: z3,
-            e_bool: sort,
-            variables: constructors,
-        }
-    }
-
-    pub fn is_zero(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
-        self.e_bool.2[0].apply(&[x]).as_bool().unwrap()
-    }
-
-    pub fn is_one(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
-        self.e_bool.2[1].apply(&[x]).as_bool().unwrap()
-    }
-
-    pub fn is_star(&self, x: &dyn ast::Ast<'ctx>) -> ast::Bool<'ctx> {
-        self.e_bool.2[2].apply(&[x]).as_bool().unwrap()
-    }
-
-    pub fn mk_zero(&self) -> Dynamic {
-        self.e_bool.1[0].apply(&[])
-    }
-
-    pub fn mk_one(&self) -> Dynamic {
-        self.e_bool.1[1].apply(&[])
-    }
-
-    pub fn mk_star(&self) -> Dynamic {
-        self.e_bool.1[2].apply(&[])
-    }
-
-    pub fn e_bool_and(&self, left: &dyn ast::Ast<'ctx>, right: &dyn ast::Ast<'ctx>) -> Dynamic {
-        let left_is_one = self.is_one(left);
-        let right_is_one = self.is_one(right);
-        let left_is_zero = self.is_zero(left);
-        let right_is_zero = self.is_zero(right);
-        let left_and_right_is_zero = left_is_zero & right_is_zero;
-        let left_or_right_is_one = left_is_one | right_is_one;
-        /*
-           if left == One or right == One {
-               One
-           } else if left == Zero and right == Zero {
-               Zero
-           } else {
-               Star
-           }
-        */
-        let x = left_and_right_is_zero.ite(&self.mk_zero(), &self.mk_star());
-        let x = left_or_right_is_one.ite(&self.mk_one(), &x);
-        x
-    }
-
-    pub fn e_bool_or(&self, left: &dyn ast::Ast<'ctx>, right: &dyn ast::Ast<'ctx>) -> Dynamic {
-        let left_is_one = self.is_one(left);
-        let right_is_one = self.is_one(right);
-        let left_is_zero = self.is_zero(left);
-        let right_is_zero = self.is_zero(right);
-        let left_or_right_is_zero = left_is_zero | right_is_zero;
-        let left_and_right_is_one = left_is_one & right_is_one;
-        /*
-           if left == Zero or right == Zero {
-               Zero
-           } else if left == One and right == One {
-               One
-           } else {
-               Star
-           }
-        */
-        let x = left_and_right_is_one.ite(&self.mk_one(), &self.mk_star());
-        let x = left_or_right_is_zero.ite(&self.mk_zero(), &x);
-        x
-    }
-
-    pub fn e_bool_not(&self, inner: &dyn ast::Ast<'ctx>) -> Dynamic {
-        let inner_is_one = self.is_one(inner);
-        let inner_is_zero = self.is_zero(inner);
-        let x = inner_is_zero.ite(&self.mk_one(), &self.mk_star());
-        let x = inner_is_one.ite(&self.mk_zero(), &x);
-        x
-    }
-
-    pub fn check_eq(&self, left: &ast::Datatype<'ctx>, right: &ast::Datatype<'ctx>) -> ast::Bool {
-        left._eq(right)
     }
 }
 

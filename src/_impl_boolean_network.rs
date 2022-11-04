@@ -384,6 +384,10 @@ impl BooleanNetwork {
     /// Try to inline the input nodes (variables) of the network as logical parameters
     /// (uninterpreted functions of arity 0).
     ///
+    /// The operation also removes all observability requirements, as the transformation between
+    /// variable and parameter can cause them to be unsatisfiable (in particular, some
+    /// regulations can become observable only for certain parameter valuations).
+    ///
     /// This often reduces the overall symbolic complexity of working with the network, as
     /// fewer symbolic variables are necessary. However, note that at the moment, not all input
     /// nodes can be correctly inlined. In particular, in order for a node to be inlined,
