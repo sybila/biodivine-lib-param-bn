@@ -1,4 +1,5 @@
 use crate::solver_context::{BnSolver, BnSolverContext};
+use crate::trap_spaces::{ExtendedBoolean, Space};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use z3::ast::{Ast, Bool};
 use z3::{FuncDecl, Solver, Sort};
@@ -20,9 +21,8 @@ impl<'z3> BnSolverContext<'z3> {
 
         let variable_constants = variable_constructors
             .iter()
-            .map(|it| {
-                it.apply(&[]).as_bool().unwrap()
-            }).collect::<Vec<_>>();
+            .map(|it| it.apply(&[]).as_bool().unwrap())
+            .collect::<Vec<_>>();
 
         let explicit_parameter_constructors = network
             .parameters()
@@ -103,7 +103,10 @@ impl<'z3> BnSolverContext<'z3> {
     }
 
     /// Create a `BnSolver` that already contains all pre-existing constraints on the network's
-    /// behaviour, like the observability and monotonicity of individual regulations.
+    /// behaviour, such as the observability and monotonicity of individual regulations.
+    ///
+    /// Note that the constraints should not influence the network variables in any way, but they
+    /// do eliminate invalid uninterpreted function instantiations.
     pub fn mk_network_solver(&'z3 self) -> BnSolver<'z3> {
         let solver = self.mk_empty_solver();
 
@@ -147,6 +150,24 @@ impl<'z3> BnSolverContext<'z3> {
             .unwrap()
     }
 
+    /// Create an AST node representing the validity of the given explicit parameter
+    /// under the given constant arguments.
+    pub fn mk_explicit_const_parameter(
+        &'z3 self,
+        parameter: ParameterId,
+        args: &[bool],
+    ) -> Bool<'z3> {
+        let args: Vec<Bool<'z3>> = args
+            .iter()
+            .map(|it| Bool::from_bool(self.as_z3(), *it))
+            .collect::<Vec<_>>();
+        let arg_refs: Vec<&dyn Ast<'z3>> = args.iter().map(|it| it as &dyn Ast).collect();
+        self.explicit_parameter_constructors[parameter.to_index()]
+            .apply(&arg_refs)
+            .as_bool()
+            .unwrap()
+    }
+
     /// Create an AST node representing the validity of the given implicit parameter
     /// under the regulators declared in the associated network.
     pub fn mk_implicit_parameter(&self, var: VariableId) -> Bool<'z3> {
@@ -156,6 +177,23 @@ impl<'z3> BnSolverContext<'z3> {
             .regulators(var)
             .into_iter()
             .map(|it| self.mk_var(it))
+            .collect::<Vec<_>>();
+        let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
+        self.implicit_parameter_constructors[var.to_index()]
+            .as_ref()
+            .unwrap()
+            .apply(&arg_refs)
+            .as_bool()
+            .unwrap()
+    }
+
+    /// Create an AST node representing the validity of the given implicit parameter
+    /// under the given constant values.
+    pub fn mk_implicit_const_parameter(&'z3 self, var: VariableId, args: &[bool]) -> Bool<'z3> {
+        assert!(self.network.get_update_function(var).is_none());
+        let args = args
+            .iter()
+            .map(|it| Bool::from_bool(self.as_z3(), *it))
             .collect::<Vec<_>>();
         let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
         self.implicit_parameter_constructors[var.to_index()]
@@ -178,6 +216,37 @@ impl<'z3> BnSolverContext<'z3> {
         } else {
             self.mk_implicit_parameter(var)
         }
+    }
+
+    /// Build a formula that is satisfied by all states which belong to the given subspace.
+    pub fn mk_space(&'z3 self, space: &Space) -> Bool<'z3> {
+        self.translate_space(space, &self.variable_constructors)
+    }
+
+    /// A helper method for translating between a `Space` and Z3 AST.
+    ///
+    /// You can supply your own variable constructors.
+    pub fn translate_space(
+        &'z3 self,
+        space: &Space,
+        variable_constructors: &[FuncDecl<'z3>],
+    ) -> Bool<'z3> {
+        let mut args = Vec::new();
+        for var in self.as_network().variables() {
+            let term = variable_constructors[var.to_index()]
+                .apply(&[])
+                .as_bool()
+                .unwrap();
+            match space[var] {
+                ExtendedBoolean::One => args.push(term),
+                ExtendedBoolean::Zero => {
+                    args.push(term.not());
+                }
+                ExtendedBoolean::Any => (),
+            }
+        }
+        let args: Vec<&Bool<'z3>> = args.iter().collect();
+        Bool::and(self.as_z3(), &args)
     }
 
     /// A helper method for translating between update functions and Z3 AST.

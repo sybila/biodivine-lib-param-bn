@@ -1,15 +1,14 @@
-use biodivine_lib_param_bn::fixed_points::solver_iterator::SolverIterator;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::solver_context::BnSolverContext;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::{BooleanNetwork, VariableId};
-use biodivine_lib_param_bn::biodivine_std::bitvector::BitVector;
+use biodivine_lib_param_bn::trap_spaces::Space;
+use biodivine_lib_param_bn::BooleanNetwork;
 
 fn main() {
     let args = Vec::from_iter(std::env::args());
     let path = &args[1];
     let model = BooleanNetwork::try_from_file(path).unwrap();
-    //let model = model.inline_inputs();
+    let model = model.inline_inputs();
 
     println!(
         "Loaded model with {} variables and {} parameters.",
@@ -18,23 +17,30 @@ fn main() {
     );
 
     let z3 = z3::Context::new(&z3::Config::new());
-    //build_z3_query(&z3, &model);
 
     let ctx = BnSolverContext::new(&z3, model.clone());
 
-    let iterator = SolverIterator::new(&ctx);
+    let all_states = Space::new(&model);
 
-    println!("{:?}", model.variables()
-        .map(|it| model.get_variable_name(it)).collect::<Vec<_>>());
+    let iterator = FixedPoints::solver_iterator(&ctx, &[all_states], &[]);
+
+    println!(
+        "{:?}",
+        model
+            .variables()
+            .map(|it| model.get_variable_name(it))
+            .collect::<Vec<_>>()
+    );
 
     let mut i = 0;
     //println!("Count: {}", iterator.take(10).count());
     for model in iterator {
-        println!("Model: {}", model.as_z3_model().);
+        println!("Model: {:?}", model.as_z3_model());
         println!("{:?}", model.get_state());
         i += 1;
         if i > 10 {
-           panic!("Too many fixed-points.");
+            println!("Too many fixed-points.");
+            return;
         }
     }
     //let i = iterator.take(100).count();
@@ -48,5 +54,4 @@ fn main() {
     /*for vertex in fixed_points.vertices().materialize().iter() {
         println!("{:?}", vertex.values());
     }*/
-
 }

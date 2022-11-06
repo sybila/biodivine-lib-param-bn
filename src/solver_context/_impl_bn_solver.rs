@@ -1,4 +1,5 @@
-use crate::solver_context::{BnSolver, BnSolverModel};
+use crate::solver_context::{BnSolver, BnSolverContext, BnSolverModel};
+use crate::trap_spaces::Space;
 use crate::{Monotonicity, VariableId};
 use std::ops::Not;
 use z3::ast::{forall_const, Ast, Bool};
@@ -9,8 +10,12 @@ impl<'z3> BnSolver<'z3> {
         &self.context.z3
     }
 
-    pub fn as_native_solver(&self) -> &Solver<'z3> {
+    pub fn as_z3_solver(&self) -> &Solver<'z3> {
         &self.solver
+    }
+
+    pub fn as_context(&self) -> &BnSolverContext<'z3> {
+        &self.context
     }
 
     pub fn check(&self) -> SatResult {
@@ -22,12 +27,16 @@ impl<'z3> BnSolver<'z3> {
     /// The result is `None` if last check was not `Sat`, or if `check` was not called
     /// after last assertions were added.
     pub fn get_model(&self) -> Option<BnSolverModel<'z3>> {
-        self.solver.get_model().map(|it| {
-            BnSolverModel {
-                context: self.context,
-                model: it
-            }
+        self.solver.get_model().map(|it| BnSolverModel {
+            context: self.context,
+            model: it,
         })
+    }
+
+    /// Retrieve the native model stored by the solver. All restrictions and caveats
+    /// of `get_model` apply as well.
+    pub fn get_z3_model(&self) -> Option<z3::Model<'z3>> {
+        self.solver.get_model()
     }
 
     pub fn push(&self) {
@@ -38,8 +47,32 @@ impl<'z3> BnSolver<'z3> {
         self.solver.pop(1);
     }
 
-    /// Add assertion to this solver which states that the `source` variable must be an observable
-    /// input in the update function of the `target` variable.
+    /// Add an assertion to this solver that the results must be within
+    /// some of the given subspaces.
+    pub fn assert_within_spaces(&self, spaces: &[Space]) {
+        let spaces: Vec<Bool<'z3>> = spaces
+            .iter()
+            .map(|space| self.context.mk_space(space))
+            .collect();
+        let spaces: Vec<&Bool<'z3>> = spaces.iter().collect();
+        let assertion = Bool::or(self.as_z3(), &spaces);
+        self.solver.assert(&assertion);
+    }
+
+    /// Add an assertion to this solver that the results must **not** be within any of the
+    /// given subspaces.
+    pub fn assert_not_within_spaces(&self, spaces: &[Space]) {
+        let spaces: Vec<Bool<'z3>> = spaces
+            .iter()
+            .map(|space| self.context.mk_space(space))
+            .collect();
+        let spaces: Vec<&Bool<'z3>> = spaces.iter().collect();
+        let assertion = Bool::or(self.as_z3(), &spaces).not();
+        self.solver.assert(&assertion);
+    }
+
+    /// Add an assertion to this solver which states that the `source` variable must be an
+    /// observable input in the update function of the `target` variable.
     ///
     /// The function panics if `source` is not an input of the `target` update function.
     pub fn assert_regulation_observability(&self, source: VariableId, target: VariableId) {

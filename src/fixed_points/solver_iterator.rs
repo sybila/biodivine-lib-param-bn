@@ -1,138 +1,185 @@
+use crate::biodivine_std::bitvector::ArrayBitVector;
+use crate::fixed_points::FixedPoints;
+use crate::solver_context::{BnSolver, BnSolverContext, BnSolverModel, RawBnModelIterator};
+use biodivine_lib_bdd::ValuationsOfClauseIterator;
+use num_traits::ToPrimitive;
 use z3::ast::Bool;
-use z3::{Model, SatResult};
-use z3::SatResult::Sat;
-use crate::BooleanNetwork;
-use crate::solver_context::{BnSolver, BnSolverContext, BnSolverModel};
 
-struct RawSolverIterator<'z3> {
-    enum_terms: Vec<Bool<'z3>>,
-    solver: BnSolver<'z3>,
-    // Stack of terms that still need to be explored.
-    stack: Vec<(Model<'z3>, usize, usize)>,
+/// An iterator that walks all satisfying results of the Z3 solver in order to list all
+/// fixed-point vertices of the associated BN.
+///
+/// The items of the iterator as `BnSolverModel` instances, from which you can extract both
+/// state and color information.
+pub struct SolverIterator<'z3> {
+    context: &'z3 BnSolverContext<'z3>,
+    inner: RawBnModelIterator<'z3>,
 }
 
-pub struct SolverIterator<'z3> {
-    inner: RawSolverIterator<'z3>,
+/// A version of the `SolverIterator` that only goes through all the distinct fixed-point
+/// vertices.
+pub struct SolverVertexIterator<'z3> {
+    context: &'z3 BnSolverContext<'z3>,
+    inner: RawBnModelIterator<'z3>,
+}
+
+/// A version of the `SolverIterator` that only goes through all the distinct fixed-point
+/// colors.
+///
+/// Note that at the moment, these are just represented as generic `BnSolverModel` instances,
+/// since there is no better type-safe object to represent them.
+pub struct SolverColorIterator<'z3> {
+    context: &'z3 BnSolverContext<'z3>,
+    inner: RawBnModelIterator<'z3>,
 }
 
 impl<'z3> SolverIterator<'z3> {
-
-    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverIterator<'z3> {
-        // Make a solver with all static constraints applied.
-        let solver = context.mk_network_solver();
-
-        for var in context.as_network().variables() {
-            let var_is_true = context.var(var);
-            let update_is_true = context.mk_update_function(var);
-
-            let assertion = update_is_true.iff(&var_is_true);
-            //println!("{:?}", assertion);
-            solver.as_native_solver().assert(&assertion);
-        }
-
-        /*
-            TODO:
-             - Enum terms must include parameters.
-             - Add iterator variant for just vertices/just parameters by restricting enum terms.
-             - Add some way to construct the raw fixed-point iterator with arbitrary enum terms.
-             - BnSolverModel should return ArrayBitVector as representation of states.
-             - BnSolverModel should be able to return some representation of uninterpreted functions.
-             - This could just be an instantiated Boolean network without parameters?
-             - Or just a GraphColors singleton?
-             - It seems that z3-sys actually has methods that can read the uninterpreted function,
-               but they are not available in this library. Maybe we can make them available?
-             - ... do the same for trap spaces?
-         */
-
-        let enum_terms: Vec<Bool<'z3>> = context.as_network().variables()
-            .map(|it| context.mk_var(it))
-            .collect();
+    /// Create a `SolverIterator` from a pre-existing solver, assuming that the solver
+    /// has all fixed-points constraints applied (e.g. using
+    /// `FixedPoints::make_fixed_points_solver`).
+    ///
+    /// Don't use it unless you are really really sure you need a custom solver.
+    pub fn new_with_solver(
+        context: &'z3 BnSolverContext<'z3>,
+        solver: BnSolver<'z3>,
+    ) -> SolverIterator<'z3> {
+        let mut enumeration_terms = Vec::new();
+        enumeration_terms.append(&mut variable_enumeration_terms(context));
+        enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
+        enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
 
         SolverIterator {
-            inner: RawSolverIterator {
-                solver,
-                enum_terms,
-                stack: Vec::new(),
-            }
+            context,
+            inner: RawBnModelIterator::new(solver, enumeration_terms),
         }
     }
 
+    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverIterator<'z3> {
+        SolverIterator::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
+    }
+}
+
+impl<'z3> SolverVertexIterator<'z3> {
+    /// Create a `SolverVertexIterator` from a pre-existing solver, assuming that the solver
+    /// has all fixed-points constraints applied (e.g. using
+    /// `FixedPoints::make_fixed_points_solver`).
+    ///
+    /// Don't use it unless you are really really sure you need a custom solver.
+    pub fn new_with_solver(
+        context: &'z3 BnSolverContext<'z3>,
+        solver: BnSolver<'z3>,
+    ) -> SolverVertexIterator<'z3> {
+        // List only vertex enumeration terms.
+        let mut enumeration_terms = Vec::new();
+        enumeration_terms.append(&mut variable_enumeration_terms(context));
+
+        SolverVertexIterator {
+            context,
+            inner: RawBnModelIterator::new(solver, enumeration_terms),
+        }
+    }
+
+    /// Create a new `SolverVertexIterator` with default constraints applied
+    /// based on the provided `BnSolverContext`.
+    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverVertexIterator<'z3> {
+        Self::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
+    }
+}
+
+impl<'z3> SolverColorIterator<'z3> {
+    /// Create a `SolverColorIterator` from a pre-existing solver, assuming that the solver
+    /// has all fixed-points constraints applied (e.g. using
+    /// `FixedPoints::make_fixed_points_solver`).
+    ///
+    /// Don't use it unless you are really really sure you need a custom solver.
+    pub fn new_with_solver(
+        context: &'z3 BnSolverContext<'z3>,
+        solver: BnSolver<'z3>,
+    ) -> SolverColorIterator<'z3> {
+        // List only vertex enumeration terms.
+        let mut enumeration_terms = Vec::new();
+        enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
+        enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
+
+        SolverColorIterator {
+            context,
+            inner: RawBnModelIterator::new(solver, enumeration_terms),
+        }
+    }
+
+    /// Create a new `SolverColorIterator` with default constraints applied
+    /// based on the provided `BnSolverContext`.
+    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverColorIterator<'z3> {
+        Self::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
+    }
 }
 
 impl<'z3> Iterator for SolverIterator<'z3> {
     type Item = BnSolverModel<'z3>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next()
+        self.inner
+            .next()
+            .map(|it| BnSolverModel::new(self.context, it))
     }
 }
 
-impl<'z3> Iterator for RawSolverIterator<'z3> {
+impl<'z3> Iterator for SolverVertexIterator<'z3> {
+    type Item = ArrayBitVector;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner
+            .next()
+            .map(|it| BnSolverModel::new(self.context, it).get_state())
+    }
+}
+
+impl<'z3> Iterator for SolverColorIterator<'z3> {
     type Item = BnSolverModel<'z3>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.stack.is_empty() {
-            println!("Stack is empty and solver is {:?}", self.solver.check());
-            return if self.solver.check() == Sat {
-                let model = self.solver.get_model().unwrap();
-                self.stack.push((self.solver.as_native_solver().get_model().unwrap(), 0, 0));
-                self.solver.push();
-                Some(model)
-            } else {
-                None
-            }
-        }
-
-        while let Some((model, i_start, i_block)) = self.stack.pop() {
-            assert!(i_block >= i_start);
-            if i_block >= self.enum_terms.len() {
-                //println!("i_block >= enum_terms.len()... Pop.");
-                // There is nothing else to condition on in this layer. So just pop the solver,
-                // allowing the underlying layer to advance to the next iteration.
-                self.solver.pop();
-                if self.stack.is_empty() {
-                    // This was the last item... just add an explicit contradiction to the solver
-                    // so that it is not satisfiable ever again.
-                    self.solver.as_native_solver().assert(
-                        &Bool::from_bool(self.solver.as_z3(), false)
-                    );
-                }
-            } else {
-                // Apply the current restriction.
-
-                // At this point, the model must exist, because that is the only way we could have
-                // gotten to the next recursive layer (i.e. a new push happens only if we have `Sat`).
-                //assert_eq!(self.solver.check(), Sat);
-                //let model = self.solver.as_native_solver().get_model().unwrap();
-                //println!("Push.");
-                self.solver.push();
-                //println!("Block !{}", i_block);
-                let block_term = model.eval(&self.enum_terms[i_block], true).unwrap();
-                self.solver.as_native_solver().assert(&self.enum_terms[i_block].iff(&block_term).not());
-                for i in i_start..i_block {
-                    let fix_term = model.eval(&self.enum_terms[i], true).unwrap();
-                    self.solver.as_native_solver().assert(&self.enum_terms[i].iff(&fix_term));
-                    //println!(" > Fix {}", i);
-                }
-                if self.solver.check() == Sat {
-                    // If the restriction is satisfiable, continue the "virtual" for-loop,
-                    // but also start a new recursive search.
-                    let new_model = self.solver.get_model().unwrap();
-                    self.stack.push((model, i_start, i_block + 1));
-                    self.stack.push((self.solver.as_native_solver().get_model().unwrap(), i_block + 1, i_block + 1));
-                    //println!("Block sat. Recursion...");
-                    return Some(new_model);
-                } else {
-                    // If it is not satisfiable, then continue the "virtual" for-loop
-                    // by conditioning on the next term.
-                    self.solver.pop();
-                    //println!("Block unsat. Pop.");
-                    self.stack.push((model, i_start, i_block + 1));
-                }
-            }
-        }
-
-        None
+        self.inner
+            .next()
+            .map(|it| BnSolverModel::new(self.context, it))
     }
+}
 
+/// **(internal)** List the Boolean terms that distinguish all state variables.
+fn variable_enumeration_terms<'z3>(context: &BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+    context
+        .as_network()
+        .variables()
+        .map(|var| context.mk_var(var))
+        .collect()
+}
+
+/// **(internal)** List the Boolean terms that distinguish all explicit parameter valuations.
+fn explicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+    let mut result = Vec::new();
+    for parameter_id in context.as_network().parameters() {
+        let parameter = context.as_network().get_parameter(parameter_id);
+        let arity = parameter.get_arity().to_u16().unwrap();
+        for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
+            let inputs = row.vector();
+            let term = context.mk_explicit_const_parameter(parameter_id, &inputs);
+            result.push(term);
+        }
+    }
+    result
+}
+
+/// **(internal)** List the Boolean terms that distinguish all implicit parameter valuations.
+fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+    let mut result = Vec::new();
+    for var in context.as_network().variables() {
+        if context.as_network().get_update_function(var).is_none() {
+            let arity = context.as_network().regulators(var).len();
+            let arity = arity.to_u16().unwrap();
+            for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
+                let inputs = row.vector();
+                let term = context.mk_implicit_const_parameter(var, &inputs);
+                result.push(term);
+            }
+        }
+    }
+    result
 }

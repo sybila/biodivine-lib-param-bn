@@ -18,16 +18,27 @@ use crate::symbolic_async_graph::{GraphColors, GraphVertices};
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
 
-pub use raw_symbolic_iterator::SymbolicIterator;
+use crate::fixed_points::solver_iterator::{
+    SolverColorIterator, SolverIterator, SolverVertexIterator,
+};
+use crate::solver_context::{BnSolver, BnSolverContext};
+use crate::trap_spaces::Space;
+pub use symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
-mod raw_symbolic_iterator;
+mod symbolic_iterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::solver_iterator`.
 pub mod solver_iterator;
 
 /// Aggregates algorithms for computing fixed point states of the given state-transition graph.
 /// Typically, the operation can be also restricted to a particular subset of candidate states.
+///
+/// Additionally, in some instances the result is provided as an iterator. Note that for
+/// the solver-based methods, there is a "color-projection" option but the iteration items
+/// are the same as for the general option, because there is currently no better way to
+/// represent the result in a type-safe manner. Later, there should be a better way of dealing
+/// with interpretation of explicit parameters.
 pub struct FixedPoints {
     _dummy: (),
 }
@@ -493,21 +504,80 @@ impl FixedPoints {
         SymbolicIterator::new(stg, restriction, size_limit)
     }
 
-    /// Constructs an iterator that enumerates all fixed-points within the given
-    /// `restriction` subset using the Z3 solver.
+    /// Constructs an iterator that uses Z3 to enumerate all fixed-points appearing within
+    /// the given list of `positive_restriction` subspaces while avoiding any of the
+    /// `negative_restriction` subspaces.
     ///
-    /// Similar notes on the `restriction` set as for `Self::symbolic_iterator` apply.
-    /// However, also note that the set has to be translated to a Boolean expression for
-    /// use in Z3, so try to avoid using too complicated BDDs here.
+    /// Keep in mind that the `positive_restriction` is by default empty, i.e. no fixed-points
+    /// are returned. You can use `Space::new` to create a subspace of all states for this
+    /// purpose. Restrictions on parameter valuations will be automatically applied based on
+    /// the `BooleanNetwork` associated with the provided `BnSolverContext`.
     ///
-    /// Note that this method works very well for finding small numbers of fixed-points,
+    /// Note that the states must be global fixed-points, not just fixed-points within the
+    /// restriction candidates.
+    ///
+    /// This method works very well for finding small numbers of fixed-points,
     /// but since the fixed-points are computed individually, it cannot really enumerate
     /// all fixed-points of models with a lot of parameters.
     ///
-    /// However, you can use it to sample the space of possible fixed-points using various
-    /// values for the `restriction` set.
-    pub fn solver_iterator(_stg: &SymbolicAsyncGraph, _restriction: &GraphColoredVertices) {
-        todo!()
+    /// However, you can conceivably use it to sample the space of possible fixed-points
+    /// using various values for the `restriction` set.
+    pub fn solver_iterator<'z3>(
+        context: &'z3 BnSolverContext<'z3>,
+        positive_restrictions: &[Space],
+        negative_restriction: &[Space],
+    ) -> SolverIterator<'z3> {
+        let solver = Self::make_fixed_points_solver(context);
+        solver.assert_within_spaces(positive_restrictions);
+        solver.assert_not_within_spaces(negative_restriction);
+        SolverIterator::new_with_solver(context, solver)
+    }
+
+    /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
+    /// the unique fixed-point vertices, ignoring the associated colors.
+    pub fn solver_vertex_iterator<'z3>(
+        context: &'z3 BnSolverContext<'z3>,
+        positive_restrictions: &[Space],
+        negative_restriction: &[Space],
+    ) -> SolverVertexIterator<'z3> {
+        let solver = Self::make_fixed_points_solver(context);
+        solver.assert_within_spaces(positive_restrictions);
+        solver.assert_not_within_spaces(negative_restriction);
+        SolverVertexIterator::new_with_solver(context, solver)
+    }
+
+    /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
+    /// the unique fixed-point colors, ignoring the associated colors.
+    pub fn solver_color_iterator<'z3>(
+        context: &'z3 BnSolverContext<'z3>,
+        positive_restrictions: &[Space],
+        negative_restriction: &[Space],
+    ) -> SolverColorIterator<'z3> {
+        let solver = Self::make_fixed_points_solver(context);
+        solver.assert_within_spaces(positive_restrictions);
+        solver.assert_not_within_spaces(negative_restriction);
+        SolverColorIterator::new_with_solver(context, solver)
+    }
+
+    /// Build a solver that is satisfied exactly by all combinations of fixed-point
+    /// vertices and parameter valuations.
+    ///
+    /// This is mainly for building very custom fixed-point iterators and you don't have to call
+    /// it explicitly unless you really know that you need a custom solver.
+    pub fn make_fixed_points_solver<'z3>(context: &'z3 BnSolverContext<'z3>) -> BnSolver<'z3> {
+        // Make a solver with all static constraints applied.
+        let solver = context.mk_network_solver();
+
+        // Add a bunch of x <=> f(x) constraints to describe a fixed-point.
+        for var in context.as_network().variables() {
+            let var_is_true = context.var(var);
+            let update_is_true = context.mk_update_function(var);
+
+            let assertion = update_is_true.iff(&var_is_true);
+            solver.as_z3_solver().assert(&assertion);
+        }
+
+        solver
     }
 }
 

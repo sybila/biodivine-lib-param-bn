@@ -13,7 +13,7 @@
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::{BooleanNetwork, SdGraph};
+use biodivine_lib_param_bn::BooleanNetwork;
 use std::time::SystemTime;
 
 fn main() {
