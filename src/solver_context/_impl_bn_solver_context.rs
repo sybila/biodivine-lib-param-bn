@@ -9,13 +9,13 @@ impl<'z3> BnSolverContext<'z3> {
     /// context. `SolverContext` will then create the network variables and parameters in this
     /// Z3 context for future manipulation.
     pub fn new(z3: &'z3 z3::Context, network: BooleanNetwork) -> BnSolverContext<'z3> {
-        let bool_sort = Sort::bool(&z3);
+        let bool_sort = Sort::bool(z3);
 
         let variable_constructors = network
             .variables()
             .map(|it| {
                 let name = network.get_variable_name(it);
-                FuncDecl::new(&z3, name.as_str(), &[], &bool_sort)
+                FuncDecl::new(z3, name.as_str(), &[], &bool_sort)
             })
             .collect::<Vec<_>>();
 
@@ -32,7 +32,7 @@ impl<'z3> BnSolverContext<'z3> {
                 let domain = (0..param.get_arity())
                     .map(|_| &bool_sort)
                     .collect::<Vec<_>>();
-                FuncDecl::new(&z3, name.as_str(), &domain, &bool_sort)
+                FuncDecl::new(z3, name.as_str(), &domain, &bool_sort)
             })
             .collect::<Vec<_>>();
 
@@ -45,7 +45,7 @@ impl<'z3> BnSolverContext<'z3> {
                     let domain = (0..regulators.len())
                         .map(|_| &bool_sort)
                         .collect::<Vec<_>>();
-                    Some(FuncDecl::new(&z3, name.as_str(), &domain, &bool_sort))
+                    Some(FuncDecl::new(z3, name.as_str(), &domain, &bool_sort))
                 } else {
                     None
                 }
@@ -86,7 +86,7 @@ impl<'z3> BnSolverContext<'z3> {
     /// also follow the order given by `network.regulators(var)`). Argument types and return
     /// type is `Bool`.
     pub fn get_implicit_parameter_constructor(&self, var: VariableId) -> &FuncDecl<'z3> {
-        &self.implicit_parameter_constructors[var.to_index()]
+        self.implicit_parameter_constructors[var.to_index()]
             .as_ref()
             .unwrap()
     }
@@ -97,7 +97,7 @@ impl<'z3> BnSolverContext<'z3> {
     /// regulatory graph like monotonicity and observability.
     pub fn mk_empty_solver(&'z3 self) -> BnSolver<'z3> {
         BnSolver {
-            context: &self,
+            context: self,
             solver: Solver::new(self.z3),
         }
     }
@@ -316,7 +316,7 @@ impl<'z3> BnSolverContext<'z3> {
     }
 
     pub fn as_z3(&self) -> &z3::Context {
-        &self.z3
+        self.z3
     }
 
     pub fn as_network(&self) -> &BooleanNetwork {

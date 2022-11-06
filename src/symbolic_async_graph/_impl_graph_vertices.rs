@@ -122,7 +122,7 @@ impl Iterator for GraphVertexIterator<'_> {
     type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
-        return if let Some(valuation) = self.iterator.next() {
+        if let Some(valuation) = self.iterator.next() {
             let mut state = ArrayBitVector::empty(self.state_variables.len());
             for (i, v) in self.state_variables.iter().enumerate() {
                 if valuation[*v] {
@@ -132,7 +132,7 @@ impl Iterator for GraphVertexIterator<'_> {
             Some(state)
         } else {
             None
-        };
+        }
     }
 }
 

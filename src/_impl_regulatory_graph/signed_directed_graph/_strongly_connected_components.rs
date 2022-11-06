@@ -8,7 +8,7 @@ impl SdGraph {
     /// The result is sorted by component size.
     pub fn strongly_connected_components(&self) -> Vec<HashSet<VariableId>> {
         let mut results = Vec::new();
-        scc_recursive(&self, self.mk_all_vertices(), &mut results);
+        scc_recursive(self, self.mk_all_vertices(), &mut results);
         results.sort_by_key(|it| it.len());
         results
     }
@@ -21,7 +21,7 @@ impl SdGraph {
         restriction: &HashSet<VariableId>,
     ) -> Vec<HashSet<VariableId>> {
         let mut results = Vec::new();
-        scc_recursive(&self, restriction.clone(), &mut results);
+        scc_recursive(self, restriction.clone(), &mut results);
         results.sort_by_key(|it| it.len());
         results
     }
@@ -53,7 +53,7 @@ fn scc_recursive(
     let fwd_and_bwd: HashSet<VariableId> = fwd.intersection(&bwd).cloned().collect();
 
     if is_non_trivial(graph, &fwd_and_bwd) {
-        results.push(fwd_and_bwd.clone());
+        results.push(fwd_and_bwd);
     }
 
     let universe_rest: HashSet<VariableId> = universe.difference(&fwd_or_bwd).cloned().collect();
@@ -94,7 +94,7 @@ fn is_non_trivial(graph: &SdGraph, scc: &HashSet<VariableId>) -> bool {
 ///
 /// Note that this does not eliminate *all* trivial SCCs, just a part of them that can be detected
 /// using this particular method.
-fn trim_trivial(edges: &Vec<Vec<(VariableId, Sign)>>, set: &mut HashSet<VariableId>) {
+fn trim_trivial(edges: &[Vec<(VariableId, Sign)>], set: &mut HashSet<VariableId>) {
     let mut continue_trimming = true;
     while continue_trimming {
         continue_trimming = false;

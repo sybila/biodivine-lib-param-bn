@@ -325,9 +325,10 @@ impl FnUpdate {
     /// Returns true if this update function uses the given parameter.
     pub fn contains_parameter(&self, parameter: ParameterId) -> bool {
         let mut result = false;
-        let mut is_param = |it: &FnUpdate| match it {
-            Param(id, _) => result = result || (*id == parameter),
-            _ => {}
+        let mut is_param = |it: &FnUpdate| {
+            if let Param(id, _) = it {
+                result = result || (*id == parameter);
+            }
         };
         self.walk_postorder(&mut is_param);
         result

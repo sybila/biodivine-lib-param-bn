@@ -118,10 +118,9 @@ fn minimal_trap_search(
         // of unknown variables.
         //let var = variable_with_shortest_cycle(sd_graph, unknown_variables.clone()).unwrap(); // The variable must exist because unknown variables are an SCC.
         let var = {
-            fvs.iter()
+            *fvs.iter()
                 .find(|it| unknown_variables.contains(*it))
                 .unwrap()
-                .clone()
         };
 
         if unknown_variables.len() > 10 {
@@ -186,7 +185,7 @@ fn minimal_top_scc(
 
     while !remaining.is_empty() {
         // Minimum ensures the result is deterministic.
-        let pivot = remaining.iter().min().unwrap().clone();
+        let pivot = *remaining.iter().min().unwrap();
 
         let fwd = sd_graph.restricted_forward_reachable(&remaining, HashSet::from([pivot]));
         let bwd = sd_graph.restricted_backward_reachable(&remaining, HashSet::from([pivot]));
@@ -208,44 +207,5 @@ fn minimal_top_scc(
         None
     } else {
         Some(best_scc)
-    }
-}
-
-/// Find a variable that belongs to the shortest cycle in the given `universe`, while having
-/// the highest degree.
-///
-/// This is based on the search for minimal cycles used when approximating a feedback vertex set.
-fn variable_with_shortest_cycle(
-    sd_graph: &SdGraph,
-    universe: HashSet<VariableId>,
-) -> Option<VariableId> {
-    let mut best_candidate = (VariableId::from_index(0), usize::MAX, 0usize);
-    // Not particularly efficient but keeps the procedure deterministic.
-    let mut universe_iter: Vec<VariableId> = universe.iter().cloned().collect();
-    universe_iter.sort();
-    for x in universe_iter {
-        if let Some(cycle_length) = sd_graph.shortest_cycle_length(&universe, x, best_candidate.1) {
-            if cycle_length == 1 {
-                // If the cycle has length one, it is guaranteed to be the shortest and we
-                // can just stop.
-                return Some(x);
-            }
-            let degree = sd_graph.approx_degree(x, &universe);
-            if cycle_length < best_candidate.1 {
-                // If this is the best cycle, just update it.
-                best_candidate = (x, cycle_length, degree);
-            } else if cycle_length == best_candidate.1 {
-                // If this is equal to the best cycle, compare degrees.
-                if degree > best_candidate.2 {
-                    best_candidate = (x, cycle_length, degree);
-                }
-            }
-        }
-    }
-
-    if best_candidate.1 == usize::MAX {
-        None
-    } else {
-        Some(best_candidate.0)
     }
 }

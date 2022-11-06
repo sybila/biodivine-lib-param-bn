@@ -7,7 +7,7 @@ use z3::{FuncDecl, SatResult, Solver};
 
 impl<'z3> BnSolver<'z3> {
     pub fn as_z3(&self) -> &z3::Context {
-        &self.context.z3
+        self.context.z3
     }
 
     pub fn as_z3_solver(&self) -> &Solver<'z3> {
@@ -15,7 +15,7 @@ impl<'z3> BnSolver<'z3> {
     }
 
     pub fn as_context(&self) -> &BnSolverContext<'z3> {
-        &self.context
+        self.context
     }
 
     pub fn check(&self) -> SatResult {
@@ -166,13 +166,13 @@ impl<'z3> BnSolver<'z3> {
         let one = Bool::from_bool(self.as_z3(), true);
         let zero = Bool::from_bool(self.as_z3(), false);
 
-        for j in 0..function.arity() {
+        for (j, arg) in fresh_args.iter().enumerate() {
             if i == j {
                 positive_args.push(&one as &dyn Ast);
                 negative_args.push(&zero as &dyn Ast);
             } else {
-                positive_args.push(&fresh_args[j] as &dyn Ast);
-                negative_args.push(&fresh_args[j] as &dyn Ast);
+                positive_args.push(arg as &dyn Ast);
+                negative_args.push(arg as &dyn Ast);
             }
         }
 
@@ -203,13 +203,13 @@ impl<'z3> BnSolver<'z3> {
         let one = Bool::from_bool(self.as_z3(), true);
         let zero = Bool::from_bool(self.as_z3(), false);
 
-        for j in 0..function.arity() {
+        for (j, arg) in fresh_args.iter().enumerate() {
             if i == j {
                 positive_args.push(&one as &dyn Ast);
                 negative_args.push(&zero as &dyn Ast);
             } else {
-                positive_args.push(&fresh_args[j] as &dyn Ast);
-                negative_args.push(&fresh_args[j] as &dyn Ast);
+                positive_args.push(arg as &dyn Ast);
+                negative_args.push(arg as &dyn Ast);
             }
         }
 

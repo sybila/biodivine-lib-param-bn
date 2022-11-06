@@ -41,7 +41,7 @@ impl PartialOrd for Space {
             is_sub_space = is_sub_space && x <= y;
             is_super_space = is_super_space && x >= y;
         }
-        assert!(!(is_super_space && is_super_space));
+        assert!(!(is_super_space && is_sub_space));
         if is_sub_space {
             Some(Ordering::Less)
         } else if is_super_space {

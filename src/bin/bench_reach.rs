@@ -1,7 +1,6 @@
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::BooleanNetwork;
-use std::convert::TryFrom;
 
 // A very basic benchmark for testing the performance of reachability procedures.
 

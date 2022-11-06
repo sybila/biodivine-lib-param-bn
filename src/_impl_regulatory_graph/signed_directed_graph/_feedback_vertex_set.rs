@@ -1,5 +1,6 @@
 use crate::VariableId;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
+use std::cmp::Ordering;
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -40,14 +41,18 @@ impl SdGraph {
                         break;
                     }
                     let degree = self.approx_degree(*x, &scc);
-                    if cycle_length < best_candidate.1 {
-                        // If this is the best cycle, just update it.
-                        best_candidate = (*x, cycle_length, degree);
-                    } else if cycle_length == best_candidate.1 {
-                        // If this is equal to the best cycle, compare degrees.
-                        if degree > best_candidate.2 {
+                    match cycle_length.cmp(&best_candidate.1) {
+                        Ordering::Less => {
+                            // If this is the best cycle, just update it.
                             best_candidate = (*x, cycle_length, degree);
                         }
+                        Ordering::Equal => {
+                            // If this is equal to the best cycle, compare degrees.
+                            if degree > best_candidate.2 {
+                                best_candidate = (*x, cycle_length, degree);
+                            }
+                        }
+                        _ => (),
                     }
                 }
             }
@@ -95,14 +100,18 @@ impl SdGraph {
                         break;
                     }
                     let degree = self.approx_degree(*x, &scc);
-                    if cycle_length < best_candidate.1 {
-                        // If this is the best cycle, just update it.
-                        best_candidate = (*x, cycle_length, degree);
-                    } else if cycle_length == best_candidate.1 {
-                        // If this is equal to the best cycle, compare degrees.
-                        if degree > best_candidate.2 {
+                    match cycle_length.cmp(&best_candidate.1) {
+                        Ordering::Less => {
+                            // If this is the best cycle, just update it.
                             best_candidate = (*x, cycle_length, degree);
                         }
+                        Ordering::Equal => {
+                            // If this is equal to the best cycle, compare degrees.
+                            if degree > best_candidate.2 {
+                                best_candidate = (*x, cycle_length, degree);
+                            }
+                        }
+                        _ => (),
                     }
                 }
             }

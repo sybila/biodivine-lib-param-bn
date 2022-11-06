@@ -66,8 +66,8 @@ impl<'a> Iterator for RawSymbolicIterator<'a> {
                             let clause = &self.clauses[next_clause];
                             next_clause += 1;
 
-                            let result_with_clause = result.and(&clause);
-                            let result_without_clause = result.and_not(&clause);
+                            let result_with_clause = result.and(clause);
+                            let result_without_clause = result.and_not(clause);
 
                             // If the clause is irrelevant, ignore it.
                             if result_with_clause.is_false() || result_without_clause.is_false() {

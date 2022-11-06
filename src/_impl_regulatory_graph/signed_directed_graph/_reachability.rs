@@ -37,7 +37,7 @@ impl SdGraph {
 /// **(internal)** A shared utility method that implements either forward or backward reachability
 /// depending on the supplied set of `SdGraph` edges.
 fn reachability(
-    edges: &Vec<Vec<(VariableId, Sign)>>,
+    edges: &[Vec<(VariableId, Sign)>],
     initial: HashSet<VariableId>,
 ) -> HashSet<VariableId> {
     let mut result = initial;
@@ -60,7 +60,7 @@ fn reachability(
 /// **(internal)** A shared utility method that implements either a restricted forward or backward
 /// reachability depending on the supplied `SdGraph` edge relation.
 fn restricted_reachability(
-    edges: &Vec<Vec<(VariableId, Sign)>>,
+    edges: &[Vec<(VariableId, Sign)>],
     initial: HashSet<VariableId>,
     universe: &HashSet<VariableId>,
 ) -> HashSet<VariableId> {

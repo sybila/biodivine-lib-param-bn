@@ -85,7 +85,7 @@ impl RegulatoryGraph {
         regulator: VariableId,
         target: VariableId,
     ) -> Result<(), String> {
-        if self.find_regulation(regulator, target) == None {
+        if self.find_regulation(regulator, target).is_none() {
             Ok(())
         } else {
             Err(format!(
@@ -125,12 +125,9 @@ impl RegulatoryGraph {
         regulator: VariableId,
         target: VariableId,
     ) -> Option<&Regulation> {
-        for r in &self.regulations {
-            if r.regulator == regulator && r.target == target {
-                return Some(r);
-            }
-        }
-        None
+        self.regulations
+            .iter()
+            .find(|r| r.regulator == regulator && r.target == target)
     }
 
     /// Return a sorted list of variables that regulate the given `target` variable.

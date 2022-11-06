@@ -7,9 +7,7 @@ use Sign::Negative;
 impl SdGraph {
     pub fn mk_all_vertices(&self) -> HashSet<VariableId> {
         let var_count = self.successors.len();
-        (0..var_count)
-            .map(|it| VariableId::from_index(it))
-            .collect()
+        (0..var_count).map(VariableId::from_index).collect()
     }
 }
 

@@ -174,7 +174,7 @@ impl FixedPoints {
         */
 
         // Finally add the global requirement on the whole state space, if it is relevant.
-        if !stg.unit_colored_vertices().is_subset(&restriction) {
+        if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
 
@@ -228,7 +228,7 @@ impl FixedPoints {
             .map(|bdd_var| {
                 let dependencies = support_sets
                     .iter()
-                    .filter(|(_, set)| set.contains(&bdd_var))
+                    .filter(|(_, set)| set.contains(bdd_var))
                     .map(|(id, _)| *id)
                     .collect::<HashSet<usize>>();
                 (*bdd_var, dependencies)
@@ -368,7 +368,7 @@ impl FixedPoints {
             .collect();
 
         // Finally add the global requirement on the whole state space, if it is relevant.
-        if !stg.unit_colored_vertices().is_subset(&restriction) {
+        if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
 
@@ -427,7 +427,7 @@ impl FixedPoints {
             .collect();
 
         // Finally add the global requirement on the whole state space, if it is relevant.
-        if !stg.unit_colored_vertices().is_subset(&restriction) {
+        if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
 
@@ -573,7 +573,7 @@ impl FixedPoints {
             let var_is_true = context.var(var);
             let update_is_true = context.mk_update_function(var);
 
-            let assertion = update_is_true.iff(&var_is_true);
+            let assertion = update_is_true.iff(var_is_true);
             solver.as_z3_solver().assert(&assertion);
         }
 

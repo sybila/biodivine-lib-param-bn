@@ -45,7 +45,7 @@ impl OptionalExtendedBoolean {
 /// as there fixing `?` to a fixed value can always potentially cancel out the `*` in the second
 /// argument.
 impl OptionalExtendedBoolean {
-    pub fn not(self) -> Self {
+    pub fn negate(self) -> Self {
         match self {
             One => Zero,
             Zero => One,

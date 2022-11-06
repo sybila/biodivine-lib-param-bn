@@ -88,7 +88,7 @@ impl SdGraph {
                 .collect()
         }
 
-        let mut stack = vec![(pivot, successor_function(&self, restriction, pivot))];
+        let mut stack = vec![(pivot, successor_function(self, restriction, pivot))];
 
         while let Some((vertex, successors)) = stack.last_mut() {
             let vertex_distance = distances[vertex];
@@ -104,7 +104,7 @@ impl SdGraph {
                 if new_successor_distance < successor_distance {
                     // Note that this can't happen to the pivot since its distance is always zero.
                     distances.insert(successor, new_successor_distance);
-                    stack.push((successor, successor_function(&self, restriction, successor)));
+                    stack.push((successor, successor_function(self, restriction, successor)));
                 } else if successor == pivot {
                     // Hence we have to handle pivot independently.
                     let cycle_on_stack: Vec<VariableId> = stack.iter().map(|(it, _)| *it).collect();
@@ -188,7 +188,7 @@ impl SdGraph {
 
         let mut stack = vec![(
             (pivot, Positive),
-            successor_function(&self, restriction, pivot),
+            successor_function(self, restriction, pivot),
         )];
 
         while let Some((item, successors)) = stack.last_mut() {
@@ -214,7 +214,7 @@ impl SdGraph {
                         distances.insert((successor, path_parity), new_successor_distance);
                         stack.push((
                             (successor, path_parity),
-                            successor_function(&self, restriction, successor),
+                            successor_function(self, restriction, successor),
                         ));
                     }
                 } else if successor == pivot {

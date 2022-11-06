@@ -67,7 +67,7 @@ impl SdGraph {
     ) -> Vec<Vec<VariableId>> {
         let mut cycles = Vec::new();
 
-        let mut components = self.restricted_strongly_connected_components(&restriction);
+        let mut components = self.restricted_strongly_connected_components(restriction);
         while let Some(mut scc) = components.pop() {
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;

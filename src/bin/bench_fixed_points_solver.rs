@@ -47,7 +47,7 @@ fn main() {
 
     println!("Count: {}", i);
 
-    let stg = SymbolicAsyncGraph::new(model.clone()).unwrap();
+    let stg = SymbolicAsyncGraph::new(model).unwrap();
     let fixed_points = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
 
     println!("Actual fixed points: {}", fixed_points.approx_cardinality());

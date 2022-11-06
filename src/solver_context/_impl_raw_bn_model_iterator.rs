@@ -32,7 +32,7 @@ impl<'z3> RawBnModelIterator<'z3> {
     ///
     /// Same restrictions as in `Self::as_solver` apply.
     pub fn as_z3_solver(&self) -> &z3::Solver<'z3> {
-        &self.solver.as_z3_solver()
+        self.solver.as_z3_solver()
     }
 
     /// Get a reference to the underlying enumeration terms.

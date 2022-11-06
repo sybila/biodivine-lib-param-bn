@@ -44,7 +44,7 @@ impl ExtendedBoolean {
 
 /// Logical operations on extended booleans.
 impl ExtendedBoolean {
-    pub fn not(self) -> Self {
+    pub fn negate(self) -> Self {
         match self {
             Zero => One,
             One => Zero,

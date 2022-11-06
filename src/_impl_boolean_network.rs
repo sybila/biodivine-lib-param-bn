@@ -92,7 +92,7 @@ impl BooleanNetwork {
 
     /// **(internal)** Utility method to ensure that a parameter is also not a variable.
     fn assert_no_such_variable(&self, name: &str) -> Result<(), String> {
-        if self.graph.find_variable(name) == None {
+        if self.graph.find_variable(name).is_none() {
             Ok(())
         } else {
             Err(format!(
@@ -104,7 +104,7 @@ impl BooleanNetwork {
 
     /// **(internal)** Utility method to ensure that a parameter is not a duplicate.
     fn assert_no_such_parameter(&self, name: &str) -> Result<(), String> {
-        if self.find_parameter(name) == None {
+        if self.find_parameter(name).is_none() {
             Ok(())
         } else {
             Err(format!("Cannot add parameter. '{}' already added.", name))
@@ -113,14 +113,14 @@ impl BooleanNetwork {
 
     /// **(internal)** Utility method to ensure that an update function is not set yet.
     fn assert_no_update_function(&self, variable: VariableId) -> Result<(), String> {
-        return if self.update_functions[variable.0] == None {
+        if self.update_functions[variable.0].is_none() {
             Ok(())
         } else {
             Err(format!(
                 "Cannot set update function for {}. Function already set.",
                 self.graph.get_variable(variable)
             ))
-        };
+        }
     }
 
     /// **(internal)** Utility method to check that the arguments of a function are a subset
@@ -429,14 +429,11 @@ impl BooleanNetwork {
                         // it, because we'd lose information about that input.
                         is_ok = is_ok && update.contains_variable(*input);
                         update.walk_postorder(&mut |it: &FnUpdate| {
-                            match it {
-                                FnUpdate::Param(_, args) => {
-                                    // If the input appears as function argument, we can't remove
-                                    // it because we don't have a way of substituting the argument.
-                                    is_ok = is_ok && !args.contains(input)
-                                }
-                                _ => (),
-                            };
+                            if let FnUpdate::Param(_, args) = it {
+                                // If the input appears as function argument, we can't remove
+                                // it because we don't have a way of substituting the argument.
+                                is_ok = is_ok && !args.contains(input)
+                            }
                         })
                     } else {
                         // The target variable does not have an update function - we'd lose

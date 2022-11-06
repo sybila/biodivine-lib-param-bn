@@ -18,7 +18,7 @@ impl FnUpdate {
                 // We assume that a parameter can evaluate to anything.
                 ExtendedBoolean::Any
             }
-            FnUpdate::Not(inner) => inner.eval_in_space(space).not(),
+            FnUpdate::Not(inner) => inner.eval_in_space(space).negate(),
             FnUpdate::Binary(op, left, right) => {
                 let left = left.eval_in_space(space);
                 let right = right.eval_in_space(space);
@@ -46,7 +46,7 @@ impl FnUpdate {
             }
             FnUpdate::Var(var) => space[*var],
             FnUpdate::Param(_, _) => OptionalExtendedBoolean::Any,
-            FnUpdate::Not(inner) => inner.eval_in_partial_space(space).not(),
+            FnUpdate::Not(inner) => inner.eval_in_partial_space(space).negate(),
             FnUpdate::Binary(op, left, right) => {
                 let left = left.eval_in_partial_space(space);
                 let right = right.eval_in_partial_space(space);
