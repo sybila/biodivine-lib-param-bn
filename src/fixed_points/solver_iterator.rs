@@ -183,3 +183,55 @@ fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
     }
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::solver_iterator::{
+        SolverColorIterator, SolverIterator, SolverVertexIterator,
+    };
+    use crate::fixed_points::FixedPoints;
+    use crate::solver_context::BnSolverContext;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::BooleanNetwork;
+
+    #[test]
+    pub fn basic_solver_test() {
+        let z3 = z3::Context::new(&z3::Config::new());
+
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p1026.aeon").unwrap();
+        let stg = SymbolicAsyncGraph::new(bn.clone()).unwrap();
+        let ctx = BnSolverContext::new(&z3, bn.clone());
+
+        let mut fixed_points = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
+        let mut fixed_vertices = fixed_points.vertices();
+        let mut fixed_colors = fixed_points.colors();
+
+        println!("Fixed points: {}", fixed_points.approx_cardinality());
+
+        let everything_iterator = SolverIterator::new(&ctx);
+        let vertex_iterator = SolverVertexIterator::new(&ctx);
+        let color_iterator = SolverColorIterator::new(&ctx);
+
+        for model in everything_iterator {
+            let symbolic_model = model.get_symbolic_model(stg.symbolic_context());
+            assert!(symbolic_model.is_subset(&fixed_points));
+            fixed_points = fixed_points.minus(&symbolic_model);
+        }
+        assert!(fixed_points.is_empty());
+
+        for model in vertex_iterator {
+            let vertex = stg.vertex(&model).vertices();
+            assert!(vertex.is_subset(&fixed_vertices));
+            fixed_vertices = fixed_vertices.minus(&vertex);
+        }
+        assert!(fixed_vertices.is_empty());
+
+        for model in color_iterator {
+            let color = model.get_symbolic_colors(stg.symbolic_context());
+            assert!(color.is_subset(&fixed_colors));
+            fixed_colors = fixed_colors.minus(&color);
+        }
+        assert!(fixed_colors.is_empty())
+    }
+}

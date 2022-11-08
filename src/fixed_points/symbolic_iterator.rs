@@ -298,7 +298,7 @@ mod tests {
 
     #[test]
     pub fn test_symbolic_iterator() {
-        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").unwrap();
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p1026.aeon").unwrap();
         let stg = SymbolicAsyncGraph::new(bn).unwrap();
 
         let mut set = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());

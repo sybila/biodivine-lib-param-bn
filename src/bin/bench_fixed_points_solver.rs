@@ -1,6 +1,6 @@
+use biodivine_lib_param_bn::biodivine_std::bitvector::BitVector;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::solver_context::BnSolverContext;
-use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::trap_spaces::Space;
 use biodivine_lib_param_bn::BooleanNetwork;
 
@@ -33,25 +33,24 @@ fn main() {
     );
 
     let mut i = 0;
-    //println!("Count: {}", iterator.take(10).count());
     for model in iterator {
-        println!("Model: {:?}", model.as_z3_model());
-        println!("{:?}", model.get_state());
+        let values = model
+            .get_state()
+            .values()
+            .into_iter()
+            .map(i32::from)
+            .collect::<Vec<_>>();
+        println!("{:?}", values);
         i += 1;
-        if i > 10 {
-            println!("Too many fixed-points.");
+        if i > 1000 {
+            println!("Too many fixed-points to print.");
             return;
         }
     }
-    //let i = iterator.take(100).count();
 
-    println!("Count: {}", i);
-
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
-    let fixed_points = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
-
-    println!("Actual fixed points: {}", fixed_points.approx_cardinality());
-    /*for vertex in fixed_points.vertices().materialize().iter() {
-        println!("{:?}", vertex.values());
-    }*/
+    if i == 0 {
+        println!("No fixed-points are present.");
+    } else {
+        println!("All fixed points printed.");
+    }
 }

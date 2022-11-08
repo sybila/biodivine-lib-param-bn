@@ -4,7 +4,14 @@ use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
 use biodivine_lib_bdd::{BddPartialValuation, BddVariable};
+use std::fmt::{Debug, Formatter};
 use z3::ast::Bool;
+
+impl<'z3> Debug for BnSolverModel<'z3> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.model)
+    }
+}
 
 impl<'z3> BnSolverModel<'z3> {
     pub fn new(context: &'z3 BnSolverContext<'z3>, model: z3::Model<'z3>) -> BnSolverModel<'z3> {
