@@ -345,6 +345,112 @@ impl FnUpdate {
         self.walk_postorder(&mut is_var);
         result
     }
+
+    /// Perform a syntactic transformation of this update function which eliminates all binary
+    /// operators except for `&` and `|`. Negation is also preserved.
+    ///
+    /// Note that the result is neither a conjunction or disjunctive normal form, it just
+    /// eliminates all operators other than conjunction and disjunction.
+    pub fn to_and_or_normal_form(&self) -> FnUpdate {
+        match self {
+            Const(_) | Var(_) | Param(_, _) => self.clone(),
+            Not(inner) => inner.to_and_or_normal_form().negation(),
+            Binary(op, left, right) => {
+                let left = left.to_and_or_normal_form();
+                let right = right.to_and_or_normal_form();
+                match op {
+                    BinaryOp::And | BinaryOp::Or => FnUpdate::mk_binary(*op, left, right),
+                    BinaryOp::Imp => {
+                        // !left | right
+                        left.negation().or(right)
+                    }
+                    BinaryOp::Xor => {
+                        // (left | right) & !(left & right)
+                        let both = left.clone().and(right.clone());
+                        let one = left.clone().and(right.clone());
+                        one.and(both.negation())
+                    }
+                    BinaryOp::Iff => {
+                        // (left & right) | (!left & !right)
+                        let both = left.clone().and(right.clone());
+                        let neither = left.negation().and(right.negation());
+                        both.or(neither)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Perform a syntactic transformation which pushes every negation to literals (constants,
+    /// variables, and parameter terms).
+    ///
+    /// Note that constants will be automatically negated (true => false, false => true). Also,
+    /// keep in mind that this will rewrite binary operators (and => or, iff => xor, etc.), so
+    /// don't expect the function to look the same afterwards.
+    pub fn distribute_negation(&self) -> FnUpdate {
+        fn recursion(update: &FnUpdate, invert: bool) -> FnUpdate {
+            match update {
+                Const(value) => Const(*value != invert),
+                Var(var) => {
+                    if invert {
+                        Var(*var).negation()
+                    } else {
+                        update.clone()
+                    }
+                }
+                Param(id, args) => {
+                    if invert {
+                        Param(*id, args.clone()).negation()
+                    } else {
+                        update.clone()
+                    }
+                }
+                Not(inner) => recursion(inner, !invert),
+                Binary(op, left, right) => {
+                    if !invert {
+                        // If we are not inverting, just propagate the result.
+                        FnUpdate::mk_binary(*op, recursion(left, false), recursion(right, false))
+                    } else {
+                        // Otherwise we must do magic.
+                        match op {
+                            BinaryOp::And => {
+                                // !(left & right) = (!left | !right)
+                                let left = recursion(left, true);
+                                let right = recursion(right, true);
+                                left.or(right)
+                            }
+                            BinaryOp::Or => {
+                                // !(left | right) = (!left & !right)
+                                let left = recursion(left, true);
+                                let right = recursion(right, true);
+                                left.and(right)
+                            }
+                            BinaryOp::Imp => {
+                                // !(left => right) = (left & !right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, true);
+                                left.and(right)
+                            }
+                            BinaryOp::Xor => {
+                                // !(left ^ right) = (left <=> right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, false);
+                                left.iff(right)
+                            }
+                            BinaryOp::Iff => {
+                                // !(left <=> right) = (left ^ right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, false);
+                                left.xor(right)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        recursion(self, false)
+    }
 }
 
 #[cfg(test)]

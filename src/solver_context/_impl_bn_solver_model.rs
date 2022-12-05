@@ -3,6 +3,8 @@ use crate::solver_context::{BnSolverContext, BnSolverModel};
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
+use crate::trap_spaces::ExtendedBoolean::{One, Zero};
+use crate::trap_spaces::Space;
 use biodivine_lib_bdd::{BddPartialValuation, BddVariable};
 use std::fmt::{Debug, Formatter};
 use z3::ast::Bool;
@@ -147,5 +149,24 @@ impl<'z3> BnSolverModel<'z3> {
             state.push(self.get_bool(var));
         }
         state
+    }
+
+    pub fn get_space(
+        &self,
+        positive_variables: &[Bool<'z3>],
+        negative_variables: &[Bool<'z3>],
+    ) -> Space {
+        let mut space = Space::new(self.context.as_network());
+        let ones = self.get_raw_state(positive_variables);
+        let zeros = self.get_raw_state(negative_variables);
+        for var in self.context.as_network().variables() {
+            if ones[var.to_index()] && !zeros[var.to_index()] {
+                space[var] = One;
+            }
+            if !ones[var.to_index()] && zeros[var.to_index()] {
+                space[var] = Zero;
+            }
+        }
+        space
     }
 }

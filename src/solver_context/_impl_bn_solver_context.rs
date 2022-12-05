@@ -62,6 +62,19 @@ impl<'z3> BnSolverContext<'z3> {
         }
     }
 
+    /// Create fresh declarations of `n` Boolean variables (zero-arity functions) corresponding
+    /// to the `n` network variables, using the given `prefix` when naming the variables.
+    pub fn declare_state_variables(&self, prefix: &str) -> Vec<FuncDecl<'z3>> {
+        let bool_sort = Sort::bool(self.z3);
+        self.network
+            .variables()
+            .map(|it| {
+                let name = format!("{}{}", prefix, self.network.get_variable_name(it));
+                FuncDecl::new(self.z3, name.as_str(), &[], &bool_sort)
+            })
+            .collect::<Vec<_>>()
+    }
+
     /// Low level method to obtain the constructor of the uninterpreted function
     /// corresponding to one of the network variables.
     ///

@@ -10,6 +10,9 @@
 
 use std::fmt::Debug;
 
+pub mod dual_symbolic_encoding;
+pub mod solver_iterator;
+
 /// **(internal)** Basic convenience methods for extended Booleans, like logical operators
 /// and display/debug traits.
 mod _impl_extended_boolean;

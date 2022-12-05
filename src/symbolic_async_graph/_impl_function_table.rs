@@ -16,6 +16,15 @@ impl FunctionTable {
             .collect();
         FunctionTable { arity, rows }
     }
+
+    /// List the symbolic variables that appear in this function table.
+    ///
+    /// Note that you can use `FunctionTable::into_iter` to list the variables with their
+    /// corresponding input vectors. This is just for cases where you need the variables but
+    /// don't care about their input valuations.
+    pub fn symbolic_variables(&self) -> &Vec<BddVariable> {
+        &self.rows
+    }
 }
 
 /// Converts a `FunctionTable` into an iterator of `Vec<bool>` (function table row) and
