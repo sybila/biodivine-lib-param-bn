@@ -43,7 +43,7 @@ cargo run --release --bin BINARY_NAME --features print-progress -- MODEL_PATH
 
 > Independent cycles problem asks to compute the set of non-intersecting 
 > cycles such that once removed, the graph becomes acyclic (i.e. every
-> other cycle intersects a member of this independent set). a *maximum* such
+> other cycle intersects with a member of this independent set). A *maximum* such
 > set is typically desired.
 
 There are four binaries related to this feature: `check_fvs`, `check_ic`,
