@@ -174,26 +174,9 @@ impl SymbolicAsyncGraph {
         self.select_partial_valuation(&partial_valuation)
     }
 
-    /// Find the smallest subspace (hypercube) that contains the given set of vertices.
-    pub fn find_subspace(&self, set: &GraphVertices) -> Vec<(VariableId, bool)> {
-        let mut result = Vec::new();
-        for var in self.network.variables() {
-            let is_true = self.fix_vertices_with_network_variable(var, true);
-            let is_false = self.fix_vertices_with_network_variable(var, false);
-
-            if set.is_subset(&is_true) {
-                result.push((var, true));
-            }
-            if set.is_subset(&is_false) {
-                result.push((var, false));
-            }
-        }
-        result
-    }
-
     /// Return true of the given set is a trap set (also invariant set; set with no outgoing
     /// transitions).
-    pub fn is_trap(&self, set: &GraphColoredVertices) -> bool {
+    pub fn is_trap_set(&self, set: &GraphColoredVertices) -> bool {
         self.can_post_out(set).is_empty()
     }
 
@@ -287,7 +270,11 @@ impl SymbolicAsyncGraph {
 
     /// Fined the smallest subspace (hypercube) that encapsulates all the vertices
     /// within this set (colors are not affected).
-    pub fn expand_to_cube(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+    ///
+    /// Keep in mind that since the colors are not affected, the result might not pass
+    /// through `GraphColoredVertices::is_subspace`, but the `vertices()` set should pass
+    /// this check.
+    pub fn wrap_in_symbolic_subspace(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
         // I'm not quite ready to make this method public...
         fn make_variable_free(
             stg: &SymbolicAsyncGraph,
@@ -310,8 +297,8 @@ impl SymbolicAsyncGraph {
         result
     }
 
-    /// The same as `expand_to_cube`, but the result is a `Space` object.
-    pub fn expand_to_space(&self, set: &GraphVertices) -> Space {
+    /// Find the smallest subspace (hypercube) that contains the given set of vertices.
+    pub fn wrap_in_subspace(&self, set: &GraphVertices) -> Space {
         let clause = set.bdd.necessary_clause().unwrap();
         let mut result = Space::new(self.as_network());
         for var in self.as_network().variables() {
@@ -327,9 +314,10 @@ impl SymbolicAsyncGraph {
         result
     }
 
-    /// Similar to `restrict`, but you can specify a single variable that should be restricted,
-    /// which results in an operation that is often faster.
-    pub fn fix_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
+    /// Fix a variable in the underlying symbolic representation and then erase it completely
+    /// from the result. The resulting representation still "contains" the variable, but the
+    /// update functions no longer depend on it.
+    pub fn restrict_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
         let bdd_var = self.symbolic_context.state_variables[var.0];
         SymbolicAsyncGraph {
             network: self.network.clone(),

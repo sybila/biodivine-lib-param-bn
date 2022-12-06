@@ -26,9 +26,10 @@ use crate::Space;
 pub use symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
+/// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
 
-/// **(internal)** Implements the iterator used by `FixedPoints::solver_iterator`.
+/// Implements the iterator used by `FixedPoints::solver_iterator`.
 pub mod solver_iterator;
 
 /// Aggregates algorithms for computing fixed point states of the given state-transition graph.

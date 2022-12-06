@@ -57,6 +57,25 @@ impl Space {
         Space(vec![Any; network.num_vars()])
     }
 
+    /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space".
+    pub fn from_values(bn: &BooleanNetwork, values: Vec<(VariableId, bool)>) -> Space {
+        let mut result = Self::new(bn);
+        for (k, v) in values {
+            result[k] = ExtendedBoolean::from(v);
+        }
+        result
+    }
+
+    pub fn to_values(&self) -> Vec<(VariableId, bool)> {
+        let mut result = Vec::new();
+        for (k, v) in self.0.iter().enumerate() {
+            if let Some(v) = v.try_as_bool() {
+                result.push((VariableId::from_index(k), v))
+            }
+        }
+        result
+    }
+
     pub fn intersect(&self, other: &Space) -> Option<Space> {
         let mut result = self.clone();
         for i in 0..self.0.len() {

@@ -86,6 +86,11 @@ impl GraphColoredVertices {
         self.copy(self.bdd.var_select(var, value))
     }
 
+    /// Compute a set where the value of the given variable is restricted.
+    ///
+    /// Restriction operation takes only the elements where `variable=value`, but then makes
+    /// the result independent on this variable by erasing it. This is useful when you
+    /// are computing various operations on subspaces.
     pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_restrict(var, value))

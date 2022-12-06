@@ -99,6 +99,37 @@ impl GraphVertices {
         self.bdd.to_dot_string(&context.bdd, true)
     }
 
+    /// Return `true` if the set can be described by a single conjunction of literals. That is,
+    /// the set is a hypercube in the $\mathbb{B}^n$ space.
+    pub fn is_subspace(&self) -> bool {
+        self.bdd.is_clause()
+    }
+
+    /// Return `true` if the set represents a single vertex.
+    pub fn is_singleton(&self) -> bool {
+        if self.bdd.is_clause() {
+            let clause = self.bdd.first_clause().unwrap();
+            for var in &self.state_variables {
+                if clause.get_value(*var).is_none() {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Compute a set where the value of the given variable is restricted.
+    ///
+    /// Restriction operation takes only the elements where `variable=value`, but then makes
+    /// the result independent on this variable by erasing it. This is useful when you
+    /// are computing various operations on subspaces.
+    pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_restrict(var, value))
+    }
+
     /// Compute a subset of this set where the given network variable is always fixed to the
     /// given value.
     pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {

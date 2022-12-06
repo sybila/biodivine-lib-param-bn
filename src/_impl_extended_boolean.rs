@@ -12,6 +12,16 @@ impl Debug for ExtendedBoolean {
     }
 }
 
+impl From<bool> for ExtendedBoolean {
+    fn from(value: bool) -> Self {
+        if value {
+            ExtendedBoolean::One
+        } else {
+            ExtendedBoolean::Zero
+        }
+    }
+}
+
 impl Display for ExtendedBoolean {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -39,6 +49,14 @@ impl ExtendedBoolean {
 
     pub fn is_fixed(&self) -> bool {
         *self != Any
+    }
+
+    pub fn try_as_bool(&self) -> Option<bool> {
+        match self {
+            One => Some(true),
+            Zero => Some(false),
+            Any => None,
+        }
     }
 }
 
