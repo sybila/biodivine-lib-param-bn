@@ -1,5 +1,5 @@
 use crate::FnUpdate::*;
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{BinaryOp, BooleanNetwork, ExtendedBoolean, FnUpdate, ParameterId, Space, VariableId};
 use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
@@ -367,7 +367,7 @@ impl FnUpdate {
                     BinaryOp::Xor => {
                         // (left | right) & !(left & right)
                         let both = left.clone().and(right.clone());
-                        let one = left.clone().and(right.clone());
+                        let one = left.and(right);
                         one.and(both.negation())
                     }
                     BinaryOp::Iff => {
@@ -450,6 +450,38 @@ impl FnUpdate {
         }
 
         recursion(self, false)
+    }
+
+    /// Perform partial evaluation of this function using extended Boolean values in the given
+    /// `Space`.
+
+    pub fn eval_in_space(&self, space: &Space) -> ExtendedBoolean {
+        match self {
+            FnUpdate::Const(value) => {
+                if *value {
+                    ExtendedBoolean::One
+                } else {
+                    ExtendedBoolean::Zero
+                }
+            }
+            FnUpdate::Var(var) => space[*var],
+            FnUpdate::Param(_, _) => {
+                // We assume that a parameter can evaluate to anything.
+                ExtendedBoolean::Any
+            }
+            FnUpdate::Not(inner) => inner.eval_in_space(space).negate(),
+            FnUpdate::Binary(op, left, right) => {
+                let left = left.eval_in_space(space);
+                let right = right.eval_in_space(space);
+                match op {
+                    BinaryOp::Or => left.or(right),
+                    BinaryOp::And => left.and(right),
+                    BinaryOp::Imp => left.implies(right),
+                    BinaryOp::Iff => left.iff(right),
+                    BinaryOp::Xor => left.xor(right),
+                }
+            }
+        }
     }
 }
 

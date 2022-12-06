@@ -3,8 +3,8 @@ use crate::solver_context::{BnSolverContext, BnSolverModel};
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
-use crate::trap_spaces::ExtendedBoolean::{One, Zero};
-use crate::trap_spaces::Space;
+use crate::ExtendedBoolean::{One, Zero};
+use crate::Space;
 use biodivine_lib_bdd::{BddPartialValuation, BddVariable};
 use std::fmt::{Debug, Formatter};
 use z3::ast::Bool;

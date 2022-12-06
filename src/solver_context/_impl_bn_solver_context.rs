@@ -1,6 +1,6 @@
 use crate::solver_context::{BnSolver, BnSolverContext};
-use crate::trap_spaces::{ExtendedBoolean, Space};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{ExtendedBoolean, Space};
 use z3::ast::{Ast, Bool};
 use z3::{FuncDecl, Solver, Sort};
 

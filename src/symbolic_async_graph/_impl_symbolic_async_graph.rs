@@ -4,8 +4,8 @@ use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_c
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
-use crate::trap_spaces::{ExtendedBoolean, Space};
 use crate::{BooleanNetwork, FnUpdate, VariableId};
+use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 

@@ -9,8 +9,8 @@ use biodivine_lib_param_bn::biodivine_std::traits::Set;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::solver_context::BnSolverContext;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::trap_spaces::Space;
 use biodivine_lib_param_bn::BooleanNetwork;
+use biodivine_lib_param_bn::Space;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();

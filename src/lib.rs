@@ -25,7 +25,6 @@ pub mod fixed_points;
 pub mod sbml;
 pub mod solver_context;
 pub mod symbolic_async_graph;
-pub mod trap_spaces;
 pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
@@ -40,6 +39,8 @@ mod _impl_boolean_network_display;
 mod _impl_boolean_network_from_bnet;
 /// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
 mod _impl_boolean_network_to_bnet;
+/// **(internal)** All methods implemented by the `ExtendedBoolean` object.
+mod _impl_extended_boolean;
 /// **(internal)** Utility methods for `FnUpdate`.
 mod _impl_fn_update;
 /// **(internal)** Utility methods for `Parameter`.
@@ -50,6 +51,8 @@ mod _impl_parameter_id;
 mod _impl_regulation;
 /// **(internal)** All methods for analysing and manipulating `RegulatoryGraph`.
 mod _impl_regulatory_graph;
+/// **(internal)** All methods implemented by the `Space` object.
+mod _impl_space;
 /// **(internal)** Utility methods for `Variable`.
 mod _impl_variable;
 /// **(internal)** Utility methods for `VariableId`.
@@ -250,3 +253,18 @@ pub type ParameterIdIterator = Map<Range<usize>, fn(usize) -> ParameterId>;
 
 /// An iterator over all `Regulations` of a `RegulatoryGraph`.
 pub type RegulationIterator<'a> = std::slice::Iter<'a, Regulation>;
+
+/// An enum representing the possible state of each variable when describing a hypercube.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub enum ExtendedBoolean {
+    Zero,
+    One,
+    Any,
+}
+
+/// `Space` represents a hypercube (multi-dimensional rectangle) in the Boolean state space.
+///
+/// Keep in mind that there is no way of representing an empty hypercube at the moment. So any API
+/// that can take/return an empty set has to use `Option<Space>` or something similar.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Space(Vec<ExtendedBoolean>);

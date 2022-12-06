@@ -22,7 +22,7 @@ use crate::fixed_points::solver_iterator::{
     SolverColorIterator, SolverIterator, SolverVertexIterator,
 };
 use crate::solver_context::{BnSolver, BnSolverContext};
-use crate::trap_spaces::Space;
+use crate::Space;
 pub use symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.

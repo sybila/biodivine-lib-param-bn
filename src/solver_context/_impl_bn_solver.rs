@@ -1,6 +1,5 @@
 use crate::solver_context::{BnSolver, BnSolverContext, BnSolverModel};
-use crate::trap_spaces::Space;
-use crate::{Monotonicity, VariableId};
+use crate::{Monotonicity, Space, VariableId};
 use std::ops::Not;
 use z3::ast::{forall_const, Ast, Bool};
 use z3::{FuncDecl, SatResult, Solver};

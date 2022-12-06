@@ -74,8 +74,8 @@ a second without issues.
 
 There is one test binary `check_fixed_points` which compares the results of
 several algorithms to ensure correctness. Additionally, there is 
-`bench_fixed_points_naive`, `bench_fixed_points_symbolic`, 
-`bench_fixed_points_symbolic_vertices` and 
+`bench_fixed_points_naive`, `bench_fixed_points_symbolic`, `bench_fixed_points_solver`, 
+`bench_fixed_points_symbolic_vertices`, and 
 `bench_fixed_points_symbolic_colors` which independently test the performance
 of each algorithm.
 
