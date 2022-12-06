@@ -104,7 +104,7 @@ jobs:
       - name: Setup cargo-tarpaulin.
         run: cargo install cargo-tarpaulin
       - name: Run tarpaulin to compute coverage.
-        run: cargo tarpaulin --lib --examples --all-features
+        run: cargo tarpaulin --verbose --lib --examples --all-features --out Xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
         with:
