@@ -23,17 +23,12 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Checkout.
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain.
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${{ env.RUST_VERSION }}
+      - name: Rust format check.
+        run: cargo fmt --all -- --check
 
   # Run basic code validity check.
   check:
@@ -43,15 +38,12 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
+      - name: Checkout.
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain.
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${{ env.RUST_VERSION }}
+      - name: Rust code validity check.
+        run: cargo check
 
   # Run all tests
   test:
@@ -61,7 +53,7 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings"
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       # Tests need Z3 solver to run.
       - name: Setup Z3
         id: z3
@@ -70,14 +62,12 @@ jobs:
           version: 4.11.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
+      - name: Checkout.
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain.
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${{ env.RUST_VERSION }}
+      - name: Run tests.
+        run: cargo test --all-features
 
   # Check code style
   clippy:
@@ -87,16 +77,12 @@ jobs:
     env:
       RUSTFLAGS: "-D warnings"
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
+      - name: Checkout.
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain.
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${{ env.RUST_VERSION }}
+      - name: Run clippy.
+        run: cargo clippy
 
   # Compute code coverage
   codecov:
@@ -104,29 +90,25 @@ jobs:
     name: Code coverage
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v2
-      - name: Setup Z3
+      - name: Checkout.
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain.
+        run: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${{ env.RUST_VERSION }}
+      - name: Setup Z3.
         id: z3
         uses: cda-tum/setup-z3@v1
         with:
           version: 4.11.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          override: true
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.22.0'
-          args: '--lib --examples --all-features'
+      - name: Setup cargo-tarpaulin.
+        run: cargo install cargo-tarpaulin
+      - name: Run tarpaulin to compute coverage.
+        run: cargo tarpaulin --lib --examples --all-features
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v1.0.2
         with:
-          token: ${{secrets.CODECOV_TOKEN}}
+          token: ${{ secrets.CODECOV_TOKEN }}
       - name: Archive code coverage results
         uses: actions/upload-artifact@v1
         with:
