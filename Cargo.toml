@@ -32,7 +32,7 @@ lazy_static = "1.4.0"           # Used for initialization of commonly used regex
 biodivine-lib-bdd = ">=0.4.2, <1.0.0"
 num-bigint = "0.4.3"            # Used as infinite-precision representation in BDDs.
 num-traits = "0.2.15"           # `BigInt::to_f64`
-roxmltree = "0.16.0"            # Used for SBML parsing.
+roxmltree = "0.15.1"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
 z3 = "0.11.2"                   # Used for fixed-point enumeration (and hopefully other things soon).
 
