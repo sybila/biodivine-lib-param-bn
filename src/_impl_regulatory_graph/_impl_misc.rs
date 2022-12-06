@@ -1,6 +1,6 @@
-use super::{Regulation, RegulatoryGraph, Variable, VariableId};
 use crate::biodivine_std::structs::build_index_map;
 use crate::{Monotonicity, RegulationIterator, VariableIdIterator, ID_REGEX};
+use crate::{Regulation, RegulatoryGraph, Variable, VariableId};
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::Index;
@@ -85,7 +85,7 @@ impl RegulatoryGraph {
         regulator: VariableId,
         target: VariableId,
     ) -> Result<(), String> {
-        if self.find_regulation(regulator, target) == None {
+        if self.find_regulation(regulator, target).is_none() {
             Ok(())
         } else {
             Err(format!(
@@ -125,12 +125,9 @@ impl RegulatoryGraph {
         regulator: VariableId,
         target: VariableId,
     ) -> Option<&Regulation> {
-        for r in &self.regulations {
-            if r.regulator == regulator && r.target == target {
-                return Some(r);
-            }
-        }
-        None
+        self.regulations
+            .iter()
+            .find(|r| r.regulator == regulator && r.target == target)
     }
 
     /// Return a sorted list of variables that regulate the given `target` variable.
@@ -142,24 +139,6 @@ impl RegulatoryGraph {
             .map(|r| r.regulator)
             .collect();
         regulators.sort();
-        regulators
-    }
-
-    /// Return the set of direct as well as transitive regulators of `target`.
-    pub fn transitive_regulators(&self, target: VariableId) -> HashSet<VariableId> {
-        let mut regulators = HashSet::new();
-        fn r_regulators(
-            rg: &RegulatoryGraph,
-            target: VariableId,
-            regulators: &mut HashSet<VariableId>,
-        ) {
-            for regulator in rg.regulators(target) {
-                if regulators.insert(regulator) {
-                    r_regulators(rg, regulator, regulators);
-                }
-            }
-        }
-        r_regulators(self, target, &mut regulators);
         regulators
     }
 
@@ -175,24 +154,6 @@ impl RegulatoryGraph {
         targets
     }
 
-    /// Return a set of direct as well as transitive targets of `regulator`.
-    pub fn transitive_targets(&self, regulator: VariableId) -> HashSet<VariableId> {
-        let mut targets = HashSet::new();
-        fn r_targets(
-            rg: &RegulatoryGraph,
-            regulator: VariableId,
-            targets: &mut HashSet<VariableId>,
-        ) {
-            for target in rg.targets(regulator) {
-                if targets.insert(target) {
-                    r_targets(rg, target, targets);
-                }
-            }
-        }
-        r_targets(self, regulator, &mut targets);
-        targets
-    }
-
     /// Compute the strongly connected components of this regulatory graph. The components
     /// are sorted topologically based on their position in the graph condensation.
     ///
@@ -200,6 +161,9 @@ impl RegulatoryGraph {
     /// When sorting topologically incomparable components, we use component size as
     /// the secondary criterion. Also, note that the algorithm is not particularly efficient,
     /// so it should be used on large networks with caution!
+    ///
+    /// **Deprecated in favor of `strongly_connected_components`.
+    #[deprecated]
     pub fn components(&self) -> Vec<HashSet<VariableId>> {
         let mut components = Vec::new();
         let mut remaining: HashSet<VariableId> = self.variables().collect();
@@ -244,6 +208,7 @@ impl RegulatoryGraph {
         (0..self.variables.len()).map(VariableId)
     }
 
+    /// Return an iterator over all regulations of this graph.
     pub fn regulations(&self) -> RegulationIterator {
         self.regulations.iter()
     }
@@ -264,9 +229,35 @@ impl Index<VariableId> for RegulatoryGraph {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod tests {
     use crate::{RegulatoryGraph, Variable, VariableId};
     use std::collections::HashSet;
+
+    /// **(test)** A utility method that returns a simple but non-trivial regulatory graph.
+    pub fn build_test_regulatory_graph() -> RegulatoryGraph {
+        /*
+           The graph has three non-trivial SCCs: {b_1, b_2}, {d_1, d_2, d_3} and {e}.
+           Then, between the SCCs, the reachability is as follows:
+               * a -> c
+               * b -> c
+               * c -> d
+               * c -> e
+        */
+        let names = vec!["a", "b_1", "b_2", "c", "d_1", "d_2", "d_3", "e"];
+        let mut rg = RegulatoryGraph::new(names.into_iter().map(|s| s.to_string()).collect());
+        rg.add_regulation("a", "c", true, None).unwrap();
+        rg.add_regulation("b_1", "b_2", true, None).unwrap();
+        rg.add_regulation("b_2", "b_1", true, None).unwrap();
+        rg.add_regulation("b_2", "c", true, None).unwrap();
+        rg.add_regulation("c", "d_2", true, None).unwrap();
+        rg.add_regulation("c", "e", true, None).unwrap();
+        rg.add_regulation("d_1", "d_3", true, None).unwrap();
+        rg.add_regulation("d_3", "d_2", true, None).unwrap();
+        rg.add_regulation("d_2", "d_1", true, None).unwrap();
+        rg.add_regulation("d_1", "d_2", true, None).unwrap();
+        rg.add_regulation("e", "e", true, None).unwrap();
+        rg
+    }
 
     #[test]
     fn test_rename() {
@@ -283,19 +274,7 @@ mod tests {
     #[test]
     fn test_regulatory_graph() {
         // First, lets build a simple graph with 8 variables and 5 SCCs.
-        let names = vec!["a", "b_1", "b_2", "c", "d_1", "d_2", "d_3", "e"];
-        let mut rg = RegulatoryGraph::new(names.into_iter().map(|s| s.to_string()).collect());
-        rg.add_regulation("a", "c", true, None).unwrap();
-        rg.add_regulation("b_1", "b_2", true, None).unwrap();
-        rg.add_regulation("b_2", "b_1", true, None).unwrap();
-        rg.add_regulation("b_2", "c", true, None).unwrap();
-        rg.add_regulation("c", "d_2", true, None).unwrap();
-        rg.add_regulation("c", "e", true, None).unwrap();
-        rg.add_regulation("d_1", "d_3", true, None).unwrap();
-        rg.add_regulation("d_3", "d_2", true, None).unwrap();
-        rg.add_regulation("d_2", "d_1", true, None).unwrap();
-        rg.add_regulation("d_1", "d_2", true, None).unwrap();
-        rg.add_regulation("e", "e", true, None).unwrap();
+        let mut rg = build_test_regulatory_graph();
 
         assert!(rg.add_regulation("a", "c", false, None).is_err());
         assert!(rg.add_regulation("a", "b", true, None).is_err());
@@ -320,6 +299,7 @@ mod tests {
             vec![VariableId(5), VariableId(7)]
         );
 
+        #[allow(deprecated)]
         let components = rg.components();
         let expected_components: Vec<HashSet<VariableId>> = vec![
             vec![VariableId(0)].into_iter().collect(),

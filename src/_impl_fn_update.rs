@@ -1,5 +1,5 @@
 use crate::FnUpdate::*;
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{BinaryOp, BooleanNetwork, ExtendedBoolean, FnUpdate, ParameterId, Space, VariableId};
 use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
@@ -321,6 +321,168 @@ impl FnUpdate {
             }
         }
     }
+
+    /// Returns true if this update function uses the given parameter.
+    pub fn contains_parameter(&self, parameter: ParameterId) -> bool {
+        let mut result = false;
+        let mut is_param = |it: &FnUpdate| {
+            if let Param(id, _) = it {
+                result = result || (*id == parameter);
+            }
+        };
+        self.walk_postorder(&mut is_param);
+        result
+    }
+
+    /// Returns true if this update function uses the given variable.
+    pub fn contains_variable(&self, variable: VariableId) -> bool {
+        let mut result = false;
+        let mut is_var = |it: &FnUpdate| match it {
+            Var(id) => result = result || (*id == variable),
+            Param(_, args) => result = result || args.contains(&variable),
+            _ => {}
+        };
+        self.walk_postorder(&mut is_var);
+        result
+    }
+
+    /// Perform a syntactic transformation of this update function which eliminates all binary
+    /// operators except for `&` and `|`. Negation is also preserved.
+    ///
+    /// Note that the result is neither a conjunction or disjunctive normal form, it just
+    /// eliminates all operators other than conjunction and disjunction.
+    pub fn to_and_or_normal_form(&self) -> FnUpdate {
+        match self {
+            Const(_) | Var(_) | Param(_, _) => self.clone(),
+            Not(inner) => inner.to_and_or_normal_form().negation(),
+            Binary(op, left, right) => {
+                let left = left.to_and_or_normal_form();
+                let right = right.to_and_or_normal_form();
+                match op {
+                    BinaryOp::And | BinaryOp::Or => FnUpdate::mk_binary(*op, left, right),
+                    BinaryOp::Imp => {
+                        // !left | right
+                        left.negation().or(right)
+                    }
+                    BinaryOp::Xor => {
+                        // (left | right) & !(left & right)
+                        let both = left.clone().and(right.clone());
+                        let one = left.and(right);
+                        one.and(both.negation())
+                    }
+                    BinaryOp::Iff => {
+                        // (left & right) | (!left & !right)
+                        let both = left.clone().and(right.clone());
+                        let neither = left.negation().and(right.negation());
+                        both.or(neither)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Perform a syntactic transformation which pushes every negation to literals (constants,
+    /// variables, and parameter terms).
+    ///
+    /// Note that constants will be automatically negated (true => false, false => true). Also,
+    /// keep in mind that this will rewrite binary operators (and => or, iff => xor, etc.), so
+    /// don't expect the function to look the same afterwards.
+    pub fn distribute_negation(&self) -> FnUpdate {
+        fn recursion(update: &FnUpdate, invert: bool) -> FnUpdate {
+            match update {
+                Const(value) => Const(*value != invert),
+                Var(var) => {
+                    if invert {
+                        Var(*var).negation()
+                    } else {
+                        update.clone()
+                    }
+                }
+                Param(id, args) => {
+                    if invert {
+                        Param(*id, args.clone()).negation()
+                    } else {
+                        update.clone()
+                    }
+                }
+                Not(inner) => recursion(inner, !invert),
+                Binary(op, left, right) => {
+                    if !invert {
+                        // If we are not inverting, just propagate the result.
+                        FnUpdate::mk_binary(*op, recursion(left, false), recursion(right, false))
+                    } else {
+                        // Otherwise we must do magic.
+                        match op {
+                            BinaryOp::And => {
+                                // !(left & right) = (!left | !right)
+                                let left = recursion(left, true);
+                                let right = recursion(right, true);
+                                left.or(right)
+                            }
+                            BinaryOp::Or => {
+                                // !(left | right) = (!left & !right)
+                                let left = recursion(left, true);
+                                let right = recursion(right, true);
+                                left.and(right)
+                            }
+                            BinaryOp::Imp => {
+                                // !(left => right) = (left & !right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, true);
+                                left.and(right)
+                            }
+                            BinaryOp::Xor => {
+                                // !(left ^ right) = (left <=> right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, false);
+                                left.iff(right)
+                            }
+                            BinaryOp::Iff => {
+                                // !(left <=> right) = (left ^ right)
+                                let left = recursion(left, false);
+                                let right = recursion(right, false);
+                                left.xor(right)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        recursion(self, false)
+    }
+
+    /// Perform partial evaluation of this function using extended Boolean values in the given
+    /// `Space`.
+
+    pub fn eval_in_space(&self, space: &Space) -> ExtendedBoolean {
+        match self {
+            FnUpdate::Const(value) => {
+                if *value {
+                    ExtendedBoolean::One
+                } else {
+                    ExtendedBoolean::Zero
+                }
+            }
+            FnUpdate::Var(var) => space[*var],
+            FnUpdate::Param(_, _) => {
+                // We assume that a parameter can evaluate to anything.
+                ExtendedBoolean::Any
+            }
+            FnUpdate::Not(inner) => inner.eval_in_space(space).negate(),
+            FnUpdate::Binary(op, left, right) => {
+                let left = left.eval_in_space(space);
+                let right = right.eval_in_space(space);
+                match op {
+                    BinaryOp::Or => left.or(right),
+                    BinaryOp::And => left.and(right),
+                    BinaryOp::Imp => left.implies(right),
+                    BinaryOp::Iff => left.iff(right),
+                    BinaryOp::Xor => left.xor(right),
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -407,6 +569,9 @@ mod tests {
             # Note that this is not really a `valid` function in terms of the regulatory graph.
             # But syntatically it is ok and should go through the parser.
             $c: a & (a | (a ^ (a => (a <=> !(f(a, b) | (true | false))))))
+            # Another function just for comparisons.
+            c -| b
+            $b: !c
         ",
         )
         .unwrap();
@@ -414,6 +579,7 @@ mod tests {
         let a = bn.as_graph().find_variable("a").unwrap();
         let b = bn.as_graph().find_variable("b").unwrap();
         let c = bn.as_graph().find_variable("c").unwrap();
+        let f = bn.find_parameter("f").unwrap();
         let fun = bn.get_update_function(c).as_ref().unwrap();
         let fun_string = fun.to_string(&bn);
 
@@ -422,6 +588,17 @@ mod tests {
             vec![bn.find_parameter("f").unwrap()],
             fun.collect_parameters()
         );
+
+        assert!(fun.contains_variable(a));
+        assert!(fun.contains_variable(b));
+        assert!(!fun.contains_variable(c));
+        assert!(fun.contains_parameter(f));
+
+        let fun_b = bn.get_update_function(b).as_ref().unwrap();
+        assert!(!fun_b.contains_variable(a));
+        assert!(!fun_b.contains_variable(b));
+        assert!(fun_b.contains_variable(c));
+        assert!(!fun_b.contains_parameter(f));
 
         let mut bn = BooleanNetwork::try_from(
             r"

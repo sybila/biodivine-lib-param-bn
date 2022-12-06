@@ -16,11 +16,11 @@ impl AsyncGraph<DefaultEdgeParams> {
 impl<Params: AsyncGraphEdgeParams> AsyncGraph<Params> {
     /// Create a new `AsyncGraph` using given edge parametrisation.
     pub fn new_with_edges(edge_params: Params) -> Result<AsyncGraph<Params>, String> {
-        return if edge_params.network().graph.num_vars() > 32 {
+        if edge_params.network().graph.num_vars() > 32 {
             Err("Can't create the graph. At most 32 variables supported".to_string())
         } else {
             Ok(AsyncGraph { edges: edge_params })
-        };
+        }
     }
 
     /// Return the total number of states in this graph.

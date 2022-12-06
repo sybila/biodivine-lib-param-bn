@@ -2,9 +2,10 @@ use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
 use crate::symbolic_async_graph::{
-    GraphColoredVertices, GraphColors, SymbolicAsyncGraph, SymbolicContext,
+    GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::{BooleanNetwork, FnUpdate, VariableId};
+use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 
@@ -64,6 +65,22 @@ impl SymbolicAsyncGraph {
         let bdd_variable = self.symbolic_context.state_variables[variable.0];
         GraphColoredVertices::new(
             self.unit_bdd.var_select(bdd_variable, value),
+            &self.symbolic_context,
+        )
+    }
+
+    /// Create a vertex set with a fixed value of the given network variable.
+    ///
+    /// Note that if you only need the vertices, this can be faster than `fix_network_variable`,
+    /// since it does not involve the BDD of color constraints.
+    pub fn fix_vertices_with_network_variable(
+        &self,
+        variable: VariableId,
+        value: bool,
+    ) -> GraphVertices {
+        let bdd_variable = self.symbolic_context.state_variables[variable.0];
+        GraphVertices::new(
+            self.symbolic_context.bdd.mk_literal(bdd_variable, value),
             &self.symbolic_context,
         )
     }
@@ -157,6 +174,12 @@ impl SymbolicAsyncGraph {
         self.select_partial_valuation(&partial_valuation)
     }
 
+    /// Return true of the given set is a trap set (also invariant set; set with no outgoing
+    /// transitions).
+    pub fn is_trap_set(&self, set: &GraphColoredVertices) -> bool {
+        self.can_post_out(set).is_empty()
+    }
+
     /// This is the same as `mk_subspace`, but it allows you to specify the partial valuation
     /// using a slice of optional Booleans instead of mapping `VariableId` objects.
     ///
@@ -241,6 +264,75 @@ impl SymbolicAsyncGraph {
                         },
                     )
                 })
+                .collect(),
+        }
+    }
+
+    /// Fined the smallest subspace (hypercube) that encapsulates all the vertices
+    /// within this set (colors are not affected).
+    ///
+    /// Keep in mind that since the colors are not affected, the result might not pass
+    /// through `GraphColoredVertices::is_subspace`, but the `vertices()` set should pass
+    /// this check.
+    pub fn wrap_in_symbolic_subspace(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
+        // I'm not quite ready to make this method public...
+        fn make_variable_free(
+            stg: &SymbolicAsyncGraph,
+            var: VariableId,
+            cube: &GraphColoredVertices,
+        ) -> GraphColoredVertices {
+            let bdd_var = stg.symbolic_context().get_state_variable(var);
+            let relaxed_bdd = cube.as_bdd().var_project(bdd_var);
+            stg.empty_vertices().copy(relaxed_bdd)
+        }
+
+        let mut result = set.clone();
+        for var in self.as_network().variables() {
+            let var_true = self.fix_network_variable(var, true);
+            let var_false = self.fix_network_variable(var, false);
+            if !(result.is_subset(&var_true) || result.is_subset(&var_false)) {
+                result = make_variable_free(self, var, &result);
+            }
+        }
+        result
+    }
+
+    /// Find the smallest subspace (hypercube) that contains the given set of vertices.
+    pub fn wrap_in_subspace(&self, set: &GraphVertices) -> Space {
+        let clause = set.bdd.necessary_clause().unwrap();
+        let mut result = Space::new(self.as_network());
+        for var in self.as_network().variables() {
+            let bdd_var = self.symbolic_context.state_variables[var.to_index()];
+            if let Some(value) = clause.get_value(bdd_var) {
+                if value {
+                    result[var] = ExtendedBoolean::One;
+                } else {
+                    result[var] = ExtendedBoolean::Zero;
+                }
+            }
+        }
+        result
+    }
+
+    /// Fix a variable in the underlying symbolic representation and then erase it completely
+    /// from the result. The resulting representation still "contains" the variable, but the
+    /// update functions no longer depend on it.
+    pub fn restrict_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
+        let bdd_var = self.symbolic_context.state_variables[var.0];
+        SymbolicAsyncGraph {
+            network: self.network.clone(),
+            symbolic_context: self.symbolic_context.clone(),
+            vertex_space: (
+                self.mk_empty_vertices(),
+                self.unit_colored_vertices()
+                    .restrict_network_variable(var, value),
+            ),
+            color_space: (self.mk_empty_colors(), self.mk_unit_colors()),
+            unit_bdd: self.unit_bdd.var_restrict(bdd_var, value),
+            update_functions: self
+                .update_functions
+                .iter()
+                .map(|f| f.var_restrict(bdd_var, value))
                 .collect(),
         }
     }

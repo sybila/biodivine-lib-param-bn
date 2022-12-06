@@ -17,6 +17,16 @@ impl VariableId {
             None
         }
     }
+
+    /// Create a `VariableId` from a constant value without any sanity checks.
+    pub fn from_index(value: usize) -> VariableId {
+        VariableId(value)
+    }
+
+    /// Convert the `VariableId` to the corresponding numeric identifier.
+    pub fn to_index(self) -> usize {
+        self.into()
+    }
 }
 
 impl Display for VariableId {

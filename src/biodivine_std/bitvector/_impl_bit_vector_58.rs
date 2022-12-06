@@ -66,7 +66,7 @@ impl Debug for BitVector58 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         write!(f, "BitVector58({})[", self.len())?;
         for i in 0..self.len() {
-            write!(f, "{}", if self.get(i) { 1 } else { 0 })?;
+            write!(f, "{}", i32::from(self.get(i)))?;
         }
         write!(f, "]")?;
         Ok(())

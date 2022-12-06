@@ -2,6 +2,7 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
+use crate::VariableId;
 use biodivine_lib_bdd::Bdd;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -65,6 +66,34 @@ impl GraphColoredVertices {
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
         self.bdd.exact_cardinality()
+    }
+
+    /// Return `true` if the set can be described by a single conjunction of literals. That is,
+    /// the set is a hypercube in the $\mathbb{B}^n$ space.
+    pub fn is_subspace(&self) -> bool {
+        self.bdd.is_clause()
+    }
+
+    /// Return `true` if the set represents a single vertex-color pair.
+    pub fn is_singleton(&self) -> bool {
+        self.bdd.is_valuation()
+    }
+
+    /// Compute a subset of this set where the given network variable is always fixed to the
+    /// given value.
+    pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_select(var, value))
+    }
+
+    /// Compute a set where the value of the given variable is restricted.
+    ///
+    /// Restriction operation takes only the elements where `variable=value`, but then makes
+    /// the result independent on this variable by erasing it. This is useful when you
+    /// are computing various operations on subspaces.
+    pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
+        let var = self.state_variables[variable.0];
+        self.copy(self.bdd.var_restrict(var, value))
     }
 }
 

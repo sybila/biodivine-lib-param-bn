@@ -80,6 +80,27 @@ impl GraphColors {
     pub fn to_dot_string(&self, context: &SymbolicContext) -> String {
         self.bdd.to_dot_string(&context.bdd, true)
     }
+
+    /// Return `true` if the set can be described by a single conjunction of literals. That is,
+    /// the set is a hypercube in the $\mathbb{B}^n$ space.
+    pub fn is_subspace(&self) -> bool {
+        self.bdd.is_clause()
+    }
+
+    /// Return `true` if the set represents a single color.
+    pub fn is_singleton(&self) -> bool {
+        if self.bdd.is_clause() {
+            let clause = self.bdd.first_clause().unwrap();
+            for var in &self.parameter_variables {
+                if clause.get_value(*var).is_none() {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
+    }
 }
 
 /// Set operations.

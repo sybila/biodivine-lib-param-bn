@@ -16,6 +16,16 @@ impl ParameterId {
             None
         }
     }
+
+    /// Create a `ParameterId` from a constant value without any sanity checks.
+    pub fn from_index(value: usize) -> ParameterId {
+        ParameterId(value)
+    }
+
+    /// Convert the `ParameterId` to the corresponding numeric identifier.
+    pub fn to_index(self) -> usize {
+        self.into()
+    }
 }
 
 #[cfg(test)]

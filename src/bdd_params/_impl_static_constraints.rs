@@ -14,7 +14,7 @@ pub fn build_static_constraints(bn: &BooleanNetwork, encoder: &BddParameterEncod
     let ctx = Ctx::new(bn, encoder);
     for r in &bn.graph.regulations {
         if let Some(fun) = bn.get_update_function(r.target) {
-            if r.monotonicity != None {
+            if r.monotonicity.is_some() {
                 let monotonicity = build_monotonicity_explicit(&ctx, r, fun);
                 condition = bdd!(condition & monotonicity);
                 if condition.is_false() {
@@ -39,7 +39,7 @@ pub fn build_static_constraints(bn: &BooleanNetwork, encoder: &BddParameterEncod
                 }
             }
         } else {
-            if r.monotonicity != None {
+            if r.monotonicity.is_some() {
                 let monotonicity = build_monotonicity_implicit(&ctx, r);
                 condition = bdd!(condition & monotonicity);
                 if condition.is_false() {

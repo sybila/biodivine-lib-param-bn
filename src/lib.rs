@@ -11,6 +11,7 @@
 //!
 #[macro_use]
 extern crate lazy_static;
+extern crate core;
 
 use regex::Regex;
 use std::collections::HashMap;
@@ -20,7 +21,9 @@ use std::ops::Range;
 pub mod async_graph;
 pub mod bdd_params;
 pub mod biodivine_std;
+pub mod fixed_points;
 pub mod sbml;
+pub mod solver_context;
 pub mod symbolic_async_graph;
 pub mod tutorial;
 
@@ -36,6 +39,8 @@ mod _impl_boolean_network_display;
 mod _impl_boolean_network_from_bnet;
 /// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
 mod _impl_boolean_network_to_bnet;
+/// **(internal)** All methods implemented by the `ExtendedBoolean` object.
+mod _impl_extended_boolean;
 /// **(internal)** Utility methods for `FnUpdate`.
 mod _impl_fn_update;
 /// **(internal)** Utility methods for `Parameter`.
@@ -44,18 +49,18 @@ mod _impl_parameter;
 mod _impl_parameter_id;
 /// **(internal)** Utility methods for `Regulation`.
 mod _impl_regulation;
-/// **(internal)** Utility methods for `RegulatoryGraph`.
+/// **(internal)** All methods for analysing and manipulating `RegulatoryGraph`.
 mod _impl_regulatory_graph;
-/// **(internal)** `RegulatoryGraph` to `.aeon` string.
-mod _impl_regulatory_graph_display;
-/// **(internal)** Equivalence relation for `RegulatoryGraph`.
-mod _impl_regulatory_graph_eq;
-/// **(internal)** Export of `RegulatoryGraph` into a `.dot` format.
-mod _impl_regulatory_graph_to_dot;
+/// **(internal)** All methods implemented by the `Space` object.
+mod _impl_space;
 /// **(internal)** Utility methods for `Variable`.
 mod _impl_variable;
 /// **(internal)** Utility methods for `VariableId`.
 mod _impl_variable_id;
+
+// Re-export data structures used for advanced graph algorithms on `RegulatoryGraph`.
+pub use _impl_regulatory_graph::signed_directed_graph::SdGraph;
+pub use _impl_regulatory_graph::signed_directed_graph::Sign;
 
 /// **(internal)** A regex string of an identifier which we currently allow to appear
 /// as a variable or parameter name.
@@ -248,3 +253,18 @@ pub type ParameterIdIterator = Map<Range<usize>, fn(usize) -> ParameterId>;
 
 /// An iterator over all `Regulations` of a `RegulatoryGraph`.
 pub type RegulationIterator<'a> = std::slice::Iter<'a, Regulation>;
+
+/// An enum representing the possible state of each variable when describing a hypercube.
+#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+pub enum ExtendedBoolean {
+    Zero,
+    One,
+    Any,
+}
+
+/// `Space` represents a hypercube (multi-dimensional rectangle) in the Boolean state space.
+///
+/// Keep in mind that there is no way of representing an empty hypercube at the moment. So any API
+/// that can take/return an empty set has to use `Option<Space>` or something similar.
+#[derive(Clone, PartialEq, Eq, Hash, Debug)]
+pub struct Space(Vec<ExtendedBoolean>);
