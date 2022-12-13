@@ -4,13 +4,34 @@ use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
+use std::collections::HashMap;
 use std::convert::TryInto;
 
 impl SymbolicContext {
-    /// Create a new `SymbolicContext` that is based on the given `BooleanNetwork`.
+    /// Create a new `SymbolicContext` that encodes the given `BooleanNetwork`, but otherwise has
+    /// no additional symbolic variables.
     pub fn new(network: &BooleanNetwork) -> Result<SymbolicContext, String> {
+        Self::with_extra_state_variables(network, &HashMap::new())
+    }
+
+    /// Create a new `SymbolicContext` that is based on the given `BooleanNetwork`, but also
+    /// contains additional symbolic variables associated with individual network variables.
+    ///
+    /// The "symbolic vs. network variable" association is used to provide a place for the
+    /// additional variables in the BDD variable ordering. Specifically, the additional variables
+    /// are placed directly *after* the corresponding state variable. Consequently, depending
+    /// on the actual meaning of these extra variables, you might want to place them close to
+    /// the "most related" state variable to reduce BDD size.
+    ///
+    /// Keep in mind that the total number of symbolic variables cannot exceed `u16::MAX`. The
+    /// names of the extra variables will be `"{network_variable}_extra_{i}`, with `i` starting
+    /// at zero (in case you want to reference them by name somewhere).
+    pub fn with_extra_state_variables(
+        network: &BooleanNetwork,
+        extra: &HashMap<VariableId, u16>,
+    ) -> Result<SymbolicContext, String> {
         // First, check if the network can be encoded using u16::MAX symbolic variables:
-        let symbolic_size = network_symbolic_size(network);
+        let symbolic_size = network_symbolic_size(network, extra);
         if symbolic_size >= u32::from(u16::MAX) {
             return Err(format!(
                 "The network is too large. {} symbolic variables needed, but {} available.",
@@ -31,6 +52,7 @@ impl SymbolicContext {
         // in the network, since this should make things easier as well...
 
         let mut state_variables: Vec<BddVariable> = Vec::new();
+        let mut extra_state_variables: Vec<Vec<BddVariable>> = vec![Vec::new(); network.num_vars()];
         let mut implicit_function_tables: Vec<Option<FunctionTable>> =
             vec![None; network.num_vars()];
         let mut explicit_function_tables: Vec<Option<FunctionTable>> =
@@ -40,6 +62,14 @@ impl SymbolicContext {
             let variable_name = network[variable].get_name();
             let state_variable = builder.make_variable(variable_name);
             state_variables.push(state_variable);
+            // Create extra state variables.
+            if let Some(extra_count) = extra.get(&variable).cloned() {
+                for i in 0..extra_count {
+                    let extra_name = format!("{}_extra_{}", network[variable].get_name(), i);
+                    let extra_variable = builder.make_variable(extra_name.as_str());
+                    extra_state_variables[variable.0].push(extra_variable);
+                }
+            }
             if let Some(update_function) = network.get_update_function(variable) {
                 // For explicit function, go through all parameters used in the function.
                 for parameter in update_function.collect_parameters() {
@@ -59,6 +89,12 @@ impl SymbolicContext {
                 let function_table = FunctionTable::new(&function_name, arity, &mut builder);
                 implicit_function_tables[variable.0] = Some(function_table);
             }
+        }
+
+        // Create a "flattened" version of extra state variables.
+        let mut all_extra_state_variables = Vec::new();
+        for list in &extra_state_variables {
+            all_extra_state_variables.append(&mut list.clone());
         }
 
         // Check that all parameter tables are constructed - if not, raise integrity error.
@@ -91,10 +127,27 @@ impl SymbolicContext {
         Ok(SymbolicContext {
             bdd: builder.build(),
             state_variables,
+            extra_state_variables,
+            all_extra_state_variables,
             parameter_variables,
             explicit_function_tables,
             implicit_function_tables,
         })
+    }
+
+    /// The number of state variables (should be equal to the number of network variables).
+    pub fn num_state_variables(&self) -> usize {
+        self.state_variables.len()
+    }
+
+    /// The number of symbolic variables encoding network parameters.
+    pub fn num_parameter_variables(&self) -> usize {
+        self.parameter_variables.len()
+    }
+
+    /// The number of extra symbolic variables.
+    pub fn num_extra_state_variables(&self) -> usize {
+        self.all_extra_state_variables.len()
     }
 
     /// Provides access to the raw `Bdd` context.
@@ -107,9 +160,46 @@ impl SymbolicContext {
         &self.state_variables
     }
 
+    /// Getter for variables encoding the parameter variables of the network.
+    pub fn parameter_variables(&self) -> &Vec<BddVariable> {
+        &self.parameter_variables
+    }
+
+    /// Get the list of all extra symbolic variables across all BN variables.
+    pub fn all_extra_state_variables(&self) -> &Vec<BddVariable> {
+        &self.all_extra_state_variables
+    }
+
+    /// Get the list of extra symbolic variables associated with a particular BN variable.
+    pub fn extra_state_variables(&self, variable: VariableId) -> &Vec<BddVariable> {
+        &self.extra_state_variables[variable.0]
+    }
+
+    /// Retrieve all extra symbolic variables associated with a particular offset across all
+    /// network variables. If a variable does not have enough extra symbolic variables, it
+    /// is not included in the result.
+    pub fn extra_state_variables_by_offset(&self, offset: usize) -> Vec<(VariableId, BddVariable)> {
+        let mut result = Vec::new();
+        for i in 0..self.num_state_variables() {
+            if offset <= self.extra_state_variables[i].len() {
+                result.push((
+                    VariableId::from_index(i),
+                    self.extra_state_variables[i][offset],
+                ));
+            }
+        }
+        result
+    }
+
     /// Get the `BddVariable` representing the network variable with the given `VariableId`.
     pub fn get_state_variable(&self, variable: VariableId) -> BddVariable {
         self.state_variables[variable.0]
+    }
+
+    /// Get the `BddVariable` extra symbolic variable associated with a particular BN variable
+    /// and an offset (within the domain of said variable).
+    pub fn get_extra_state_variable(&self, variable: VariableId, offset: usize) -> BddVariable {
+        self.extra_state_variables[variable.0][offset]
     }
 
     /// Getter for the entire function table of an implicit update function.
@@ -129,11 +219,6 @@ impl SymbolicContext {
         &self.explicit_function_tables[parameter.0]
     }
 
-    /// Getter for variables encoding the parameter variables of the network.
-    pub fn parameter_variables(&self) -> &Vec<BddVariable> {
-        &self.parameter_variables
-    }
-
     /// Create a constant true/false `Bdd`.
     pub fn mk_constant(&self, value: bool) -> Bdd {
         if value {
@@ -146,6 +231,12 @@ impl SymbolicContext {
     /// Create a `Bdd` that is true when given network variable is true.
     pub fn mk_state_variable_is_true(&self, variable: VariableId) -> Bdd {
         self.bdd.mk_var(self.state_variables[variable.0])
+    }
+
+    /// Create a `Bdd` that is true when the given extra symbolic variable is true.
+    pub fn mk_extra_state_variable_is_true(&self, variable: VariableId, offset: usize) -> Bdd {
+        self.bdd
+            .mk_var(self.extra_state_variables[variable.0][offset])
     }
 
     /// Create a `Bdd` that is true when given explicit uninterpreted function (aka parameter)
@@ -307,12 +398,13 @@ fn arity_to_row_count(arity: u32) -> u32 {
 }
 
 /// **(internal)** Compute the number of symbolic variables necessary to represent
-/// the given `network`, or `u32::MAX` in case of overflow.
+/// the given `network` (including the `extra` variables), or `u32::MAX` in the case
+/// of an overflow.
 ///
-/// Note that this actually *also* verifies that arity of every function is at most u16, because
-/// anything larger would trigger overflow anyway.
-fn network_symbolic_size(network: &BooleanNetwork) -> u32 {
-    let mut size: u32 = 0;
+/// Note that this actually *also* verifies that the arity of every function is at most `u16`,
+/// because anything larger would trigger overflow anyway.
+fn network_symbolic_size(network: &BooleanNetwork, extra: &HashMap<VariableId, u16>) -> u32 {
+    let mut size: u32 = extra.values().map(|it| u32::from(*it)).sum();
     for parameter_id in network.parameters() {
         let arity = network.get_parameter(parameter_id).arity;
         size = size.saturating_add(arity_to_row_count(arity))
@@ -333,8 +425,9 @@ fn network_symbolic_size(network: &BooleanNetwork) -> u32 {
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
-    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
     use crate::BooleanNetwork;
+    use std::collections::{HashMap, HashSet};
     use std::convert::TryFrom;
 
     #[test]
@@ -343,5 +436,48 @@ mod tests {
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
         let graph = SymbolicAsyncGraph::new(network).unwrap();
         assert!(!graph.unit_colored_vertices().is_empty());
+    }
+
+    #[test]
+    fn test_extra_variables() {
+        // The network doesn't really matter, we are only testing encoding of variables.
+        let model = BooleanNetwork::try_from(
+            r#"
+            A -> B
+            B -> C
+            C -> A
+        "#,
+        )
+        .unwrap();
+        let a = model.as_graph().find_variable("A").unwrap();
+        let b = model.as_graph().find_variable("B").unwrap();
+        let c = model.as_graph().find_variable("C").unwrap();
+        let extra_arity = HashMap::from([(a, 3), (c, 5)]);
+
+        let ctx = SymbolicContext::with_extra_state_variables(&model, &extra_arity).unwrap();
+
+        assert_eq!(3, ctx.num_state_variables());
+        assert_eq!(6, ctx.num_parameter_variables());
+        assert_eq!(8, ctx.num_extra_state_variables());
+
+        // Check that all created variables are unique.
+        let mut set = HashSet::new();
+        for i in 0..3 {
+            let var = ctx.get_extra_state_variable(a, i);
+            assert!(set.insert(var));
+        }
+        for i in 0..5 {
+            let var = ctx.get_extra_state_variable(c, i);
+            assert!(set.insert(var));
+        }
+
+        let mut set2 = HashSet::new();
+        for n_var in [a, b, c] {
+            for b_var in ctx.extra_state_variables(n_var) {
+                assert!(set2.insert(*b_var));
+            }
+        }
+
+        assert_eq!(set, set2);
     }
 }
