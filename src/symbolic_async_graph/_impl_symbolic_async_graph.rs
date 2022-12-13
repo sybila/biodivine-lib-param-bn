@@ -1,6 +1,7 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
+use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
@@ -10,9 +11,56 @@ use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 
 impl SymbolicAsyncGraph {
+    /// Create a `SymbolicAsyncGraph` based on the default symbolic encoding of the supplied
+    /// `BooleanNetwork` as implemented by `SymbolicContext`.
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
         let context = SymbolicContext::new(&network)?;
-        let unit_bdd = apply_regulation_constraints(context.bdd.mk_true(), &network, &context)?;
+        let unit = context.mk_constant(true);
+        Self::with_custom_context(network, context, unit)
+    }
+
+    /// Create a `SymbolicAsyncGraph` using a given `network`, the symbolic `context` (encoding)
+    /// of said network (possibly with extra symbolic variables), and an initial `unit_bdd` which
+    /// is used to restrict all valid BDDs corresponding to this graph.
+    ///
+    /// However, note that we do not validate that the provided `SymbolicContext` and `Bdd` are
+    /// compatible with the provided network. If you use a context that was not created for the
+    /// given network, the behaviour is undefined (you'll likely see something fail rather
+    /// quickly though).
+    ///
+    /// Several notes to keep in mind while using this method:
+    ///  1. The `unit_bdd` is used as an "initial value" for the set of all states and colors of
+    ///     this graph. However, it is still modified to only allow valid parameter valuations,
+    ///     so you can use it to reduce the space of valid states/colors, but it is not necessarily
+    ///     the final "unit set" of the graph.
+    ///  2. The presence of extra symbolic variables can modify the semantics of symbolic
+    ///     operations implemented on `SymbolicAsyncGraph`, `GraphVertices`, `GraphColors` and
+    ///     `GraphColoredVertices`. The `SymbolicAsyncGraph` will not use or depend on the extra
+    ///     variables in any capacity. Hence, as long as the extra variables remain unused, all
+    ///     operations should behave as expected. However, once you introduce the variables externally
+    ///     (e.g. using a "raw" BDD operation instead of the "high level" API), you should verify
+    ///     that the semantics of symbolic operations are really what you expect them to be. For
+    ///     example, an intersection on sets will now also depend on the values of the extra
+    ///     variables, not just states and colors.
+    ///  3. In general, `unit_bdd` should be a cartesian product of a set of vertices, a set
+    ///     of colors, and a set of valuations on the extra variables. If you don't follow this
+    ///     requirement, almost everything remains valid, but ultimately, some symbolic operations
+    ///     may not have the same semantics as in the "officially supported" case. In particular,
+    ///     you can find that some operations will automatically expand the result based on this
+    ///     cartesian product assumption, so again, use at your own risk.
+    ///
+    /// TODO:
+    ///     If we ever get a chance to rewrite `SymbolicAsyncGraph`, all of this should be handled
+    ///     much more transparently. I.e. it should be possible to create a graph on custom
+    ///     subset of states/colors without the cartesian product requirement. Also, we should be
+    ///     able to be more transparent/explicit about the presence of extra symbolic variables.
+    pub fn with_custom_context(
+        network: BooleanNetwork,
+        context: SymbolicContext,
+        unit_bdd: Bdd,
+    ) -> Result<SymbolicAsyncGraph, String> {
+        assert_eq!(network.num_vars(), context.num_state_variables());
+        let unit_bdd = apply_regulation_constraints(unit_bdd, &network, &context)?;
 
         // For each variable, pre-compute contexts where the update function can be applied, i.e.
         // (F = 1 & var = 0) | (F = 0 & var = 1)
@@ -71,16 +119,20 @@ impl SymbolicAsyncGraph {
 
     /// Create a vertex set with a fixed value of the given network variable.
     ///
-    /// Note that if you only need the vertices, this can be faster than `fix_network_variable`,
-    /// since it does not involve the BDD of color constraints.
+    /// Note that if you only need the vertices, this can be slightly faster than running
+    /// `SymbolicAsyncGraph::fix_network_variable().vertices()`.
     pub fn fix_vertices_with_network_variable(
         &self,
         variable: VariableId,
         value: bool,
     ) -> GraphVertices {
         let bdd_variable = self.symbolic_context.state_variables[variable.0];
+        // Originally, I was hoping this will be indeed faster, but then we allowed arbitrary
+        // unit sets and hence the unit set always has to be included in this anyway.
         GraphVertices::new(
-            self.symbolic_context.bdd.mk_literal(bdd_variable, value),
+            self.unit_bdd
+                .var_select(bdd_variable, value)
+                .project(&self.symbolic_context.parameter_variables),
             &self.symbolic_context,
         )
     }
@@ -336,6 +388,39 @@ impl SymbolicAsyncGraph {
                 .collect(),
         }
     }
+
+    /// Uses projection to eliminate any extra variables that a given symbolic set might depend on.
+    ///
+    /// You can use this method to "reset" the set such that it is guaranteed to be compliant
+    /// with the `SymbolicAsyncGraph` representation. However, keep in mind that "existential"
+    /// projection will include all items, even if they are valid only for a subset
+    /// of the extra-variable valuations (i.e. it's a big union).
+    pub fn existential_extra_variable_projection<T: BddSet>(&self, set: &T) -> T {
+        set.copy(
+            set.as_bdd()
+                .project(&self.symbolic_context.all_extra_state_variables),
+        )
+    }
+
+    /// Uses projection to eliminate any extra variables that a given symbolic set might depend on.
+    ///
+    /// You can use this method to "reset" the set such that it is guaranteed to be compliant
+    /// with the `SymbolicAsyncGraph` representation. However, keep in mind that "universal"
+    /// projection will include only items that are valid for *any* valuation of
+    /// the extra variables (i.e. it's a big intersection).
+    pub fn universal_extra_variable_projection<T: BddSet>(&self, set: &T) -> T {
+        let mut result = set.as_bdd().clone();
+        for var in &self.symbolic_context.all_extra_state_variables {
+            // The same as var_project, but uses conjunction instead of disjunction.
+            result = Bdd::fused_binary_flip_op(
+                (&result, None),
+                (&result, Some(*var)),
+                None,
+                biodivine_lib_bdd::op_function::and,
+            )
+        }
+        set.copy(result)
+    }
 }
 
 impl SymbolicAsyncGraph {
@@ -557,8 +642,9 @@ impl SymbolicAsyncGraph {
 mod tests {
     use crate::biodivine_std::bitvector::BitVector;
     use crate::biodivine_std::traits::Set;
-    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
     use crate::BooleanNetwork;
+    use std::collections::HashMap;
     use std::convert::TryFrom;
 
     #[test]
@@ -1000,5 +1086,47 @@ mod tests {
                 .pick_color()
                 .approx_cardinality()
         );
+    }
+
+    #[test]
+    fn basic_test_with_custom_context() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+        let a = bn.as_graph().find_variable("A").unwrap();
+        let b = bn.as_graph().find_variable("B").unwrap();
+        let extra_vars = HashMap::from([(a, 3), (b, 5)]);
+        let context = SymbolicContext::with_extra_state_variables(&bn, &extra_vars).unwrap();
+        // Only allow states where a=1
+        let unit = context.mk_state_variable_is_true(a);
+        let stg = SymbolicAsyncGraph::with_custom_context(bn, context, unit).unwrap();
+
+        // It's not 8, but 4, since the state space is restricted.
+        let states = stg.unit_colored_vertices().vertices();
+        assert_eq!(4.0, states.approx_cardinality());
+
+        let extra_a = stg.symbolic_context().mk_extra_state_variable_is_true(a, 1);
+        let states = states.copy(states.as_bdd().and(&extra_a));
+        assert_ne!(4.0, states.approx_cardinality()); // Now the cardinality computation doesn't work.
+        let ok_states = stg.existential_extra_variable_projection(&states);
+        assert_eq!(4.0, ok_states.approx_cardinality()); // But now everything should be restored.
+
+        let b_states = stg.fix_vertices_with_network_variable(b, true);
+        assert_eq!(2.0, states.approx_cardinality());
+        // This thing here is some weird set that depends on extra variables,
+        // but only for b=false states.
+        let not_ok_b_states = b_states.union(&states);
+        assert_ne!(b_states, not_ok_b_states);
+        let ok_b_states = stg.universal_extra_variable_projection(&not_ok_b_states);
+        assert_eq!(b_states, ok_b_states);
     }
 }

@@ -1,5 +1,6 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
@@ -39,22 +40,14 @@ impl GraphVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        let cardinality = self.bdd.cardinality();
-        if cardinality.is_infinite() || cardinality.is_nan() {
-            self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
-        } else {
-            let parameter_variable_count =
-                self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
-            let parameter_count = 2.0f64.powi(parameter_variable_count.into());
-            cardinality / parameter_count
-        }
+        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        let parameter_variable_count =
+        let unused_variables =
             self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(parameter_variable_count)
+        self.bdd.exact_cardinality().shr(unused_variables)
     }
 
     /// Pick one vertex from this set and return it as a singleton.
@@ -167,25 +160,16 @@ impl Iterator for GraphVertexIterator<'_> {
     }
 }
 
-/* Set operations */
-impl Set for GraphVertices {
-    fn union(&self, other: &Self) -> Self {
-        self.copy(self.bdd.or(&other.bdd))
+impl BddSet for GraphVertices {
+    fn as_bdd(&self) -> &Bdd {
+        GraphVertices::as_bdd(self)
     }
 
-    fn intersect(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and(&other.bdd))
+    fn copy(&self, bdd: Bdd) -> Self {
+        GraphVertices::copy(self, bdd)
     }
 
-    fn minus(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and_not(&other.bdd))
-    }
-
-    fn is_empty(&self) -> bool {
-        self.bdd.is_false()
-    }
-
-    fn is_subset(&self, other: &Self) -> bool {
-        self.bdd.and_not(&other.bdd).is_false()
+    fn active_variables(&self) -> u16 {
+        u16::try_from(self.state_variables.len()).unwrap()
     }
 }

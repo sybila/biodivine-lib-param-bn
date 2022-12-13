@@ -55,6 +55,13 @@ mod _impl_symbolic_async_graph_operators;
 /// **(internal)** Implementation of the `SymbolicContext`.
 mod _impl_symbolic_context;
 
+/// A module with a trait that describes common methods shared by all set representations
+/// based on BDDs.
+///
+/// These methods should eventually replace code that was previously duplicated across multiple
+/// set objects but is kept there for now due to compatibility.
+mod bdd_set;
+
 /// Symbolic representation of a color set.
 ///
 /// Implementation contains all symbolic variables, but state variables are unconstrained.

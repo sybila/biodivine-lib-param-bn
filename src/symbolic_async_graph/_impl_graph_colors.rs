@@ -1,4 +1,5 @@
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{GraphColors, SymbolicContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
@@ -53,22 +54,15 @@ impl GraphColors {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        let cardinality = self.bdd.cardinality();
-        if cardinality.is_infinite() || cardinality.is_nan() {
-            self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
-        } else {
-            let state_variable_count =
-                self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
-            let state_count = (2.0f64).powi(state_variable_count.into());
-            cardinality / state_count
-        }
+        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        let state_variable_count =
+        // Includes state variables and extra variables.
+        let unused_variables =
             self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(state_variable_count)
+        self.bdd.exact_cardinality().shr(unused_variables)
     }
 
     /// Amount of storage used for this symbolic set.
@@ -103,25 +97,16 @@ impl GraphColors {
     }
 }
 
-/// Set operations.
-impl Set for GraphColors {
-    fn union(&self, other: &Self) -> Self {
-        self.copy(self.bdd.or(&other.bdd))
+impl BddSet for GraphColors {
+    fn as_bdd(&self) -> &Bdd {
+        GraphColors::as_bdd(self)
     }
 
-    fn intersect(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and(&other.bdd))
+    fn copy(&self, bdd: Bdd) -> Self {
+        GraphColors::copy(self, bdd)
     }
 
-    fn minus(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and_not(&other.bdd))
-    }
-
-    fn is_empty(&self) -> bool {
-        self.bdd.is_false()
-    }
-
-    fn is_subset(&self, other: &Self) -> bool {
-        self.bdd.and_not(&other.bdd).is_false()
+    fn active_variables(&self) -> u16 {
+        u16::try_from(self.parameter_variables.len()).unwrap()
     }
 }
