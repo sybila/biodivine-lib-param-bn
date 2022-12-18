@@ -1,4 +1,5 @@
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
 };
@@ -6,6 +7,7 @@ use crate::VariableId;
 use biodivine_lib_bdd::Bdd;
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
+use std::ops::Shr;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -52,20 +54,14 @@ impl GraphColoredVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        let cardinality = self.bdd.cardinality();
-        if cardinality.is_infinite() || cardinality.is_nan() {
-            self.bdd
-                .exact_cardinality()
-                .to_f64()
-                .unwrap_or(f64::INFINITY)
-        } else {
-            cardinality
-        }
+        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        self.bdd.exact_cardinality()
+        let unused_variables = self.bdd.num_vars()
+            - u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap();
+        self.bdd.exact_cardinality().shr(unused_variables)
     }
 
     /// Return `true` if the set can be described by a single conjunction of literals. That is,
@@ -94,29 +90,6 @@ impl GraphColoredVertices {
     pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_restrict(var, value))
-    }
-}
-
-/// Set operations.
-impl Set for GraphColoredVertices {
-    fn union(&self, other: &Self) -> Self {
-        self.copy(self.bdd.or(&other.bdd))
-    }
-
-    fn intersect(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and(&other.bdd))
-    }
-
-    fn minus(&self, other: &Self) -> Self {
-        self.copy(self.bdd.and_not(&other.bdd))
-    }
-
-    fn is_empty(&self) -> bool {
-        self.bdd.is_false()
-    }
-
-    fn is_subset(&self, other: &Self) -> bool {
-        self.bdd.and_not(&other.bdd).is_false()
     }
 }
 
@@ -177,5 +150,19 @@ impl GraphColoredVertices {
             bdd: self.bdd.project(&self.parameter_variables),
             state_variables: self.state_variables.clone(),
         }
+    }
+}
+
+impl BddSet for GraphColoredVertices {
+    fn as_bdd(&self) -> &Bdd {
+        GraphColoredVertices::as_bdd(self)
+    }
+
+    fn copy(&self, bdd: Bdd) -> Self {
+        GraphColoredVertices::copy(self, bdd)
+    }
+
+    fn active_variables(&self) -> u16 {
+        u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap()
     }
 }

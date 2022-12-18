@@ -55,6 +55,13 @@ mod _impl_symbolic_async_graph_operators;
 /// **(internal)** Implementation of the `SymbolicContext`.
 mod _impl_symbolic_context;
 
+/// A module with a trait that describes common methods shared by all set representations
+/// based on BDDs.
+///
+/// These methods should eventually replace code that was previously duplicated across multiple
+/// set objects but is kept there for now due to compatibility.
+mod bdd_set;
+
 /// Symbolic representation of a color set.
 ///
 /// Implementation contains all symbolic variables, but state variables are unconstrained.
@@ -127,7 +134,15 @@ pub struct SymbolicAsyncGraph {
 #[derive(Clone)]
 pub struct SymbolicContext {
     bdd: BddVariableSet,
+    // One symbolic variable for each network variable.
     state_variables: Vec<BddVariable>,
+    // A (possibly empty) list of extra symbolic variables for each network variable.
+    extra_state_variables: Vec<Vec<BddVariable>>,
+    // The same variables as above, but in one list (some operations only need this representation
+    // and it could take us some time to compute it for large models).
+    all_extra_state_variables: Vec<BddVariable>,
+    // All symbolic variables representing parameters. The association between
+    // variables and parameters is then managed by `FunctionTable` objects below.
     parameter_variables: Vec<BddVariable>,
     explicit_function_tables: Vec<FunctionTable>,
     implicit_function_tables: Vec<Option<FunctionTable>>,
