@@ -51,7 +51,7 @@ fn tokenize_function_group(
                 if Some('>') == data.next() {
                     output.push(Token::Imp);
                 } else {
-                    return Result::Err("Expected '>' after '='.".to_string());
+                    return Err("Expected '>' after '='.".to_string());
                 }
             }
             '<' => {
@@ -59,19 +59,19 @@ fn tokenize_function_group(
                     if Some('>') == data.next() {
                         output.push(Token::Iff)
                     } else {
-                        return Result::Err("Expected '>' after '='.".to_string());
+                        return Err("Expected '>' after '='.".to_string());
                     }
                 } else {
-                    return Result::Err("Expected '=' after '<'.".to_string());
+                    return Err("Expected '=' after '<'.".to_string());
                 }
             }
             // '>' is invalid as a start of a token
-            '>' => return Result::Err("Unexpected '>'.".to_string()),
+            '>' => return Err("Unexpected '>'.".to_string()),
             ')' => {
                 return if !top_level {
-                    Result::Ok(output)
+                    Ok(output)
                 } else {
-                    Result::Err("Unexpected ')'.".to_string())
+                    Err("Unexpected ')'.".to_string())
                 }
             }
             '(' => {
@@ -92,13 +92,13 @@ fn tokenize_function_group(
                 }
                 output.push(Token::Name(name.into_iter().collect()));
             }
-            _ => return Result::Err(format!("Unexpected '{}'.", c)),
+            _ => return Err(format!("Unexpected '{}'.", c)),
         }
     }
     if top_level {
-        Result::Ok(output)
+        Ok(output)
     } else {
-        Result::Err("Expected ')'.".to_string())
+        Err("Expected ')'.".to_string())
     }
 }
 
@@ -175,12 +175,12 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
         if data[0] == Token::Not {
             return Ok(Box::new(Not(terminal(&data[1..])?)));
         } else if data.len() == 1 {
-            // This should be either a name or a parenthesis group, everything else does not make sense.
+            // This should be either a name or a parenthesis group, anything else does not make sense.
             match &data[0] {
                 Token::Name(name) => {
-                    return if name == "true" {
+                    return if name == "true" || name == "1" {
                         Ok(Box::new(Const(true)))
-                    } else if name == "false" {
+                    } else if name == "false" || name == "0" {
                         Ok(Box::new(Const(false)))
                     } else {
                         Ok(Box::new(Var(name.clone())))
@@ -249,6 +249,26 @@ mod tests {
         for str in inputs {
             assert_eq!(str, format!("{}", FnUpdateTemp::try_from(str).unwrap()))
         }
+    }
+
+    #[test]
+    fn update_function_constants() {
+        assert_eq!(
+            FnUpdateTemp::try_from("0").unwrap(),
+            FnUpdateTemp::Const(false)
+        );
+        assert_eq!(
+            FnUpdateTemp::try_from("1").unwrap(),
+            FnUpdateTemp::Const(true)
+        );
+        assert_eq!(
+            FnUpdateTemp::try_from("false").unwrap(),
+            FnUpdateTemp::Const(false)
+        );
+        assert_eq!(
+            FnUpdateTemp::try_from("true").unwrap(),
+            FnUpdateTemp::Const(true)
+        );
     }
 
     #[test]
