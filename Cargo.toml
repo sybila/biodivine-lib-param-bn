@@ -35,7 +35,6 @@ num-traits = "0.2.15"           # `BigInt::to_f64`
 roxmltree = "0.15.1"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
 z3 = "0.11.2"                   # Used for fixed-point enumeration (and hopefully other things soon).
-base64 = "0.21.0"               # Used for escaping very weird annotation values.
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"

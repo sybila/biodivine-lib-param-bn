@@ -8,8 +8,6 @@ mod _from_string_for_boolean_network;
 mod _from_string_for_fn_update_temp;
 /// **(internal)** `RegulatoryGraph` parsing.
 mod _from_string_for_regulation_temp;
-/// **(internal)** Parser for model annotations, specified using the `#!` comment prefix.
-mod _impl_annotations;
 /// **(internal)** Parsing utility methods for the `BooleanNetwork`.
 mod _impl_boolean_network;
 /// **(internal)** Implementation of `FnUpdateTemp`.

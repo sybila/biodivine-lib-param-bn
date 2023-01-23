@@ -1,6 +1,5 @@
 use crate::ModelAnnotation;
-use base64::prelude::BASE64_STANDARD;
-use base64::Engine;
+use crate::_impl_annotations::{ESC_PATH_SEGMENT, SIMPLE_PATH_SEGMENT};
 
 impl ModelAnnotation {
     /// Parse annotations from a particular model string.
@@ -13,10 +12,6 @@ impl ModelAnnotation {
     pub fn from_model_string(model: &str) -> ModelAnnotation {
         let mut result = ModelAnnotation::new();
 
-        // Matches a "foo:" path segment.
-        let path_name = regex::Regex::new("^\\s*([a-zA-Z0-9_]*)\\s*:").unwrap();
-        // Matches a "`foo`:" path segment.
-        let esc_path_name = regex::Regex::new("^\\s*`([^`]*)`\\s*:").unwrap();
         for line in model.lines() {
             let line = line.trim();
             if !line.starts_with("#!") {
@@ -30,15 +25,15 @@ impl ModelAnnotation {
             while !annotation.is_empty() {
                 // Try to match a normal path segment, and if this fails, also try to match
                 // an escaped path segment.
-                let capture = path_name
+                let capture = SIMPLE_PATH_SEGMENT
                     .captures(annotation)
-                    .or_else(|| esc_path_name.captures(annotation));
+                    .or_else(|| ESC_PATH_SEGMENT.captures(annotation));
                 if let Some(capture) = capture {
                     // This chain is a small hack to convince the borrow checker that `c` is in
                     // fact a reference to `line` and not to `capture`.
                     let c = capture.get(1).unwrap().as_str();
                     path.push(c);
-                    // Advance the annotation string to the begging of either the next segment,
+                    // Advance the annotation string to the beginning of either the next segment,
                     // or the annotation value.
                     annotation = annotation[capture[0].len()..].trim();
                 } else {
@@ -47,22 +42,20 @@ impl ModelAnnotation {
                 }
             }
 
-            // Strip away the "value escape" brackets if they are present.
-            if annotation.starts_with('`') && annotation.ends_with('`') {
-                annotation = &annotation[1..annotation.len() - 1];
+            // Strip away the "value escape" backticks if they are present.
+            if annotation.starts_with("#`") && annotation.ends_with("`#") {
+                annotation = &annotation[2..annotation.len() - 2];
             }
 
-            if annotation.starts_with("b`") && annotation.ends_with('`') {
-                // Decode BASE64 values which contain problematic content, like newlines.
-                let decoded = BASE64_STANDARD
-                    .decode(&annotation[2..annotation.len() - 1])
-                    .unwrap();
-                let decoded = String::from_utf8(decoded).unwrap();
-                result.ensure_value(&path, decoded);
-                continue;
-            }
+            // Create an annotation node for this value.
+            let child = result.ensure_child(&path);
 
-            result.ensure_value(&path, annotation.to_string());
+            // If the tree already has some value here, add a newline first.
+            if child.value().is_some() {
+                child.append_value(&[], "\n");
+            }
+            // Then push the new value.
+            child.append_value(&[], annotation);
         }
 
         result
@@ -78,52 +71,32 @@ mod tests {
         // Basic key value:
         let annotation = ModelAnnotation::from_model_string("#! key : value");
         let key = annotation.get_child(&["key"]).unwrap();
-        assert_eq!("value", key.value_singleton().unwrap().as_str());
+        assert_eq!("value", key.value().unwrap().as_str());
 
         // Duplicate key value:
         let annotation = ModelAnnotation::from_model_string("#! key : value\n#! key : value 2");
         let key = annotation.get_child(&["key"]).unwrap();
-        assert_eq!(2, key.values().len());
+        assert_eq!("value\nvalue 2", key.value().unwrap().as_str());
 
         // Escaped names:
-        let annotation = ModelAnnotation::from_model_string("#!`complex/k:e:y`:`complex:{value}`");
+        let annotation =
+            ModelAnnotation::from_model_string("#!`complex/k:e:y`:#`complex:{value}`#");
         let key = annotation.get_child(&["complex/k:e:y"]).unwrap();
-        assert_eq!("complex:{value}", key.value_singleton().unwrap().as_str());
+        assert_eq!("complex:{value}", key.value().unwrap().as_str());
 
         // Nested keys:
         let annotation = ModelAnnotation::from_model_string("#!key_1:key_2:value");
         let key = annotation.get_child(&["key_1", "key_2"]).unwrap();
-        assert_eq!("value", key.value_singleton().unwrap().as_str());
+        assert_eq!("value", key.value().unwrap().as_str());
 
         // Empty keys and values:
-        let annotation = ModelAnnotation::from_model_string("#!:key_2:\n#!");
+        let annotation = ModelAnnotation::from_model_string("#!:key_2:");
         let key = annotation.get_child(&["", "key_2"]).unwrap();
-        assert_eq!("", key.value_singleton().unwrap().as_str());
-        assert_eq!("", annotation.value_singleton().unwrap().as_str());
+        assert!(key.value().unwrap().is_empty());
 
         // Mixing with normal comments:
         let annotation = ModelAnnotation::from_model_string("# Comment\n#! key : value\n# Comment");
         let key = annotation.get_child(&["key"]).unwrap();
-        assert_eq!("value", key.value_singleton().unwrap().as_str());
-    }
-
-    #[test]
-    pub fn annotation_read_write_test() {
-        let mut annotations = ModelAnnotation::new();
-        // "root" annotation
-        annotations.ensure_value(&[], "hello".to_string());
-        // normal annotation
-        annotations.ensure_value(&["name"], "Model name".to_string());
-        // Empty key and value
-        annotations.ensure_value(&["var", "", "x"], "".to_string());
-        // Escaped names and values
-        annotations.ensure_value(&["var {list}"], "Hello: there".to_string());
-        // BASE64 value
-        annotations.ensure_value(&["base64"], "Hello\nWorld: `Some text`.".to_string());
-
-        let string = annotations.to_string();
-        let parsed = ModelAnnotation::from_model_string(string.as_str());
-
-        assert_eq!(annotations, parsed);
+        assert_eq!("value", key.value().unwrap().as_str());
     }
 }

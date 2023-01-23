@@ -14,7 +14,7 @@ extern crate lazy_static;
 extern crate core;
 
 use regex::Regex;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::Range;
 
@@ -30,7 +30,7 @@ pub mod tutorial;
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
 mod _aeon_parser;
 /// **(internal)** Methods for manipulating `ModelAnnotation` objects.
-mod _impl_annotation;
+mod _impl_annotations;
 /// **(internal)** Utility methods for `BinaryOp`.
 mod _impl_binary_op;
 /// **(internal)** Utility methods for `BooleanNetwork`.
@@ -275,10 +275,10 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// properties that are not directly recognized by the main AEON toolbox.
 ///
 /// Annotations are comments which start with `#!`. After the `#!` "preamble", each annotation
-/// can contain a "path prefix" with path segments separated using `:` (path segments can be
+/// can contains a "path prefix" with path segments separated using `:` (path segments can be
 /// surrounded by white space that is automatically trimmed). Based on these path
 /// segments, the parser will create an annotation tree. If there are multiple annotations with
-/// the same path, these are grouped together into a set of values.
+/// the same path, their values are concatenated using newlines.
 ///
 /// For example, annotations can be used to describe model layout:
 ///
@@ -290,7 +290,7 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// Another usage for annotations are extra properties enforced on the model behaviour, for
 /// example through CTL:
 /// ```test
-/// #! property : EF var_1 => AG ! var_2
+/// #! property : AG (problem => AF apoptosis)
 /// ```
 ///
 /// Obviously, you can also use annotations to specify model metadata:
@@ -300,26 +300,22 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// #! description:var_1: This variable describes ...
 /// ```
 ///
-/// You can also use "empty" path (e.g. `#!is_multivalued`), and you can use empty annotation
+/// You can use "empty" path (e.g. `#! is_multivalued`), and you can use an empty annotation
 /// value with a non-empty path (e.g. `#!is_multivalued:var_1:`). Though this is not particularly
 /// encouraged: it is better to just have `var_1` as the annotation value if you can do that.
 /// An exception to this may be a case where `is_multivalued:var_1:` has an "optional" value and
-/// you want to express that they "key" is provided, but the "value" is missing. Similarly, for
-/// the sake of completeness, it is technically allowed to use empty path names (e.g. `a::b:value`),
-/// but it is discouraged.
+/// you want to express that while the "key" is provided, but the "value" is missing. Similarly, for
+/// the sake of completeness, it is technically allowed to use empty path names (e.g. `a::b:value`
+/// translates to `["a", "", "b"] = "value"`), but it is discouraged.
 ///
-/// Finally, the annotation value can in fact contain the `:` symbol, but you have to ensure there
-/// is a non-identifier character preceding this `:` (identifier characters are alphanumeric
-/// symbols plus an underscore. To make this distinction safer, you can enclose the annotation
-/// value into curly brackets. These will be stripped during parsing:
-///
-/// ```text
-/// #! name: {Model: the exploration of names}
-/// ```
-///
-/// This annotation will be parsed as `"name":"Model: the exploration of names"`.
+/// Note that the path segments should only contain alphanumeric characters and underscores,
+/// but can be escaped using backticks (`` ` ``; other backticks in path segments are not allowed).
+/// Similarly, annotation values cannot contain colons (path segment separators) or backticks,
+/// unless escaped with `` #`ACTUAL_STRING`# ``. You can also use escaping if you wish to
+/// retain whitespace around annotation values. As mentioned, multi-line values can be split
+/// into multiple annotation comments.
 #[derive(PartialEq, Eq, Clone)]
 pub struct ModelAnnotation {
-    values: HashSet<String>,
+    value: Option<String>,
     inner: HashMap<String, ModelAnnotation>,
 }
