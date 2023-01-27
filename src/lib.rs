@@ -23,6 +23,7 @@ pub mod bdd_params;
 pub mod biodivine_std;
 pub mod fixed_points;
 pub mod sbml;
+#[cfg(feature = "solver-z3")]
 pub mod solver_context;
 pub mod symbolic_async_graph;
 pub mod tutorial;
