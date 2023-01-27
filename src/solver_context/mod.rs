@@ -79,7 +79,7 @@ pub struct BnSolverModel<'z3> {
 /// sure they are undone before the next item is retrieved from the iterator.
 ///
 /// The enumeration approach is based on this more involved discussion:
-/// https://stackoverflow.com/questions/11867611/z3py-checking-all-solutions-for-equation/70656700#70656700
+/// <https://stackoverflow.com/questions/11867611/z3py-checking-all-solutions-for-equation/70656700#70656700>
 pub struct RawBnModelIterator<'z3> {
     solver: BnSolver<'z3>,
     enumeration_terms: Vec<Bool<'z3>>,
