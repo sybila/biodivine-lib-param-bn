@@ -18,18 +18,22 @@ use crate::symbolic_async_graph::{GraphColors, GraphVertices};
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
 
+#[cfg(feature = "solver-z3")]
 use crate::fixed_points::solver_iterator::{
     SolverColorIterator, SolverIterator, SolverVertexIterator,
 };
+#[cfg(feature = "solver-z3")]
 use crate::solver_context::{BnSolver, BnSolverContext};
+#[cfg(feature = "solver-z3")]
 use crate::Space;
-pub use symbolic_iterator::SymbolicIterator;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
+pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
+#[cfg(feature = "solver-z3")]
 pub mod solver_iterator;
 
 /// Aggregates algorithms for computing fixed point states of the given state-transition graph.
@@ -523,6 +527,7 @@ impl FixedPoints {
     ///
     /// However, you can conceivably use it to sample the space of possible fixed-points
     /// using various values for the `restriction` set.
+    #[cfg(feature = "solver-z3")]
     pub fn solver_iterator<'z3>(
         context: &'z3 BnSolverContext<'z3>,
         positive_restrictions: &[Space],
@@ -536,6 +541,7 @@ impl FixedPoints {
 
     /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
     /// the unique fixed-point vertices, ignoring the associated colors.
+    #[cfg(feature = "solver-z3")]
     pub fn solver_vertex_iterator<'z3>(
         context: &'z3 BnSolverContext<'z3>,
         positive_restrictions: &[Space],
@@ -549,6 +555,7 @@ impl FixedPoints {
 
     /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
     /// the unique fixed-point colors, ignoring the associated colors.
+    #[cfg(feature = "solver-z3")]
     pub fn solver_color_iterator<'z3>(
         context: &'z3 BnSolverContext<'z3>,
         positive_restrictions: &[Space],
@@ -565,6 +572,7 @@ impl FixedPoints {
     ///
     /// This is mainly for building very custom fixed-point iterators and you don't have to call
     /// it explicitly unless you really know that you need a custom solver.
+    #[cfg(feature = "solver-z3")]
     pub fn make_fixed_points_solver<'z3>(context: &'z3 BnSolverContext<'z3>) -> BnSolver<'z3> {
         // Make a solver with all static constraints applied.
         let solver = context.mk_network_solver();

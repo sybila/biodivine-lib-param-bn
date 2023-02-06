@@ -10,6 +10,7 @@ readme = "README.md"
 keywords = ["boolean-network", "asynchronous", "symbolic", "graph", "systems-biology"]
 categories = ["science", "simulation"]
 license = "MIT"
+rust-version = "1.60"
 
 [lib]
 name = "biodivine_lib_param_bn"
@@ -19,12 +20,23 @@ path = "src/lib.rs"
 name = "dump-graph"
 path = "src/bin/dump_graph.rs"
 
+[[bin]]
+name = "bench-fixed-points-solver"
+path = "src/bin/bench_fixed_points_solver.rs"
+required-features = ["solver-z3"]
+
+[[bin]]
+name = "check-fixed-points-solver"
+path = "src/bin/check_fixed_points_solver.rs"
+required-features = ["solver-z3"]
+
 # Enable rich docs for some online docs autogen services.
 [package.metadata.docs.rs]
 rustdoc-args = ["--html-in-header", "docs-head.html"]
 
 [features]
 print-progress = []
+solver-z3 = ["dep:z3"]
 
 [dependencies]
 regex = "1.3.3"                 # Regexes used for parsing of basic .aeon constructs.
@@ -32,9 +44,13 @@ lazy_static = "1.4.0"           # Used for initialization of commonly used regex
 biodivine-lib-bdd = ">=0.4.2, <1.0.0"
 num-bigint = "0.4.3"            # Used as infinite-precision representation in BDDs.
 num-traits = "0.2.15"           # `BigInt::to_f64`
+# The latest versions of roxmltree did some
+# changes to namespace resolution and is now
+# super slow on SBML :( We'll have to fix this
+# at some point...
 roxmltree = "0.15.1"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
-z3 = "0.11.2"                   # Used for fixed-point enumeration (and hopefully other things soon).
+z3 = { version = "0.11.2", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
