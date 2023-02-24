@@ -37,7 +37,7 @@ impl ModelAnnotation {
     ///
     /// If such annotation dues not exist, returns `None`. If you want to instead create
     /// the path when it does not exist, use `ModelAnnotation::ensure_child`.
-    pub fn get_mut_child<'a>(&'a mut self, path: &[&str]) -> Option<&'a ModelAnnotation> {
+    pub fn get_mut_child<'a>(&'a mut self, path: &[&str]) -> Option<&'a mut ModelAnnotation> {
         if path.is_empty() {
             Some(self)
         } else {
