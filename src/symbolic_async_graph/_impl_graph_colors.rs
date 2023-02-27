@@ -1,6 +1,8 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
-use crate::symbolic_async_graph::{GraphColors, SymbolicContext};
+use crate::symbolic_async_graph::projected_iteration::{FnUpdateProjection, RawProjection};
+use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph, SymbolicContext};
+use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
@@ -94,6 +96,30 @@ impl GraphColors {
         } else {
             false
         }
+    }
+
+    /// Perform a "raw projection" which eliminates the given symbolic variables from this set.
+    ///
+    /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
+    /// should only depend on *parameter variables*.
+    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+        let mut retained = Vec::new();
+        for v in &self.parameter_variables {
+            if !variables.contains(v) {
+                retained.push(*v);
+            }
+        }
+        RawProjection::new(retained, &self.bdd)
+    }
+
+    /// Create an iterable symbolic projection which only retains the update functions of the
+    /// specified network variables.
+    pub fn fn_update_projection<'a>(
+        &self,
+        functions: &[VariableId],
+        context: &'a SymbolicAsyncGraph,
+    ) -> FnUpdateProjection<'a> {
+        FnUpdateProjection::new(functions.to_vec(), context, &self.bdd)
     }
 }
 

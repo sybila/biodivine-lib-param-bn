@@ -55,6 +55,10 @@ mod _impl_symbolic_async_graph_operators;
 /// **(internal)** Implementation of the `SymbolicContext`.
 mod _impl_symbolic_context;
 
+/// Implementation of the `RawSymbolicIterator` and other low-level iterators
+/// that are used to iterate through various projections of symbolic sets.
+pub mod projected_iteration;
+
 /// A module with a trait that describes common methods shared by all set representations
 /// based on BDDs.
 ///

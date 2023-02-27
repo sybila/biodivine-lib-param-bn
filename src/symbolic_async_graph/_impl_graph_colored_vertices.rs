@@ -1,10 +1,13 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
+use crate::symbolic_async_graph::projected_iteration::{
+    FnUpdateProjection, MixedProjection, RawProjection, StateProjection,
+};
 use crate::symbolic_async_graph::{
-    GraphColoredVertices, GraphColors, GraphVertices, SymbolicContext,
+    GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::VariableId;
-use biodivine_lib_bdd::Bdd;
+use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
 use num_traits::ToPrimitive;
 use std::ops::Shr;
@@ -90,6 +93,51 @@ impl GraphColoredVertices {
     pub fn restrict_network_variable(&self, variable: VariableId, value: bool) -> Self {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_restrict(var, value))
+    }
+
+    /// Perform a "raw projection" which eliminates the given symbolic variables from this set.
+    ///
+    /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
+    /// should only depend on *state and parameter variables* (i.e. not on extra state variables).
+    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+        let mut retained = Vec::new();
+        for v in &self.state_variables {
+            if !variables.contains(v) {
+                retained.push(*v);
+            }
+        }
+        for v in &self.parameter_variables {
+            if !variables.contains(v) {
+                retained.push(*v);
+            }
+        }
+        RawProjection::new(retained, &self.bdd)
+    }
+
+    /// Create an iterable symbolic projection which only retains the specified network variables.
+    pub fn state_projection(&self, variables: &[VariableId]) -> StateProjection {
+        StateProjection::new(variables.to_vec(), &self.state_variables, &self.bdd)
+    }
+
+    /// Create an iterable symbolic projection which only retains the update functions
+    /// of the specified network variables.
+    pub fn fn_update_projection<'a>(
+        &self,
+        functions: &[VariableId],
+        context: &'a SymbolicAsyncGraph,
+    ) -> FnUpdateProjection<'a> {
+        FnUpdateProjection::new(functions.to_vec(), context, &self.bdd)
+    }
+
+    /// Create an iterable symbolic projection which only retains the specified network variables
+    /// and the update functions of the specified variables.
+    pub fn mixed_projection<'a>(
+        &self,
+        variables: &[VariableId],
+        functions: &[VariableId],
+        context: &'a SymbolicAsyncGraph,
+    ) -> MixedProjection<'a> {
+        MixedProjection::new(variables.to_vec(), functions.to_vec(), context, &self.bdd)
     }
 }
 
