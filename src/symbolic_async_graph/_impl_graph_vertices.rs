@@ -1,6 +1,7 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
+use crate::symbolic_async_graph::projected_iteration::{RawProjection, StateProjection};
 use crate::symbolic_async_graph::{
     GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
 };
@@ -128,6 +129,25 @@ impl GraphVertices {
     pub fn fix_network_variable(&self, variable: VariableId, value: bool) -> Self {
         let var = self.state_variables[variable.0];
         self.copy(self.bdd.var_select(var, value))
+    }
+
+    /// Perform a "raw projection" which eliminates the given symbolic variables from this set.
+    ///
+    /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
+    /// should only depend on *state variables*.
+    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+        let mut retained = Vec::new();
+        for v in &self.state_variables {
+            if !variables.contains(v) {
+                retained.push(*v);
+            }
+        }
+        RawProjection::new(retained, &self.bdd)
+    }
+
+    /// Create an iterable symbolic projection which only retains the specified network variables.
+    pub fn state_projection(&self, variables: &[VariableId]) -> StateProjection {
+        StateProjection::new(variables.to_vec(), &self.state_variables, &self.bdd)
     }
 }
 

@@ -30,6 +30,8 @@ use crate::Space;
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
+use crate::symbolic_async_graph::projected_iteration::MixedProjection;
+use crate::VariableId;
 pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
@@ -200,6 +202,99 @@ impl FixedPoints {
         }
 
         fixed_points
+    }
+
+    /// This is a general symbolic projected fixed-point algorithm. It works on the same
+    /// principle as `Self::symbolic`, `Self::symbolic_colors` and `Self::symbolic_vertices`.
+    /// However, it allows projection to arbitrary network components.
+    ///
+    /// In theory, this should be the same as running `Self::symbolic` and computing
+    /// a `MixedProjection` on the result. However, the benefit here is that the projection
+    /// is applied gradually during fixed-point search. This means we can potentially handle
+    /// much larger networks, because at no point is the exact result fully represented.
+    /// The same is true for `Self::symbolic_colors` and `Self::symbolic_vertices`, but here
+    /// we have a much finer control over what network elements are retained.
+    ///
+    /// Naturally, you can use empty `retain_state` or `retain_function` to implement a projection
+    /// to subset of states/functions. For now, we do not provide extra methods for this, as it
+    /// is not a very common use case. But if you want it, get in touch.
+    pub fn symbolic_projection<'a>(
+        stg: &'a SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+        retain_state: &[VariableId],
+        retain_function: &[VariableId],
+    ) -> MixedProjection<'a> {
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Start symbolic projected fixed-point search with {}[nodes:{}] candidates.",
+                restriction.approx_cardinality(),
+                restriction.symbolic_size()
+            );
+        }
+
+        let mut to_merge: Vec<Bdd> = stg
+            .as_network()
+            .variables()
+            .map(|var| {
+                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+                let is_stable = stg.unit_colored_vertices().minus(&can_step);
+                if cfg!(feature = "print-progress") {
+                    println!(
+                        " > Created initial set for {:?} using {} BDD nodes.",
+                        var,
+                        is_stable.symbolic_size()
+                    );
+                }
+                is_stable.into_bdd()
+            })
+            .collect();
+
+        // Now compute the BDD variables that should be projected away.
+        let ctx = stg.symbolic_context();
+
+        // Initially, "remove" all variables.
+        let mut project: HashSet<BddVariable> =
+            ctx.bdd_variable_set().variables().into_iter().collect();
+        // Now, remove all state and parameter variables that we want to keep.
+        for var in retain_state {
+            project.remove(&ctx.get_state_variable(*var));
+        }
+        for var in retain_function {
+            if let Some(function) = stg.as_network().get_update_function(*var) {
+                for p_id in function.collect_parameters() {
+                    for p in ctx.get_explicit_function_table(p_id).symbolic_variables() {
+                        project.remove(p);
+                    }
+                }
+            } else {
+                for p in ctx.get_implicit_function_table(*var).symbolic_variables() {
+                    project.remove(p);
+                }
+            }
+        }
+
+        // Finally add the global requirement on the whole state space, if it is relevant.
+        if !stg.unit_colored_vertices().is_subset(restriction) {
+            to_merge.push(restriction.as_bdd().clone());
+        }
+
+        let fixed_points =
+            Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] projected results.",
+                fixed_points.cardinality(),
+                fixed_points.size(),
+            );
+        }
+
+        MixedProjection::new(
+            retain_state.to_vec(),
+            retain_function.to_vec(),
+            stg,
+            &fixed_points,
+        )
     }
 
     /// This is a helper method that is used by `Self::symbolic_vertices` and
@@ -595,7 +690,7 @@ mod tests {
     use crate::biodivine_std::traits::Set;
     use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::BooleanNetwork;
+    use crate::{BooleanNetwork, VariableId};
 
     #[test]
     pub fn simple_fixed_point_test() {
@@ -632,5 +727,42 @@ mod tests {
         }
 
         assert!(expected.is_empty());
+    }
+
+    #[test]
+    pub fn simple_projected_fixed_point_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").unwrap();
+        let stg = SymbolicAsyncGraph::new(bn.clone()).unwrap();
+
+        let ccr_m = bn.as_graph().find_variable("CcrM").unwrap();
+        let dna = bn.as_graph().find_variable("DnaA").unwrap();
+
+        // Compute how DnaA/CcrM fixed-points depend on the CcrM function.
+        let projection = FixedPoints::symbolic_projection(
+            &stg,
+            stg.unit_colored_vertices(),
+            &[ccr_m, dna],
+            &[ccr_m],
+        );
+
+        // There are 4 fixed points. Two have CcrM=True and two have CcrM=False. The remaining
+        // variables are false.
+
+        assert_eq!(4, projection.iter().count());
+
+        let mut has_true = false;
+        let mut has_false = false;
+        for (state, function) in projection.iter() {
+            assert_eq!(1, function.len());
+            // All functions should be non-trivial. That's all I've got.
+            assert!(function[0].1.as_binary().is_some());
+            assert_eq!((VariableId(2), false), state[1]);
+            if state[0].1 {
+                has_true = true;
+            } else {
+                has_false = true;
+            }
+        }
+        assert!(has_true && has_false);
     }
 }

@@ -148,20 +148,21 @@ impl SymbolicAsyncGraph {
             if let Some(function) = &mut witness.update_functions[variable.0] {
                 let instantiated_expression = self
                     .symbolic_context
-                    .instantiate_fn_update(&witness_valuation, function)
-                    .to_boolean_expression(&self.symbolic_context.bdd);
+                    .instantiate_fn_update(&witness_valuation, function);
+
                 *function =
-                    FnUpdate::try_from_expression(instantiated_expression, self.network.as_graph())
-                        .unwrap();
+                    FnUpdate::build_from_bdd(self.symbolic_context(), &instantiated_expression);
             } else {
                 let regulators = self.network.regulators(variable);
-                let instantiated_expression = self
-                    .symbolic_context
-                    .instantiate_implicit_function(&witness_valuation, variable, &regulators)
-                    .to_boolean_expression(&self.symbolic_context.bdd);
-                let instantiated_fn_update =
-                    FnUpdate::try_from_expression(instantiated_expression, self.network.as_graph());
-                witness.update_functions[variable.0] = instantiated_fn_update;
+                let instantiated_expression = self.symbolic_context.instantiate_implicit_function(
+                    &witness_valuation,
+                    variable,
+                    &regulators,
+                );
+                witness.update_functions[variable.0] = Some(FnUpdate::build_from_bdd(
+                    self.symbolic_context(),
+                    &instantiated_expression,
+                ));
             }
         }
         // Remove all explicit parameters since they have been eliminated.

@@ -15,9 +15,9 @@ impl Debug for ExtendedBoolean {
 impl From<bool> for ExtendedBoolean {
     fn from(value: bool) -> Self {
         if value {
-            ExtendedBoolean::One
+            One
         } else {
-            ExtendedBoolean::Zero
+            Zero
         }
     }
 }

@@ -1,5 +1,7 @@
+use crate::symbolic_async_graph::SymbolicContext;
 use crate::FnUpdate::*;
 use crate::{BinaryOp, BooleanNetwork, ExtendedBoolean, FnUpdate, ParameterId, Space, VariableId};
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable};
 use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
@@ -7,33 +9,33 @@ use std::collections::{HashMap, HashSet};
 impl FnUpdate {
     /// Create a `true` formula.
     pub fn mk_true() -> FnUpdate {
-        FnUpdate::Const(true)
+        Const(true)
     }
 
     /// Create a `false` formula.
     pub fn mk_false() -> FnUpdate {
-        FnUpdate::Const(false)
+        Const(false)
     }
 
     /// Create an `x` formula where `x` is a Boolean variable.
     pub fn mk_var(id: VariableId) -> FnUpdate {
-        FnUpdate::Var(id)
+        Var(id)
     }
 
     /// Create a `p(x_1, ..., x_k)` formula where `p` is a parameter function and `x_1` through
     /// `x_k` are its arguments.
     pub fn mk_param(id: ParameterId, args: &[VariableId]) -> FnUpdate {
-        FnUpdate::Param(id, args.to_vec())
+        Param(id, args.to_vec())
     }
 
     /// Create a `!phi` formula, where `phi` is an inner `FnUpdate`.
     pub fn mk_not(inner: FnUpdate) -> FnUpdate {
-        FnUpdate::Not(Box::new(inner))
+        Not(Box::new(inner))
     }
 
     /// Create a `phi 'op' psi` where `phi` and `psi` are arguments of `op` operator.
     pub fn mk_binary(op: BinaryOp, left: FnUpdate, right: FnUpdate) -> FnUpdate {
-        FnUpdate::Binary(op, Box::new(left), Box::new(right))
+        Binary(op, Box::new(left), Box::new(right))
     }
 
     /// Negate this function.
@@ -69,7 +71,7 @@ impl FnUpdate {
     /// If `Const`, return the value, otherwise return `None`.
     pub fn as_const(&self) -> Option<bool> {
         match self {
-            FnUpdate::Const(value) => Some(*value),
+            Const(value) => Some(*value),
             _ => None,
         }
     }
@@ -77,7 +79,7 @@ impl FnUpdate {
     /// If `Var`, return the id, otherwise return `None`.
     pub fn as_var(&self) -> Option<VariableId> {
         match self {
-            FnUpdate::Var(value) => Some(*value),
+            Var(value) => Some(*value),
             _ => None,
         }
     }
@@ -85,7 +87,7 @@ impl FnUpdate {
     /// If `Param`, return the id and args, otherwise return `None`.
     pub fn as_param(&self) -> Option<(ParameterId, &[VariableId])> {
         match self {
-            FnUpdate::Param(id, args) => Some((*id, args)),
+            Param(id, args) => Some((*id, args)),
             _ => None,
         }
     }
@@ -93,7 +95,7 @@ impl FnUpdate {
     /// If `Not`, return the inner function, otherwise return `None`.
     pub fn as_not(&self) -> Option<&FnUpdate> {
         match self {
-            FnUpdate::Not(inner) => Some(inner),
+            Not(inner) => Some(inner),
             _ => None,
         }
     }
@@ -101,7 +103,7 @@ impl FnUpdate {
     /// If `Binary`, return the operator and left/right formulas, otherwise return `None`.
     pub fn as_binary(&self) -> Option<(&FnUpdate, BinaryOp, &FnUpdate)> {
         match self {
-            FnUpdate::Binary(op, l, r) => Some((l, *op, r)),
+            Binary(op, l, r) => Some((l, *op, r)),
             _ => None,
         }
     }
@@ -109,6 +111,74 @@ impl FnUpdate {
 
 /// Other utility methods.
 impl FnUpdate {
+    /// Build an update function from an instantiated `Bdd`.
+    ///
+    /// The support set of the `Bdd` must be a subset of the state variables, i.e. the `Bdd`
+    /// can only depend on the network variables. Note that it should be possible to also build
+    /// a variant of this function where this requirement is lifted, but it's a bit more
+    /// complicated and so far we are ok with only building fully instantiated update functions.
+    ///
+    /// The function produces a DNF representation based on all satisfying clauses. This is far
+    /// from minimal, but appears to be slightly more concise than the default translation in
+    /// lib-bdd.
+    pub fn build_from_bdd(context: &SymbolicContext, bdd: &Bdd) -> FnUpdate {
+        if bdd.is_true() {
+            return FnUpdate::mk_true();
+        }
+        if bdd.is_false() {
+            return FnUpdate::mk_false();
+        }
+
+        let state_variables: HashMap<BddVariable, VariableId> = context
+            .state_variables()
+            .iter()
+            .enumerate()
+            .map(|(i, v)| (*v, VariableId::from_index(i)))
+            .collect();
+        let support = bdd.support_set();
+        for k in &support {
+            if !state_variables.contains_key(k) {
+                panic!("Non-state variables found in the provided BDD.")
+            }
+        }
+
+        // Because the BDD isn't constant, there must be at least one clause and each clause
+        // must have at least one literal.
+
+        fn build_clause(
+            map: &HashMap<BddVariable, VariableId>,
+            clause: BddPartialValuation,
+        ) -> FnUpdate {
+            fn build_literal(
+                map: &HashMap<BddVariable, VariableId>,
+                literal: (BddVariable, bool),
+            ) -> FnUpdate {
+                let var = FnUpdate::mk_var(*map.get(&literal.0).unwrap());
+                if literal.1 {
+                    var
+                } else {
+                    FnUpdate::mk_not(var)
+                }
+            }
+
+            let mut literals = clause.to_values().into_iter();
+            let mut clause = build_literal(map, literals.next().unwrap());
+            for literal in literals {
+                let literal = build_literal(map, literal);
+                clause = FnUpdate::mk_binary(BinaryOp::And, clause, literal);
+            }
+            clause
+        }
+
+        let mut clauses = bdd.sat_clauses();
+        let mut result = build_clause(&state_variables, clauses.next().unwrap());
+        for clause in clauses {
+            let clause = build_clause(&state_variables, clause);
+            result = FnUpdate::mk_binary(BinaryOp::Or, result, clause);
+        }
+        result
+    }
+
     /// Return a sorted vector of all variables that are actually used as inputs in this function.
     pub fn collect_arguments(&self) -> Vec<VariableId> {
         fn r_arguments(function: &FnUpdate, args: &mut HashSet<VariableId>) {
@@ -163,13 +233,13 @@ impl FnUpdate {
     /// Convert this update function to a string, taking names from the provided `BooleanNetwork`.
     pub fn to_string(&self, context: &BooleanNetwork) -> String {
         match self {
-            FnUpdate::Const(value) => value.to_string(),
-            FnUpdate::Var(id) => context.get_variable_name(*id).to_string(),
-            FnUpdate::Not(inner) => format!("!{}", inner.to_string(context)),
-            FnUpdate::Binary(op, l, r) => {
+            Const(value) => value.to_string(),
+            Var(id) => context.get_variable_name(*id).to_string(),
+            Not(inner) => format!("!{}", inner.to_string(context)),
+            Binary(op, l, r) => {
                 format!("({} {} {})", l.to_string(context), op, r.to_string(context))
             }
-            FnUpdate::Param(id, args) => {
+            Param(id, args) => {
                 if args.is_empty() {
                     context[*id].get_name().to_string()
                 } else {
@@ -198,11 +268,11 @@ impl FnUpdate {
     /// return `None`".
     pub fn evaluate(&self, values: &HashMap<VariableId, bool>) -> Option<bool> {
         match self {
-            FnUpdate::Const(value) => Some(*value),
-            FnUpdate::Var(id) => values.get(id).cloned(),
-            FnUpdate::Param(_, _) => None,
-            FnUpdate::Not(inner) => inner.evaluate(values).map(|it| !it),
-            FnUpdate::Binary(op, left, right) => {
+            Const(value) => Some(*value),
+            Var(id) => values.get(id).cloned(),
+            Param(_, _) => None,
+            Not(inner) => inner.evaluate(values).map(|it| !it),
+            Binary(op, left, right) => {
                 let left = left.evaluate(values);
                 let right = right.evaluate(values);
                 match op {
@@ -247,16 +317,16 @@ impl FnUpdate {
     /// function, but does not influence the specialisation.
     pub fn is_specialisation_of(&self, other: &FnUpdate) -> bool {
         match other {
-            FnUpdate::Const(_) => self == other,
-            FnUpdate::Var(_) => self == other,
-            FnUpdate::Not(inner) => {
+            Const(_) => self == other,
+            Var(_) => self == other,
+            Not(inner) => {
                 if let Some(self_inner) = self.as_not() {
                     self_inner.is_specialisation_of(inner)
                 } else {
                     false
                 }
             }
-            FnUpdate::Binary(op, left, right) => {
+            Binary(op, left, right) => {
                 if let Some((self_left, self_op, self_right)) = self.as_binary() {
                     self_op == *op
                         && self_left.is_specialisation_of(left)
@@ -265,7 +335,7 @@ impl FnUpdate {
                     false
                 }
             }
-            FnUpdate::Param(_, args) => {
+            Param(_, args) => {
                 // Every argument in this sub-tree must be declared in the parameter.
                 self.collect_arguments()
                     .iter()
@@ -284,14 +354,14 @@ impl FnUpdate {
         F: FnMut(&FnUpdate),
     {
         match self {
-            FnUpdate::Const(_) => action(self),
-            FnUpdate::Param(_, _) => action(self),
-            FnUpdate::Var(_) => action(self),
-            FnUpdate::Not(inner) => {
+            Const(_) => action(self),
+            Param(_, _) => action(self),
+            Var(_) => action(self),
+            Not(inner) => {
                 inner.walk_postorder(action);
                 action(self);
             }
-            FnUpdate::Binary(_, left, right) => {
+            Binary(_, left, right) => {
                 left.walk_postorder(action);
                 right.walk_postorder(action);
                 action(self);
@@ -304,17 +374,17 @@ impl FnUpdate {
     /// is the index into the vector). Similarly replaces every `ParameterId`.
     pub fn substitute(&self, vars: &[VariableId], params: &[ParameterId]) -> FnUpdate {
         match self {
-            FnUpdate::Const(_) => self.clone(),
-            FnUpdate::Param(id, args) => {
+            Const(_) => self.clone(),
+            Param(id, args) => {
                 let new_args = args.iter().map(|it| vars[it.0]).collect();
-                FnUpdate::Param(params[id.0], new_args)
+                Param(params[id.0], new_args)
             }
-            FnUpdate::Var(id) => FnUpdate::mk_var(vars[id.0]),
-            FnUpdate::Not(inner) => {
+            Var(id) => FnUpdate::mk_var(vars[id.0]),
+            Not(inner) => {
                 let inner = inner.substitute(vars, params);
                 FnUpdate::mk_not(inner)
             }
-            FnUpdate::Binary(op, left, right) => {
+            Binary(op, left, right) => {
                 let left = left.substitute(vars, params);
                 let right = right.substitute(vars, params);
                 FnUpdate::mk_binary(*op, left, right)
@@ -457,20 +527,20 @@ impl FnUpdate {
 
     pub fn eval_in_space(&self, space: &Space) -> ExtendedBoolean {
         match self {
-            FnUpdate::Const(value) => {
+            Const(value) => {
                 if *value {
                     ExtendedBoolean::One
                 } else {
                     ExtendedBoolean::Zero
                 }
             }
-            FnUpdate::Var(var) => space[*var],
-            FnUpdate::Param(_, _) => {
+            Var(var) => space[*var],
+            Param(_, _) => {
                 // We assume that a parameter can evaluate to anything.
                 ExtendedBoolean::Any
             }
-            FnUpdate::Not(inner) => inner.eval_in_space(space).negate(),
-            FnUpdate::Binary(op, left, right) => {
+            Not(inner) => inner.eval_in_space(space).negate(),
+            Binary(op, left, right) => {
                 let left = left.eval_in_space(space);
                 let right = right.eval_in_space(space);
                 match op {
@@ -487,7 +557,9 @@ impl FnUpdate {
 
 #[cfg(test)]
 mod tests {
-    use crate::{BinaryOp, BooleanNetwork, FnUpdate};
+    use crate::symbolic_async_graph::SymbolicContext;
+    use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
+    use biodivine_lib_bdd::bdd;
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
@@ -643,5 +715,45 @@ mod tests {
         let (l, _, r) = r.as_binary().unwrap();
         assert!(l.as_const().unwrap());
         assert!(!r.as_const().unwrap());
+    }
+
+    #[test]
+    pub fn test_symbolic_instantiation() {
+        let bn = BooleanNetwork::try_from(
+            "
+            a -> b
+            b -> a
+            b -| b
+        ",
+        )
+        .unwrap();
+
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let vars = ctx.bdd_variable_set();
+
+        let var_a = &FnUpdate::mk_var(VariableId(0));
+        let var_b = &FnUpdate::mk_var(VariableId(1));
+        let not_var_a = &FnUpdate::mk_not(var_a.clone());
+        let not_var_b = &FnUpdate::mk_not(var_b.clone());
+
+        let bdd = bdd!(vars, "a");
+        assert_eq!(
+            FnUpdate::mk_var(VariableId(0)),
+            FnUpdate::build_from_bdd(&ctx, &bdd)
+        );
+
+        let bdd = bdd!(vars, "a" & "b");
+        assert_eq!(
+            FnUpdate::mk_binary(BinaryOp::And, var_a.clone(), var_b.clone()),
+            FnUpdate::build_from_bdd(&ctx, &bdd)
+        );
+
+        let bdd = bdd!(vars, "a" <=> "b");
+        let a_and_b = FnUpdate::mk_binary(BinaryOp::And, var_a.clone(), var_b.clone());
+        let not_a_and_b = FnUpdate::mk_binary(BinaryOp::And, not_var_a.clone(), not_var_b.clone());
+        assert_eq!(
+            FnUpdate::mk_binary(BinaryOp::Or, not_a_and_b, a_and_b),
+            FnUpdate::build_from_bdd(&ctx, &bdd)
+        );
     }
 }
