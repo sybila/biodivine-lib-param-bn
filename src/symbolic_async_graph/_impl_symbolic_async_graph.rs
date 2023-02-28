@@ -291,7 +291,7 @@ impl SymbolicAsyncGraph {
             symbolic_context: self.symbolic_context.clone(),
             vertex_space: (self.mk_empty_vertices(), set.clone()),
             color_space: (self.mk_empty_colors(), set.colors()),
-            unit_bdd: set.bdd.clone(),
+            unit_bdd: self.unit_bdd.and(&set.bdd),
             update_functions: self
                 .update_functions
                 .iter()
@@ -636,6 +636,15 @@ impl SymbolicAsyncGraph {
         }
 
         Ok(self.unit_colors().copy(colors))
+    }
+
+    /// Obtain a reference to the underlying raw `Bdd` which evaluates
+    /// the variable's update function.
+    ///
+    /// Intuitively, this `Bdd` corresponds to the set of all vertex-color pairs that can perform
+    /// a transition under the given `variable`. This is a very low-level functionality.
+    pub fn raw_function_bdd(&self, variable: VariableId) -> &Bdd {
+        &self.update_functions[variable.to_index()]
     }
 }
 

@@ -59,6 +59,8 @@ mod _impl_symbolic_context;
 /// that are used to iterate through various projections of symbolic sets.
 pub mod projected_iteration;
 
+pub mod reachability;
+
 /// A module with a trait that describes common methods shared by all set representations
 /// based on BDDs.
 ///
