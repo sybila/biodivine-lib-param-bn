@@ -33,6 +33,7 @@ required-features = ["solver-z3"]
 # Enable rich docs for some online docs autogen services.
 [package.metadata.docs.rs]
 rustdoc-args = ["--html-in-header", "docs-head.html"]
+features = [ "solver-z3" ]
 
 [features]
 print-progress = []
