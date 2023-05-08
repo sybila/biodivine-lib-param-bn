@@ -309,8 +309,7 @@ impl BooleanNetwork {
                     let regulator_is_false = ctx.bdd_variable_set().mk_not_var(regulator);
 
                     let observability = {
-                        let fn_x1_to_1 =
-                            bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
+                        let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
                         let fn_x0_to_1 =
                             bdd!(fn_is_true & regulator_is_false).var_exists(regulator);
                         bdd!(fn_x1_to_1 ^ fn_x0_to_1).exists(ctx.state_variables())
