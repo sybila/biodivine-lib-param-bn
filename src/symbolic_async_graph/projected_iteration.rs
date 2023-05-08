@@ -210,7 +210,7 @@ impl<'a, 'b> Iterator for FnUpdateProjectionIterator<'a, 'b> {
 /// the network variables and some of the update functions.
 ///
 /// This type of projection can be used to relate a specific state to a specific update function.
-/// For example, how does a phenotype variable changes with a particular update function?
+/// For example, how does a phenotype variable change with a particular update function?
 ///
 /// Note that the same considerations regarding `FnUpdate` uniqueness as for `FnUpdateProjection`
 /// apply here as well.
