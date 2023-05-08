@@ -46,12 +46,12 @@ pub(crate) fn apply_regulation_constraints(
         */
         let observability = if regulation.observable {
             // \exists x_r : F(x_1, ..., x_r, ..., x_n) & x_r | Context where F is one for x_r, but with x_r erased.
-            let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_project(regulator);
+            let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
             // \exists x_r : F(x_1, ..., x_r, ..., x_m) & !x_r | Context where F is one for !x_r, but with x_r erased.
-            let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_project(regulator);
+            let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_exists(regulator);
             // Context where F for x_r is not equal F for !x_r (i.e. all witnesses of observability)
             // and then with all states erased.
-            bdd!(fn_x1_to_1 ^ fn_x0_to_1).project(&context.state_variables)
+            bdd!(fn_x1_to_1 ^ fn_x0_to_1).exists(&context.state_variables)
         } else {
             context.mk_constant(true)
         };
@@ -76,14 +76,14 @@ pub(crate) fn apply_regulation_constraints(
         */
         let non_monotonous = match regulation.monotonicity {
             Some(Monotonicity::Activation) => {
-                let fn_x1_to_0 = bdd!(fn_is_false & regulator_is_true).var_project(regulator);
-                let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_project(regulator);
-                bdd!(fn_x0_to_1 & fn_x1_to_0).project(&context.state_variables)
+                let fn_x1_to_0 = bdd!(fn_is_false & regulator_is_true).var_exists(regulator);
+                let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_exists(regulator);
+                bdd!(fn_x0_to_1 & fn_x1_to_0).exists(&context.state_variables)
             }
             Some(Monotonicity::Inhibition) => {
-                let fn_x0_to_0 = bdd!(fn_is_false & regulator_is_false).var_project(regulator);
-                let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_project(regulator);
-                bdd!(fn_x0_to_0 & fn_x1_to_1).project(&context.state_variables)
+                let fn_x0_to_0 = bdd!(fn_is_false & regulator_is_false).var_exists(regulator);
+                let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
+                bdd!(fn_x0_to_0 & fn_x1_to_1).exists(&context.state_variables)
             }
             None => context.mk_constant(false),
         };

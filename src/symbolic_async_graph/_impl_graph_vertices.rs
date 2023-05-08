@@ -76,7 +76,7 @@ impl GraphVertices {
     pub fn materialize(&self) -> IterableVertices {
         // This is a colossal hack, but it is easier than trying to drag parameter variables into this.
         let all_false: Bdd = BddValuation::all_false(self.bdd.num_vars()).into();
-        let parameters_false = all_false.project(&self.state_variables);
+        let parameters_false = all_false.exists(&self.state_variables);
         IterableVertices {
             materialized_bdd: self.bdd.and(&parameters_false),
             state_variables: self.state_variables.clone(),

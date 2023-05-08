@@ -132,7 +132,7 @@ impl SymbolicAsyncGraph {
         GraphVertices::new(
             self.unit_bdd
                 .var_select(bdd_variable, value)
-                .project(&self.symbolic_context.parameter_variables),
+                .exists(&self.symbolic_context.parameter_variables),
             &self.symbolic_context,
         )
     }
@@ -335,7 +335,7 @@ impl SymbolicAsyncGraph {
             cube: &GraphColoredVertices,
         ) -> GraphColoredVertices {
             let bdd_var = stg.symbolic_context().get_state_variable(var);
-            let relaxed_bdd = cube.as_bdd().var_project(bdd_var);
+            let relaxed_bdd = cube.as_bdd().var_exists(bdd_var);
             stg.empty_vertices().copy(relaxed_bdd)
         }
 
@@ -399,7 +399,7 @@ impl SymbolicAsyncGraph {
     pub fn existential_extra_variable_projection<T: BddSet>(&self, set: &T) -> T {
         set.copy(
             set.as_bdd()
-                .project(&self.symbolic_context.all_extra_state_variables),
+                .exists(&self.symbolic_context.all_extra_state_variables),
         )
     }
 

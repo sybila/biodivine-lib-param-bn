@@ -63,10 +63,10 @@ impl RawProjection {
             .into_iter()
             .filter(|it| !retained.contains(it))
             .collect();
-        let projection = bdd.project(&to_eliminate);
+        let projection = bdd.exists(&to_eliminate);
         // Then fix everything that is not retained to `False` to ensure succinct enumeration.
         let all_false = BddValuation::all_false(projection.num_vars());
-        let parameters_false = Bdd::from(all_false).project(&retained);
+        let parameters_false = Bdd::from(all_false).exists(&retained);
         RawProjection {
             retained_variables: retained,
             bdd: projection.and(&parameters_false),
