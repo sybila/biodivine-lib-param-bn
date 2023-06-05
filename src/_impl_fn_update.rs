@@ -1,5 +1,6 @@
 use crate::symbolic_async_graph::SymbolicContext;
 use crate::FnUpdate::*;
+use crate::_aeon_parser::FnUpdateTemp;
 use crate::{BinaryOp, BooleanNetwork, ExtendedBoolean, FnUpdate, ParameterId, Space, VariableId};
 use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable};
 use std::collections::{HashMap, HashSet};
@@ -111,6 +112,14 @@ impl FnUpdate {
 
 /// Other utility methods.
 impl FnUpdate {
+    /// Try to parse an update function from a string expression using the provided `network`
+    /// as context.
+    pub fn try_from_str(expression: &str, network: &BooleanNetwork) -> Result<FnUpdate, String> {
+        let tmp = FnUpdateTemp::try_from(expression)?;
+        let update = tmp.into_fn_update(network)?;
+        Ok(*update)
+    }
+
     /// Build an update function from an instantiated `Bdd`.
     ///
     /// The support set of the `Bdd` must be a subset of the state variables, i.e. the `Bdd`
@@ -654,6 +663,13 @@ mod tests {
         let f = bn.find_parameter("f").unwrap();
         let fun = bn.get_update_function(c).as_ref().unwrap();
         let fun_string = fun.to_string(&bn);
+
+        let fun_parse = FnUpdate::try_from_str(
+            "a & (a | (a ^ (a => (a <=> !(f(a, b) | (true | false))))))",
+            &bn,
+        )
+        .unwrap();
+        assert_eq!(fun, &fun_parse);
 
         assert_eq!(vec![a, b], fun.collect_arguments());
         assert_eq!(

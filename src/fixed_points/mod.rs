@@ -352,7 +352,7 @@ impl FixedPoints {
             for p_var in project.clone() {
                 let dependencies = dependency_map.get(&p_var).unwrap();
                 if dependencies.is_subset(&merged) {
-                    result = result.var_project(p_var);
+                    result = result.var_exists(p_var);
                     project.remove(&p_var);
 
                     if cfg!(feature = "print-progress") {
