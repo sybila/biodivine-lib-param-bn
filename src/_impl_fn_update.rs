@@ -381,6 +381,10 @@ impl FnUpdate {
     /// Create a copy of this function which replaces every occurrence of every
     /// `VariableId` with a new one supplied by the provided vector (original `VariableId`
     /// is the index into the vector). Similarly replaces every `ParameterId`.
+    ///
+    /// TODO:
+    ///  The name of this function is very much not great. We should rename it to something
+    ///  more natural, like "substitute_symbols". Also... is anybody actually using this?
     pub fn substitute(&self, vars: &[VariableId], params: &[ParameterId]) -> FnUpdate {
         match self {
             Const(_) => self.clone(),
@@ -399,6 +403,46 @@ impl FnUpdate {
                 FnUpdate::mk_binary(*op, left, right)
             }
         }
+    }
+
+    /// Create a copy of this [FnUpdate] with every occurrence of [VariableId] `var` substituted
+    /// for [FnUpdate] `expression`.
+    ///
+    /// At the moment, the process can fail if there are uninterpreted functions (parameters)
+    /// in which `var` appears as an argument. This is because we don't have a symbolic translation
+    /// for such functions (yet). In such case, the function returns `None`.
+    ///
+    /// TODO: Once we actually have *full* support for any combination of nested uninterpreted
+    /// functions, this operation can be declared as infallible.
+    pub fn substitute_variable(&self, var: VariableId, expression: &FnUpdate) -> Option<FnUpdate> {
+        Some(match self {
+            Const(_) => self.clone(),
+            Param(_, args) => {
+                // If the variable is used in an uninterpreted function,
+                // we cannot perform the substitution.
+                if args.contains(&var) {
+                    return None;
+                } else {
+                    self.clone()
+                }
+            }
+            Var(id) => {
+                if id == &var {
+                    expression.clone()
+                } else {
+                    self.clone()
+                }
+            }
+            Not(inner) => {
+                let inner = inner.substitute_variable(var, expression)?;
+                FnUpdate::mk_not(inner)
+            }
+            Binary(op, left, right) => {
+                let left = left.substitute_variable(var, expression)?;
+                let right = right.substitute_variable(var, expression)?;
+                FnUpdate::mk_binary(*op, left, right)
+            }
+        })
     }
 
     /// Returns true if this update function uses the given parameter.
@@ -567,7 +611,7 @@ impl FnUpdate {
 #[cfg(test)]
 mod tests {
     use crate::symbolic_async_graph::SymbolicContext;
-    use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
+    use crate::{BinaryOp, BooleanNetwork, FnUpdate, RegulatoryGraph, VariableId};
     use biodivine_lib_bdd::bdd;
     use std::collections::HashMap;
     use std::convert::TryFrom;
@@ -771,5 +815,24 @@ mod tests {
             FnUpdate::mk_binary(BinaryOp::Or, not_a_and_b, a_and_b),
             FnUpdate::build_from_bdd(&ctx, &bdd)
         );
+    }
+
+    #[test]
+    pub fn test_variable_substitution() {
+        let mut bn = BooleanNetwork::new(RegulatoryGraph::new(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
+        bn.add_parameter("f", 2).unwrap();
+        let fn1 = FnUpdate::try_from_str("(a & b) | !(c & !a) & f(b, c)", &bn).unwrap();
+        let fn2 = FnUpdate::try_from_str("(b <=> c)", &bn).unwrap();
+        let fn3 =
+            FnUpdate::try_from_str("((b <=> c) & b) | !(c & !(b <=> c)) & f(b, c)", &bn).unwrap();
+        let fn4 = FnUpdate::try_from_str("(a & b & f(a, b))", &bn).unwrap();
+
+        let a = bn.as_graph().find_variable("a").unwrap();
+        assert_eq!(Some(fn3), fn1.substitute_variable(a, &fn2));
+        assert_eq!(None, fn4.substitute_variable(a, &fn2));
     }
 }
