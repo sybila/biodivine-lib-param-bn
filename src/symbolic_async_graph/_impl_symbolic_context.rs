@@ -390,6 +390,18 @@ impl SymbolicContext {
             .map(|v| self.mk_state_variable_is_true(*v))
             .collect();
     }
+
+    /// This is similar to [BddVariableSet::transfer_from], but applied at the level of
+    /// symbolic contexts.
+    ///
+    /// Note that in theory, this method *can* translate between different types of symbolic
+    /// objects (e.g. variable to parameter), but it requires that the two use equivalent names.
+    /// Hence it is not really possible to create such situation organically, because state,
+    /// parameter and extra variables are intentionally created with names that are incompatible.
+    ///
+    pub fn transfer_from(&self, bdd: &Bdd, ctx: &SymbolicContext) -> Option<Bdd> {
+        self.bdd.transfer_from(bdd, &ctx.bdd)
+    }
 }
 
 /// **(internal)** Compute the number of rows necessary to represent a function with given arity.
