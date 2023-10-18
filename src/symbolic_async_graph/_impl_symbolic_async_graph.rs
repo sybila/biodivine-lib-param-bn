@@ -637,6 +637,77 @@ impl SymbolicAsyncGraph {
 
         Ok(self.unit_colors().copy(colors))
     }
+
+    /// Translate a symbolic set from a compatible `graph` such that it is valid in *this*
+    /// [SymbolicAsyncGraph].
+    ///
+    /// The `graph` is considered compatible if:
+    ///  1. All parameters which appear in `colors` also appear in this graph under the same name
+    ///  (parameters not used in `colors` do not matter).
+    ///  2. The internal ordering of symbolic parameter variables is equivalent between graphs.
+    ///
+    /// At the moment, condition (2) depends on network structure and is hard to directly
+    /// influence unless you use [SymbolicAsyncGraph::with_custom_context]. In the future, we
+    /// plan to relax this restriction by automatically reordering the variables as
+    /// part of translation (TODO).
+    pub fn transfer_colors_from(
+        &self,
+        colors: &GraphColors,
+        graph: &SymbolicAsyncGraph,
+    ) -> Option<GraphColors> {
+        let bdd = self
+            .symbolic_context
+            .transfer_from(&colors.bdd, &graph.symbolic_context);
+        bdd.map(|it| GraphColors::new(it, self.symbolic_context()))
+    }
+
+    /// Translate a symbolic set from a compatible `graph` such that it is valid in *this*
+    /// [SymbolicAsyncGraph].
+    ///
+    /// The `graph` is considered compatible if:
+    ///  1. All variables which appear in `vertices` also appear in this graph under the same name
+    ///  (variables not used in `vertices` do not matter).
+    ///  2. The internal ordering of symbolic variables is equivalent between the two graphs.
+    ///
+    /// At the moment, variables are by default ordered alphabetically, hence condition (2)
+    /// should be only broken if one of the graphs uses a custom ordering. In the future, we plan
+    /// to relax this restriction by automatically reordering the variables as part
+    /// of translation (TODO).
+    pub fn transfer_vertices_from(
+        &self,
+        vertices: &GraphVertices,
+        graph: &SymbolicAsyncGraph,
+    ) -> Option<GraphVertices> {
+        let bdd = self
+            .symbolic_context
+            .transfer_from(&vertices.bdd, &graph.symbolic_context);
+        bdd.map(|it| GraphVertices::new(it, self.symbolic_context()))
+    }
+
+    /// Translate a symbolic set from a compatible `graph` such that it is valid in *this*
+    /// [SymbolicAsyncGraph].
+    ///
+    /// The `graph` is considered compatible if:
+    ///  1. All parameters and state variables which appear in `set` also appear in this graph
+    ///  under the same name (variables not used in `set` do not matter).
+    ///  2. The internal ordering of relevant symbolic variables is equivalent between graphs.
+    ///
+    /// At the moment, condition (2) depends on network structure and is hard to directly
+    /// influence if parameters are used extensively unless you use
+    /// [SymbolicAsyncGraph::with_custom_context]. In the future, we plan to relax this
+    /// restriction by automatically reordering the variables as part of translation (TODO).
+    /// For state variables, the ordering should be by default equivalent, since they are ordered
+    /// alphabetically.
+    pub fn transfer_from(
+        &self,
+        set: &GraphColoredVertices,
+        graph: &SymbolicAsyncGraph,
+    ) -> Option<GraphColoredVertices> {
+        let bdd = self
+            .symbolic_context
+            .transfer_from(&set.bdd, &graph.symbolic_context);
+        bdd.map(|it| GraphColoredVertices::new(it, self.symbolic_context()))
+    }
 }
 
 #[cfg(test)]
@@ -1129,5 +1200,82 @@ mod tests {
         assert_ne!(b_states, not_ok_b_states);
         let ok_b_states = stg.universal_extra_variable_projection(&not_ok_b_states);
         assert_eq!(b_states, ok_b_states);
+    }
+
+    #[test]
+    fn test_symbolic_set_transfer() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -| b
+            b -| c
+            a -> c
+            c -?? a
+            b -> d
+            $a: p(c)
+            $b: !a
+            $c: !b & a
+            $d: b
+        ",
+        )
+        .unwrap();
+
+        let g1_a = bn.as_graph().find_variable("a").unwrap();
+        let g1_b = bn.as_graph().find_variable("b").unwrap();
+        let g1_c = bn.as_graph().find_variable("c").unwrap();
+
+        let bn_reduced = bn.inline_variable(g1_b).unwrap();
+
+        let g2_a = bn_reduced.as_graph().find_variable("a").unwrap();
+        let g2_c = bn_reduced.as_graph().find_variable("c").unwrap();
+
+        // These two graphs should be compatible.
+        let g1 = SymbolicAsyncGraph::new(bn).unwrap();
+        let g2 = SymbolicAsyncGraph::new(bn_reduced).unwrap();
+
+        // Basic set translation:
+        assert_eq!(
+            g1.empty_vertices().as_bdd(),
+            g1.transfer_from(g2.empty_vertices(), &g2).unwrap().as_bdd(),
+        );
+        assert_eq!(
+            g1.unit_colored_vertices().as_bdd(),
+            g1.transfer_from(g2.unit_colored_vertices(), &g2)
+                .unwrap()
+                .as_bdd(),
+        );
+        assert_eq!(
+            g1.empty_colors().as_bdd(),
+            g1.transfer_colors_from(g2.empty_colors(), &g2)
+                .unwrap()
+                .as_bdd(),
+        );
+        assert_eq!(
+            g1.unit_colors().as_bdd(),
+            g1.transfer_colors_from(g2.unit_colors(), &g2)
+                .unwrap()
+                .as_bdd(),
+        );
+        assert_eq!(
+            g1.unit_colored_vertices().vertices().as_bdd(),
+            g1.transfer_vertices_from(&g2.unit_colored_vertices().vertices(), &g2)
+                .unwrap()
+                .as_bdd(),
+        );
+        assert_eq!(
+            g1.unit_colored_vertices().vertices().as_bdd(),
+            g1.transfer_vertices_from(&g2.unit_colored_vertices().vertices(), &g2)
+                .unwrap()
+                .as_bdd(),
+        );
+
+        // These two spaces are compatible because they only use shared variables.
+        let g2_space = g2.mk_subspace(&[(g2_a, true), (g2_c, false)]);
+        let g1_space = g1.mk_subspace(&[(g1_a, true), (g1_c, false)]);
+        assert_eq!(g1_space, g1.transfer_from(&g2_space, &g2).unwrap());
+        assert_eq!(g2_space, g2.transfer_from(&g1_space, &g1).unwrap());
+
+        // This space is not compatible because it uses the reduced variable
+        let g1_space = g1.mk_subspace(&[(g1_a, true), (g1_b, false)]);
+        assert_eq!(None, g2.transfer_from(&g1_space, &g1));
     }
 }
