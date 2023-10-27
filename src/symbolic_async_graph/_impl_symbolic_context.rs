@@ -439,6 +439,7 @@ mod tests {
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
     use crate::BooleanNetwork;
+    use biodivine_lib_bdd::BddPartialValuation;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryFrom;
 
@@ -491,5 +492,81 @@ mod tests {
         }
 
         assert_eq!(set, set2);
+    }
+
+    #[test]
+    fn dual_encoding() {
+        // The purpose of this test is just to have an example of a "dual" encoding that can be
+        // useful for trap space computation. However, we are not really testing anything that
+        // substantial.
+
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_instantiated.aeon").unwrap();
+
+        // For each BN variable, we want to add two extra variables for the new "dual" encoding.
+        let extra_variables = bn
+            .variables()
+            .map(|var| (var, 2))
+            .collect::<HashMap<_, _>>();
+        let ctx = SymbolicContext::with_extra_state_variables(&bn, &extra_variables).unwrap();
+
+        // We separate the extra variables into "positive" and "negative" so that we can access
+        // them later.
+        let mut positive_encoded = Vec::new();
+        let mut negative_encoded = Vec::new();
+        for var in bn.variables() {
+            let extra_variables = ctx.extra_state_variables(var);
+            positive_encoded.push(extra_variables[0]);
+            negative_encoded.push(extra_variables[1]);
+        }
+
+        // We also prepare a "reverse" mapping from symbolic state variables to BN variables,
+        // so that we can tell which symbolic variable represents which BN variable.
+        let reverse_state_variables = ctx
+            .state_variables()
+            .iter()
+            .cloned()
+            .zip(bn.variables())
+            .collect::<HashMap<_, _>>();
+
+        // A helper function which transforms a DNF clause based on normal "state" variables into
+        // a DNF clause which uses the variables of our "dual" encoding.
+        let remap_clause = |mut clause: BddPartialValuation| {
+            for (bdd_var, is_positive) in clause.to_values() {
+                let bn_variable = reverse_state_variables.get(&bdd_var).unwrap();
+                let dual_variable = if is_positive {
+                    positive_encoded[bn_variable.to_index()]
+                } else {
+                    negative_encoded[bn_variable.to_index()]
+                };
+                // Remove old "state" variable.
+                clause.unset_value(bdd_var);
+                // Add one of the "dual" variables.
+                clause.set_value(dual_variable, true);
+            }
+            clause
+        };
+
+        // Now we can convert every function into positive condition (when a variable can
+        // grow from 0 to 1) and negative condition (when a variable can fall from 1 to 0).
+        for var in bn.variables() {
+            let var_update = bn.get_update_function(var).as_ref().unwrap();
+            let fn_bdd = ctx.mk_fn_update_true(var_update);
+
+            let positive_dnf = fn_bdd.sat_clauses().map(remap_clause).collect::<Vec<_>>();
+            let positive_bdd = ctx.bdd_variable_set().mk_dnf(&positive_dnf);
+
+            // Do the same thing for negation to obtain the negative condition.
+            let negative_dnf = fn_bdd
+                .not()
+                .sat_clauses()
+                .map(remap_clause)
+                .collect::<Vec<_>>();
+            let negative_bdd = ctx.bdd_variable_set().mk_dnf(&negative_dnf);
+
+            // In this particular test, we just assume these BDDs are not false, i.e.
+            // every variable can sometimes grow and sometimes fall.
+            assert!(!positive_bdd.is_false());
+            assert!(!negative_bdd.is_false());
+        }
     }
 }
