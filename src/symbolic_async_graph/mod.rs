@@ -169,6 +169,12 @@ pub struct FunctionTableIterator<'a> {
     table: &'a FunctionTable,
 }
 
+/// A helper structure which provides a collection of static functions that can be used
+/// to analyse static constraints of Boolean functions.
+pub struct RegulationConstraint {
+    _impossible: (), // Ensures `RegulationConstraint` cannot be instantiated.
+}
+
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;

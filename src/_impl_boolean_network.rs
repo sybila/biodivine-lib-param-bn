@@ -1,10 +1,9 @@
-use crate::symbolic_async_graph::SymbolicContext;
+use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
 use crate::Monotonicity::Inhibition;
 use crate::{
     BooleanNetwork, FnUpdate, Monotonicity, Parameter, ParameterId, ParameterIdIterator,
-    RegulatoryGraph, Variable, VariableId, VariableIdIterator, ID_REGEX,
+    Regulation, RegulatoryGraph, Variable, VariableId, VariableIdIterator, ID_REGEX,
 };
-use biodivine_lib_bdd::bdd;
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 use std::path::Path;
@@ -271,21 +270,28 @@ impl BooleanNetwork {
 }
 
 impl BooleanNetwork {
-    /// Infer a regulatory graph based on the update functions of this `BooleanNetwork`.
+    /// Infer a *sufficient* regulatory graph based on the update functions of
+    /// this `BooleanNetwork`.
     ///
     /// The resulting graph is solely based on the information that can be inferred from the
     /// update functions. In particular, if the BN contains uninterpreted functions,
     /// the monotonicity of variables appearing within these functions is unknown. Overall,
-    /// this method is typically only useful for fully specified networks with minor errors
+    /// the method is typically only useful for fully specified networks with minor errors
     /// in the regulatory graph.
     ///
     /// The BN still has to satisfy basic integrity constraints. In particular, every uninterpreted
     /// function must be used, and must be used consistently (i.e. correct arity). Also, every
     /// update function may only use variables declared as regulators. Otherwise, an error
     /// is returned.
+    ///
+    /// The method can also fail if a non-observable regulator is removed from a partially
+    /// specified function, because in such case we cannot always transform the function
+    /// in a way that is valid.
     pub fn infer_valid_graph(&self) -> Result<BooleanNetwork, String> {
         let ctx = SymbolicContext::new(self)?;
 
+        // This should ensure the variable IDs in the old and the new network are compatible,
+        // so that we can reuse Regulation and FnUpdate objects.
         let var_names = self
             .variables()
             .map(|id| self.get_variable_name(id))
@@ -294,88 +300,68 @@ impl BooleanNetwork {
 
         let mut new_rg = RegulatoryGraph::new(var_names);
         for target_var in self.variables() {
-            let target_name = self.get_variable_name(target_var);
             if let Some(function) = self.get_update_function(target_var) {
-                // If the update function exists, compute a BDD which describes all satisfying
-                // inputs to that function, and then infer function properties from this BDD.
                 let fn_is_true = ctx.mk_fn_update_true(function);
-                let fn_is_false = fn_is_true.not();
-
-                // All non-trivial code is explained in `impl_regulation_constraint`.
-
                 for regulator_var in self.as_graph().regulators(target_var) {
-                    let regulator_name = self.get_variable_name(regulator_var);
-
-                    let regulator = ctx.state_variables()[regulator_var.0];
-                    let regulator_is_true = ctx.bdd_variable_set().mk_var(regulator);
-                    let regulator_is_false = ctx.bdd_variable_set().mk_not_var(regulator);
-
-                    let observability = {
-                        let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
-                        let fn_x0_to_1 =
-                            bdd!(fn_is_true & regulator_is_false).var_exists(regulator);
-                        bdd!(fn_x1_to_1 ^ fn_x0_to_1).exists(ctx.state_variables())
+                    let Some(regulation) = RegulationConstraint::infer_sufficient_regulation(
+                        &ctx,
+                        regulator_var,
+                        target_var,
+                        &fn_is_true,
+                    ) else {
+                        continue;
                     };
 
-                    if !observability.is_false() {
-                        let activation = {
-                            let fn_x1_to_0 =
-                                bdd!(fn_is_false & regulator_is_true).var_exists(regulator);
-                            let fn_x0_to_1 =
-                                bdd!(fn_is_true & regulator_is_false).var_exists(regulator);
-                            bdd!(fn_x0_to_1 & fn_x1_to_0).exists(ctx.state_variables())
-                        }
-                        .not();
-
-                        let inhibition = {
-                            let fn_x0_to_0 =
-                                bdd!(fn_is_false & regulator_is_false).var_exists(regulator);
-                            let fn_x1_to_1 =
-                                bdd!(fn_is_true & regulator_is_true).var_exists(regulator);
-                            bdd!(fn_x0_to_0 & fn_x1_to_1).exists(ctx.state_variables())
-                        }
-                        .not();
-
-                        let monotonicity = match (activation.is_false(), inhibition.is_false()) {
-                            (false, true) => Some(Activation),
-                            (true, false) => Some(Inhibition),
-                            _ => None,
-                        };
-
-                        new_rg
-                            .add_regulation(regulator_name, target_name, true, monotonicity)
-                            .unwrap();
-                    }
+                    new_rg.add_raw_regulation(regulation).unwrap();
                 }
             } else {
                 // If the update function is missing, just copy the existing regulators, but
                 // remove any monotonicity/observability.
-                for regulator in self.as_graph().regulators(target_var) {
-                    let regulator_name = self.get_variable_name(regulator);
+                for regulator_var in self.as_graph().regulators(target_var) {
                     new_rg
-                        .add_regulation(regulator_name, target_name, false, None)
+                        .add_raw_regulation(Regulation {
+                            regulator: regulator_var,
+                            target: target_var,
+                            observable: false,
+                            monotonicity: None,
+                        })
                         .unwrap();
                 }
             }
         }
 
         let mut new_bn = BooleanNetwork::new(new_rg);
+
+        // Copy over existing parameters
+        for parameter_id in self.parameters() {
+            let parameter = &self[parameter_id];
+            new_bn
+                .add_parameter(&parameter.name, parameter.arity)
+                .unwrap();
+        }
+
         for var in self.variables() {
             let name = self.get_variable_name(var);
             if let Some(update) = self.get_update_function(var) {
-                // We first try to just copy the function. If there are no non-observable
-                // variables this should work. If there is an error, we have to copy the
-                // function using a string translation.
-                if new_bn
-                    .set_update_function(var, Some(update.clone()))
-                    .is_err()
-                {
-                    let fn_bdd = ctx.mk_fn_update_true(update);
-                    let fn_string = fn_bdd
-                        .to_boolean_expression(ctx.bdd_variable_set())
-                        .to_string();
-                    new_bn.add_string_update_function(name, &fn_string).unwrap();
-                }
+                // At the moment, there is no way to "fix" the function in a way that
+                // works with logical parameters if one of the arguments is non-observable.
+                // As such, we first try to copy the function with no change. then we try to
+                // run it through a string translation, but this only works on functions without
+                // parameters. If this fails, the conversion fails.
+                let Err(_) = new_bn.set_update_function(var, Some(update.clone())) else {
+                    continue;
+                };
+                let fn_bdd = ctx.mk_fn_update_true(update);
+                let fn_string = fn_bdd
+                    .to_boolean_expression(ctx.bdd_variable_set())
+                    .to_string();
+                let Err(_) = new_bn.add_string_update_function(name, &fn_string) else {
+                    continue;
+                };
+                return Err(format!(
+                    "Cannot translate function for variable {} due to elimianted arguments.",
+                    name
+                ));
             }
         }
 
@@ -766,6 +752,38 @@ mod test {
 
         let inferred = bn.infer_valid_graph().unwrap();
         assert_eq!(expected.as_graph(), inferred.as_graph());
+    }
+
+    #[test]
+    fn test_rg_inference_with_parameters() {
+        let bn = BooleanNetwork::try_from(
+            r"
+                a -> c
+                b -| c
+                $c: f(a, b)
+            ",
+        )
+        .unwrap();
+        let expected = BooleanNetwork::try_from(
+            r"
+                a -?? c
+                b -?? c
+                $c: f(a, b)
+            ",
+        )
+        .unwrap();
+
+        assert_eq!(expected, bn.infer_valid_graph().unwrap());
+
+        let invalid = BooleanNetwork::try_from(
+            r"
+                a -> c
+                b -| c
+                $c: b & x & (a | !a)
+            ",
+        )
+        .unwrap();
+        assert!(invalid.infer_valid_graph().is_err());
     }
 
     #[test]

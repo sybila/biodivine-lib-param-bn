@@ -49,6 +49,13 @@ impl RegulatoryGraph {
         Ok(())
     }
 
+    /// Add a new regulation using the [Regulation] object.
+    pub fn add_raw_regulation(&mut self, regulation: Regulation) -> Result<(), String> {
+        self.assert_no_regulation(regulation.regulator, regulation.target)?;
+        self.regulations.push(regulation);
+        Ok(())
+    }
+
     /// Set the name of a network variable. The name must not be used by any other variable.
     ///
     /// Note that you don't have to rename anything else in the network, since all other
