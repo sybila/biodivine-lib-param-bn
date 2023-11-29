@@ -5,9 +5,7 @@ use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph, SymbolicConte
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 use std::convert::TryFrom;
-use std::ops::Shr;
 
 impl GraphColors {
     /// Make a new color set from a `bdd` and a symbolic `context`.

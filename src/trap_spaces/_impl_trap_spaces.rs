@@ -159,6 +159,53 @@ impl TrapSpaces {
 
         minimal
     }
+
+    /// The same as [Self::minimize], but searches for maximal spaces within `spaces`.
+    pub fn maximize(
+        ctx: &SymbolicSpaceContext,
+        spaces: &NetworkColoredSpaces,
+    ) -> NetworkColoredSpaces {
+        let mut original = spaces.clone();
+        let mut maximal = ctx.mk_empty_colored_spaces();
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Start maximal space search with {}[nodes:{}] candidates.",
+                original.approx_cardinality(),
+                original.symbolic_size()
+            );
+        }
+
+        while !original.is_empty() {
+            let maximum_candidate = original.pick_space();
+            // Compute the set of strict sub spaces.
+            let super_spaces = ctx.mk_sub_spaces(maximum_candidate.as_bdd());
+            let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
+
+            original = original.minus(&super_spaces);
+            maximal = maximal.minus(&super_spaces).union(&maximum_candidate);
+
+            if cfg!(feature = "print-progress") {
+                println!(
+                    "Maximization in progress: {}[nodes:{}] unprocessed, {}[nodes:{}] candidates.",
+                    original.approx_cardinality(),
+                    original.symbolic_size(),
+                    maximal.approx_cardinality(),
+                    maximal.symbolic_size(),
+                );
+            }
+        }
+
+        if cfg!(feature = "print-progress") {
+            println!(
+                "Found {}[nodes:{}] minimal spaces.",
+                maximal.approx_cardinality(),
+                maximal.symbolic_size(),
+            );
+        }
+
+        maximal
+    }
 }
 
 #[cfg(test)]
@@ -177,12 +224,16 @@ mod tests {
 
         let essential_traps = TrapSpaces::essential_symbolic(&network, &ctx, &unit);
         let minimal_traps = TrapSpaces::minimal_symbolic(&network, &ctx, &unit);
+        let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
 
         assert!(minimal_traps.is_subset(&essential_traps));
+        assert!(maximal_traps.is_subset(&essential_traps));
         assert_eq!(7.0, essential_traps.approx_cardinality());
         assert_eq!(1.0, minimal_traps.approx_cardinality());
+        assert_eq!(1.0, maximal_traps.approx_cardinality());
 
         assert!(minimal_traps.is_singleton());
+        assert!(maximal_traps.is_singleton());
         assert!(!essential_traps.is_singleton());
     }
 }
