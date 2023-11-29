@@ -577,7 +577,11 @@ impl FnUpdate {
 
     /// Perform partial evaluation of this function using extended Boolean values in the given
     /// `Space`.
-
+    ///
+    /// *WARNING:* This is only syntactic evaluation. This will not resolve cases that require
+    /// satisfiability check to reduce tautologies/contradictions. For example, `(x & !x)`
+    /// evaluated in `x=*` still evaluates as `*`, since the tautology cannot be detected
+    /// from the expression `(* & !*)`.
     pub fn eval_in_space(&self, space: &Space) -> ExtendedBoolean {
         match self {
             Const(value) => {

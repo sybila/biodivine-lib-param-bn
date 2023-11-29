@@ -57,7 +57,7 @@ impl Space {
         Space(vec![Any; network.num_vars()])
     }
 
-    /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space".
+    /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space" object.
     pub fn from_values(bn: &BooleanNetwork, values: Vec<(VariableId, bool)>) -> Space {
         let mut result = Self::new(bn);
         for (k, v) in values {
@@ -66,6 +66,7 @@ impl Space {
         result
     }
 
+    /// Convert a space into a list of values compatible with the normal `SymbolicAsyncGraph`.
     pub fn to_values(&self) -> Vec<(VariableId, bool)> {
         let mut result = Vec::new();
         for (k, v) in self.0.iter().enumerate() {
@@ -76,6 +77,7 @@ impl Space {
         result
     }
 
+    /// Try to intersect two spaces. If the result is empty, returns `None`.
     pub fn intersect(&self, other: &Space) -> Option<Space> {
         let mut result = self.clone();
         for i in 0..self.0.len() {
@@ -97,36 +99,13 @@ impl Space {
         Some(result)
     }
 
+    /// Count the number of `*` in this space.
     pub fn count_any(&self) -> usize {
         self.0.iter().filter(|it| **it == Any).count()
     }
 
-    /// Check if this `Space` is a **trap** space within the given `BooleanNetwork`.
-    ///
-    /// A trap space is a `Space` in which every asynchronous transition from every state leads
-    /// to a state within the same `Space`.
-    pub fn is_trap_space(&self, network: &BooleanNetwork) -> bool {
-        for var in network.variables() {
-            let expected_value = self[var];
-            if expected_value.is_fixed() {
-                if let Some(update) = network.get_update_function(var) {
-                    let actual_value = update.eval_in_space(self);
-                    if expected_value != actual_value {
-                        // Since expected value is fixed, either actual value is a different
-                        // constant, or `Any`, in which case this is still not a trap space.
-                        return false;
-                    }
-                } else {
-                    // If the function is unknown, the whole thing is a giant parameter that we
-                    // know nothing about, hence the value cannot be fixed.
-                    return false;
-                }
-            } else {
-                // If the expected value is `Any`, then there can be no transitions escaping
-                // using this variable, so we can just skip it.
-            }
-        }
-
-        true
+    /// Count the number of `0` and `1` in this space.
+    pub fn count_fixed(&self) -> usize {
+        self.0.iter().filter(|it| **it != Any).count()
     }
 }
