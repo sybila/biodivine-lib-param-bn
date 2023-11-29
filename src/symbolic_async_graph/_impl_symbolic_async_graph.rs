@@ -5,6 +5,7 @@ use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
+use crate::trap_spaces::SymbolicSpaceContext;
 use crate::{BooleanNetwork, FnUpdate, VariableId};
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
@@ -15,6 +16,18 @@ impl SymbolicAsyncGraph {
     /// `BooleanNetwork` as implemented by `SymbolicContext`.
     pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
         let context = SymbolicContext::new(&network)?;
+        let unit = context.mk_constant(true);
+        Self::with_custom_context(network, context, unit)
+    }
+
+    /// Create a [SymbolicAsyncGraph] that is compatible with an existing [SymbolicSpaceContext].
+    ///
+    /// The `network` argument must be the same as used for the creation of the `context` object.
+    pub fn with_space_context(
+        network: BooleanNetwork,
+        context: &SymbolicSpaceContext,
+    ) -> Result<SymbolicAsyncGraph, String> {
+        let context = context.inner_context().clone();
         let unit = context.mk_constant(true);
         Self::with_custom_context(network, context, unit)
     }
