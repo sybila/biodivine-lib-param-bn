@@ -9,8 +9,6 @@ use crate::symbolic_async_graph::{
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
-use std::ops::Shr;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -57,14 +55,12 @@ impl GraphColoredVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        BddSet::approx_cardinality(self)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        let unused_variables = self.bdd.num_vars()
-            - u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(unused_variables)
+        BddSet::exact_cardinality(self)
     }
 
     /// Return `true` if the set can be described by a single conjunction of literals. That is,
@@ -75,7 +71,22 @@ impl GraphColoredVertices {
 
     /// Return `true` if the set represents a single vertex-color pair.
     pub fn is_singleton(&self) -> bool {
-        self.bdd.is_valuation()
+        if self.bdd.is_clause() {
+            let clause = self.bdd.first_clause().unwrap();
+            for var in &self.state_variables {
+                if clause[*var].is_none() {
+                    return false;
+                }
+            }
+            for var in &self.parameter_variables {
+                if clause[*var].is_none() {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
     }
 
     /// Compute a subset of this set where the given network variable is always fixed to the
@@ -180,7 +191,16 @@ impl GraphColoredVertices {
         if self.is_empty() {
             self.clone()
         } else {
-            self.copy(self.bdd.sat_witness().unwrap().into())
+            let witness = self.bdd.sat_witness().unwrap();
+            // Retain only the relevant variables.
+            let mut partial_valuation = Vec::new();
+            for s_var in &self.state_variables {
+                partial_valuation.push((*s_var, witness[*s_var]));
+            }
+            for p_var in &self.parameter_variables {
+                partial_valuation.push((*p_var, witness[*p_var]));
+            }
+            self.copy(self.bdd.select(&partial_valuation))
         }
     }
 

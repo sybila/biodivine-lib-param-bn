@@ -2,15 +2,11 @@ use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::{RawProjection, StateProjection};
-use crate::symbolic_async_graph::{
-    GraphVertexIterator, GraphVertices, IterableVertices, SymbolicContext,
-};
+use crate::symbolic_async_graph::{GraphVertexIterator, GraphVertices, SymbolicContext};
 use crate::VariableId;
-use biodivine_lib_bdd::{Bdd, BddValuation, BddVariable};
+use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 use std::convert::TryFrom;
-use std::ops::Shr;
 
 impl GraphVertices {
     /// Create a new set of vertices using the given `Bdd` and a symbolic `context`.
@@ -41,14 +37,12 @@ impl GraphVertices {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        BddSet::approx_cardinality(self)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        let unused_variables =
-            self.bdd.num_vars() - u16::try_from(self.state_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(unused_variables)
+        BddSet::exact_cardinality(self)
     }
 
     /// Pick one vertex from this set and return it as a singleton.
@@ -73,19 +67,17 @@ impl GraphVertices {
     ///
     /// Note that sadly you have to use `set.materialize().iter()` to actually iterate over
     /// the vertices, since we are not moving our the value of this set.
-    pub fn materialize(&self) -> IterableVertices {
-        // This is a colossal hack, but it is easier than trying to drag parameter variables into this.
-        let all_false: Bdd = BddValuation::all_false(self.bdd.num_vars()).into();
-        let parameters_false = all_false.exists(&self.state_variables);
-        IterableVertices {
-            materialized_bdd: self.bdd.and(&parameters_false),
+    #[allow(deprecated)]
+    pub fn materialize(&self) -> crate::symbolic_async_graph::IterableVertices {
+        crate::symbolic_async_graph::IterableVertices {
+            projection: RawProjection::new(self.state_variables.clone(), self.as_bdd()),
             state_variables: self.state_variables.clone(),
         }
     }
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        self.bdd.size()
+        BddSet::symbolic_size(self)
     }
 
     /// Convert this set to a `.dot` graph.
@@ -149,29 +141,51 @@ impl GraphVertices {
     pub fn state_projection(&self, variables: &[VariableId]) -> StateProjection {
         StateProjection::new(variables.to_vec(), &self.state_variables, &self.bdd)
     }
+
+    /// Create an iterator equivalent to [GraphVertices::into_iter], but without destroying the
+    /// original object.
+    pub fn iter(&self) -> GraphVertexIterator {
+        let projection = RawProjection::new(self.state_variables.clone(), &self.bdd);
+        GraphVertexIterator {
+            inner_iterator: projection.into_iter(),
+            state_variables: self.state_variables.clone(),
+        }
+    }
 }
 
-impl IterableVertices {
+impl IntoIterator for GraphVertices {
+    type Item = ArrayBitVector;
+    type IntoIter = GraphVertexIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let projection = RawProjection::new(self.state_variables.clone(), &self.bdd);
+        GraphVertexIterator {
+            inner_iterator: projection.into_iter(),
+            state_variables: self.state_variables,
+        }
+    }
+}
+
+#[allow(deprecated)]
+impl crate::symbolic_async_graph::IterableVertices {
     /// Turn this materialized vertex set into an actual iterator.
     pub fn iter(&self) -> GraphVertexIterator {
-        return GraphVertexIterator {
-            iterator: self.materialized_bdd.sat_valuations(),
+        GraphVertexIterator {
+            inner_iterator: self.projection.clone().into_iter(),
             state_variables: self.state_variables.clone(),
-        };
+        }
     }
 }
 
 /// Iterate over vertices using `GraphVertexIterator`.
-impl Iterator for GraphVertexIterator<'_> {
+impl Iterator for GraphVertexIterator {
     type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if let Some(valuation) = self.iterator.next() {
+        if let Some(valuation) = self.inner_iterator.next() {
             let mut state = ArrayBitVector::empty(self.state_variables.len());
             for (i, v) in self.state_variables.iter().enumerate() {
-                if valuation[*v] {
-                    state.flip(i);
-                }
+                state.set(i, valuation[*v].unwrap());
             }
             Some(state)
         } else {

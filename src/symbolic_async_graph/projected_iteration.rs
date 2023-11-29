@@ -38,6 +38,7 @@ use std::collections::HashSet;
 /// has all non-retained variables fixed to `False`. This ensures that when we iterate through
 /// its valuations, we do not repeat valuations that only differ in variables that
 /// are not retained.
+#[derive(Clone)]
 pub struct RawProjection {
     retained_variables: Vec<BddVariable>,
     bdd: Bdd,
@@ -48,6 +49,27 @@ pub struct RawProjection {
 pub struct RawSymbolicIterator<'a> {
     raw_projection: &'a RawProjection,
     inner_iterator: BddSatisfyingValuations<'a>,
+}
+
+/// A version of [RawSymbolicIterator] which actually owns the underlying [RawProjection].
+/// This means the iterator is not tied to the lifetime of the projection.
+///
+/// Note that due to our unfortunate API design, this `struct` has to use a minor "hack" to
+/// make it work. In particular, we have to "fake" a `'static` lifetime on
+/// the [BddSatisfyingValuations] iterator. In our case, this is safe because (a) we don't
+/// leak the inner iterator anywhere, so the hack is contained to our private code, and (b)
+/// we still own the original projection, so it actually lives as long as the iterator.
+/// Finally, (c), the destruction of the iterator is passive and does not perform any actions
+/// on the underlying projection (which may have been destroyed at this time, depending
+/// on the destructor invocation order).
+///
+/// Also note that the `Box` around `RawProjection` is essential! When we are constructing
+/// the inner iterator, we need to reference the final memory location of the `RawProjection`.
+/// Hence we need a heap pointer that will stay the same after we move the projection into
+/// the [OwnedRawSymbolicIterator].
+pub struct OwnedRawSymbolicIterator {
+    raw_projection: Box<RawProjection>,
+    inner_iterator: BddSatisfyingValuations<'static>,
 }
 
 impl RawProjection {
@@ -81,18 +103,51 @@ impl RawProjection {
     }
 }
 
+impl IntoIterator for RawProjection {
+    type Item = BddPartialValuation;
+    type IntoIter = OwnedRawSymbolicIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let iterable = Box::new(self);
+        let static_iterable = unsafe {
+            (iterable.as_ref() as *const RawProjection)
+                .as_ref()
+                .unwrap()
+        };
+        OwnedRawSymbolicIterator {
+            raw_projection: iterable,
+            inner_iterator: static_iterable.bdd.sat_valuations(),
+        }
+    }
+}
+
+/// Restrict a BDD valuation only to the provided "retained" variables.
+fn restrict_valuation(valuation: BddValuation, retain: &[BddVariable]) -> BddPartialValuation {
+    let mut partial = BddPartialValuation::empty();
+    for var in retain {
+        partial.set_value(*var, valuation[*var]);
+    }
+    partial
+}
+
 impl<'a> Iterator for RawSymbolicIterator<'a> {
     type Item = BddPartialValuation;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Extract only the symbolic variables that are actually retained in this projection.
-        self.inner_iterator.next().map(|valuation| {
-            let mut partial_valuation = BddPartialValuation::empty();
-            for var in &self.raw_projection.retained_variables {
-                partial_valuation.set_value(*var, valuation.value(*var))
-            }
-            partial_valuation
-        })
+        self.inner_iterator
+            .next()
+            .map(|valuation| restrict_valuation(valuation, &self.raw_projection.retained_variables))
+    }
+}
+
+impl Iterator for OwnedRawSymbolicIterator {
+    type Item = BddPartialValuation;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner_iterator
+            .next()
+            .map(|valuation| restrict_valuation(valuation, &self.raw_projection.retained_variables))
     }
 }
 
