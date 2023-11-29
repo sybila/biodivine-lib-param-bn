@@ -50,7 +50,7 @@ impl GraphColoredVertices {
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        self.bdd.size()
+        BddSet::symbolic_size(self)
     }
 
     /// Approximate size of this set (error grows for large sets).

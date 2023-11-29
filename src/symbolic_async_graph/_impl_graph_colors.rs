@@ -56,20 +56,17 @@ impl GraphColors {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        BddSet::approx_cardinality(self)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        // Includes state variables and extra variables.
-        let unused_variables =
-            self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(unused_variables)
+        BddSet::exact_cardinality(self)
     }
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        self.bdd.size()
+        BddSet::symbolic_size(self)
     }
 
     /// Convert this set to a `.dot` graph.
