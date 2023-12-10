@@ -44,6 +44,9 @@ impl TryFrom<&str> for BooleanNetwork {
             variable_names.insert(reg.regulator.clone());
             variable_names.insert(reg.target.clone());
         }
+        for (name, _) in &update_functions {
+            variable_names.insert(name.clone());
+        }
         let mut variable_names: Vec<String> = variable_names.into_iter().collect();
         variable_names.sort();
 

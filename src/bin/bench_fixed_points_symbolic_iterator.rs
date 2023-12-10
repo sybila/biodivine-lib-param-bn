@@ -7,7 +7,7 @@ fn main() {
     let args = Vec::from_iter(std::env::args());
     let path = &args[1];
     let model = BooleanNetwork::try_from_file(path).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true);
 
     println!(
         "Loaded model with {} variables and {} parameters.",

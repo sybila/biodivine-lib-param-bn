@@ -58,6 +58,14 @@ impl BooleanNetwork {
         Ok(id)
     }
 
+    /// Set parameter name. This should be relatively safe since we use IDs everythere.
+    fn rename_parameter(&mut self, parameter: ParameterId, new_name: &str) -> Result<(), String> {
+        self.assert_no_such_parameter(new_name)?;
+        let param = self.parameters.get_mut(parameter.to_index()).unwrap();
+        param.name = new_name.to_string();
+        Ok(())
+    }
+
     /// Add a new `UpdateFunction` to the `BooleanNetwork`.
     ///
     /// The variable must not already have an update function. We assume all the variables
@@ -368,32 +376,58 @@ impl BooleanNetwork {
         Ok(new_bn)
     }
 
+    /// Similar to [BooleanNetwork::inline_inputs], but inlines constant values (i.e. `x=true` or
+    /// `x=false`).
+    ///
+    /// However, keep in mind that the constant check if purely syntactic, so it won't detect
+    /// non-trivial tautologies/contradictions. However, we perform partial syntactic evaluation
+    /// of expressions, so we should be able to at least detect `x | true` as `true`.
+    ///
+    /// The inlining is performed iteratively, meaning if the inlining produces a new constant,
+    /// it is also inlined.
+    pub fn inline_constants(&self, repair_graph: bool) -> BooleanNetwork {
+        let empty = HashMap::new();
+        let mut result = self.clone();
+        'inlining: loop {
+            for var in result.variables() {
+                if let Some(update) = result.get_update_function(var) {
+                    if let Some(value) = update.evaluate(&empty) {
+                        // Reduces the amount of bloat after inlining.
+                        result
+                            .set_update_function(var, Some(FnUpdate::Const(value)))
+                            .unwrap();
+                        result = result.inline_variable_internal(var, repair_graph);
+                        // `result` has changed, we have to start over.
+                        continue 'inlining;
+                    }
+                }
+            }
+            break;
+        }
+        result
+    }
+
     /// Try to inline the input nodes (variables) of the network as logical parameters
     /// (uninterpreted functions of arity 0).
     ///
-    /// The operation also removes all observability requirements, as the transformation between
-    /// variable and parameter can cause them to be unsatisfiable (in particular, some
-    /// regulations can become observable only for certain parameter valuations).
+    /// Here, an "input" is a variable `x` such that:
+    ///   - `x` has no incoming regulations and a missing update function.
+    ///   - `x` has an identity update function.
     ///
-    /// This often reduces the overall symbolic complexity of working with the network, as
-    /// fewer symbolic variables are necessary. However, note that at the moment, not all input
-    /// nodes can be correctly inlined. In particular, in order for a node to be inlined,
-    /// the following must hold:
+    /// Note that this does not include constant nodes (e.g. `x=true`). These are handled
+    /// separately by [BooleanNetwork::inline_constants]. Also, the self-regulated case is
+    /// only checked syntactically (e.g. `x = x & (a | !a)` is not considered an input).
+    /// Input variables that are not influencing any variable are removed.
     ///
-    ///  - Either it has no regulators and its update function is unknown, or it has exactly one
-    ///    regulator and its update function is the identity function (update(x) = x). That is,
-    ///    constant source nodes are not inlined.
-    ///  - Every variable that depends on it has an explicit update function, the source node
-    ///    does appear in this function (syntactically; we do not check for observability), and
-    ///    it does not appear as an argument to any of the nested uninterpreted functions.
+    /// This method is equivalent to calling [BooleanNetwork::inline_variable] on each input,
+    /// except that for self-regulating inputs, the inlining is actually permitted.
     ///
-    /// The second requirement is necessary to ensure that the newly created parameter will still
-    /// appear in the network, and that we are not losing any information about its effect in the
-    /// downstream functions. However, note that we are still technically losing the
-    /// monotonicity/observability requirements. You should thus always check the integrity of
-    /// both the original and transformed network.
-    pub fn inline_inputs(&self) -> BooleanNetwork {
-        let inputs: HashSet<VariableId> = self
+    /// Finally, just as [BooleanNetwork::inline_variable], the method can generate an
+    /// inconsistent regulatory graph. If `repair_graph` is set to true, the static properties
+    /// of relevant regulations are inferred using BDDs.
+    ///
+    pub fn inline_inputs(&self, repair_graph: bool) -> BooleanNetwork {
+        let inputs: Vec<VariableId> = self
             .variables()
             .filter(|it| {
                 // Check if the variable is an input.
@@ -403,85 +437,24 @@ impl BooleanNetwork {
 
                 let has_identity_update =
                     self.get_update_function(*it) == &Some(FnUpdate::Var(*it));
-                let is_only_regulator = self.as_graph().regulators(*it) == vec![*it];
-                let is_identity_input = has_identity_update && is_only_regulator;
-                is_free_input || is_identity_input
-            })
-            .filter(|input| {
-                // Only retain inputs that are safe to remove.
-                let mut is_ok = true;
-                for target in self.targets(*input) {
-                    if let Some(update) = self.get_update_function(target) {
-                        // If the input does not appear in the function at all, we can't remove
-                        // it, because we'd lose information about that input.
-                        is_ok = is_ok && update.contains_variable(*input);
-                    } else {
-                        // The target variable does not have an update function - we'd lose
-                        // one implicit argument if we just delete this input variable.
-                        is_ok = false;
-                    }
-                }
-                is_ok
+                is_free_input || has_identity_update
             })
             .collect();
 
-        let variables: HashSet<VariableId> =
-            self.variables().filter(|it| !inputs.contains(it)).collect();
-        let mut variable_names: Vec<String> = variables
-            .iter()
-            .map(|it| self.get_variable_name(*it))
-            .cloned()
-            .collect();
+        /*
+           This is not super efficient, because we make a new copy of the BN every time,
+           but we also want to avoid copying the inlining logic here, because it is already
+           sufficiently complex.
+        */
 
-        variable_names.sort();
-
-        let mut new_rg = RegulatoryGraph::new(variable_names);
-        for reg in self.as_graph().regulations() {
-            if variables.contains(&reg.get_regulator()) {
-                let source_name = self.get_variable_name(reg.get_regulator());
-                let target_name = self.get_variable_name(reg.get_target());
-                new_rg
-                    .add_regulation(
-                        source_name.as_str(),
-                        target_name.as_str(),
-                        false, // necessary for this to work...
-                        reg.get_monotonicity(),
-                    )
-                    .unwrap();
-            }
+        let mut result = self.clone();
+        for input in inputs {
+            let name = self.get_variable_name(input);
+            let new_id = result.as_graph().find_variable(name).unwrap();
+            result = result.inline_variable_internal(new_id, repair_graph);
         }
 
-        let mut new_bn = BooleanNetwork::new(new_rg);
-
-        // Copy old parameters.
-        for param in self.parameters() {
-            let param = self.get_parameter(param);
-            new_bn
-                .add_parameter(param.get_name().as_str(), param.get_arity())
-                .unwrap();
-        }
-
-        // Add new inlined parameters.
-        // Note that integrity of the original BN ensures that there is no parameter
-        // with the same name already.
-        for var in &inputs {
-            let name = self.get_variable_name(*var);
-            new_bn.add_parameter(name.as_str(), 0).unwrap();
-        }
-
-        // Copy update functions. Technically, they should still be syntactically correct, so
-        // we just have to re-parse them in the new context.
-        for var in &variables {
-            let update = self.get_update_function(*var);
-            let name = self.get_variable_name(*var);
-            if let Some(update) = update {
-                new_bn
-                    .add_string_update_function(name.as_str(), update.to_string(self).as_str())
-                    .unwrap();
-            }
-        }
-
-        new_bn
+        result
     }
 
     /// Produce a new [BooleanNetwork] where the given [VariableId] `var` has been eliminated
@@ -489,7 +462,7 @@ impl BooleanNetwork {
     ///
     /// Note that the inlining operation is purely syntactic. This means that even if we create
     /// new regulations when relevant, the resulting regulatory graph may be inconsistent with
-    /// the update functions. If you set `repair_graph` to `true`, the function will perform
+    /// the update functions. If you set `repair_graph` to `true`, the method will perform
     /// semantic analysis on the new functions and repair regulatory graph where relevant.
     /// If `repair_graph` is set to `false`, the operation does not perform any post-processing.
     ///
@@ -502,15 +475,15 @@ impl BooleanNetwork {
     ///
     /// ### Limitations
     ///
-    /// **At the moment, the reduced variable cannot have a self-regulation.** If such variable
+    /// **At the moment, the reduced variable cannot have a self-regulation.** If such a variable
     /// is targeted with reduction, the result is `None`. If a variable is inlined into a missing
     /// function, the function is given a name as a new parameter, and the variable is inlined
-    /// into this new parameter.
+    /// into this new parameter function.
     ///
     /// Note that variables that don't regulate anything (outputs) are simply removed by this
-    /// reduction (although this is correct behaviour, just not super intuitive).
+    /// reduction. However, this is correct behaviour, just not super intuitive.
     ///
-    /// Finally, note that because the set of variables is different between this and the
+    /// Also note that because the set of variables is different between this and the
     /// resulting [BooleanNetwork], any [VariableId] that is valid in this network is not
     /// valid in the resulting network.
     ///
@@ -530,32 +503,80 @@ impl BooleanNetwork {
     /// functions.
     ///
     pub fn inline_variable(&self, var: VariableId, repair_graph: bool) -> Option<BooleanNetwork> {
-        let mut old_bn = self.clone();
-        let old_rg = self.as_graph();
-
-        let var_regulators = old_rg.regulators(var);
-        let var_targets = old_rg.targets(var);
-        if var_targets.contains(&var) {
+        if self.as_graph().targets(var).contains(&var) {
             // Cannot inline variable if it is self-regulated.
             return None;
         }
+        Some(self.inline_variable_internal(var, repair_graph))
+    }
+
+    /// An internal infallible version of [BooleanNetwork::inline_variable] which does not check
+    /// for self-regulations. The idea is that you can use this function if you are *sure* the
+    /// inlining is reasonable even if a self-regulation is present.
+    fn inline_variable_internal(&self, var: VariableId, repair_graph: bool) -> BooleanNetwork {
+        // TODO: Please break this up into smaller methods. I'm just not sure how... yet.
+        let mut old_bn = self.clone();
+        let old_rg = self.as_graph();
+
+        // Remove `var` from regulators if it is there.
+        let var_regulators = old_rg
+            .regulators(var)
+            .into_iter()
+            .filter(|it| *it != var)
+            .collect::<Vec<_>>();
+        let var_targets = old_rg.targets(var);
+
+        // If we have to create an explicit uninterpreted function for the inlined variable,
+        // we have to give it a unique name at first. But one the variable is inlined, we can
+        // use the old name. So here, we save whether a parameter needs to be removed, and if
+        // so, to what.
+        let mut rename_parameter: Option<(ParameterId, String)> = None;
 
         // 1. The very first step is to replace anonymous functions with explicit ones if they
         //    are somehow related to `var`. Hence in the next steps, we can assume the inlined
         //    function and the target functions are all explicit.
-        for var in var_targets.iter().chain(&[var]) {
-            if old_bn.get_update_function(*var).is_none() {
-                let regulators = old_rg.regulators(*var);
-                let name = format!("fn__{}", old_bn.get_variable_name(*var));
-                let arity = u32::try_from(regulators.len()).unwrap();
-                let Ok(p_id) = old_bn.add_parameter(&name, arity) else {
-                    // This could happen if we accidentally name a new parameter after an existing
-                    // one, but this should be extremely rare.
-                    eprintln!("WARNING: Cannot inline variable due to parameter name collision.");
-                    return None;
+        for check_var in var_targets.iter().chain(&[var]) {
+            let has_missing_function = old_bn.get_update_function(*check_var).is_none();
+            let contains_self = old_bn
+                .get_update_function(*check_var)
+                .as_ref()
+                .map(|it| it.contains_variable(var))
+                .unwrap_or(false);
+            let contains_self = *check_var == var && contains_self;
+            if has_missing_function || contains_self {
+                let regulators = old_rg.regulators(*check_var);
+                let mut prefix = "fn".to_string(); // This is used to resolve name collisions.
+                let p_id = loop {
+                    let name = format!("{}_{}", prefix, old_bn.get_variable_name(*check_var));
+                    let arity = u32::try_from(regulators.len()).unwrap();
+                    match old_bn.add_parameter(&name, arity) {
+                        Ok(p_id) => break p_id,
+                        Err(_) => {
+                            // In case of collision, append a _ to prefix.
+                            prefix = format!("{}_", prefix);
+                        }
+                    }
                 };
-                let update = FnUpdate::mk_basic_param(p_id, &regulators);
-                old_bn.set_update_function(*var, Some(update)).unwrap();
+                if *check_var == var {
+                    rename_parameter = Some((p_id, old_bn.get_variable_name(*check_var).clone()));
+                }
+                if has_missing_function {
+                    // If we are creating the parameter due to a missing function, simply create
+                    // a new update function and place it there.
+                    let update = FnUpdate::mk_basic_param(p_id, &regulators);
+                    old_bn
+                        .set_update_function(*check_var, Some(update))
+                        .unwrap();
+                } else {
+                    // Otherwise we are here due to `contains_self`, in which case we need to swap
+                    // the variable for the fresh parameter.
+                    let function = old_bn.get_update_function(*check_var).as_ref().unwrap();
+                    let function =
+                        function.substitute_variable(*check_var, &FnUpdate::mk_param(p_id, &[]));
+                    old_bn
+                        .set_update_function(*check_var, Some(function))
+                        .unwrap();
+                }
             }
         }
 
@@ -654,8 +675,28 @@ impl BooleanNetwork {
         }
 
         // 4. Now we can actually create a new network and all the relevant parameters.
+        //    Here, we have to account for the fact that if a variable is unused and has an unknown
+        //    function, we created an explicit parameter for it, which is now also unused. Such
+        //    parameter should not be copied as it is redundant.
         let mut new_bn = BooleanNetwork::new(new_rg);
         for id in old_bn.parameters() {
+            if rename_parameter.as_ref().map(|(a, _)| *a) == Some(id) {
+                // The rename_parameter is the one created *for* the inlined variable. We
+                // should check that the variable is actually used somewhere before copying it.
+                let mut is_used = false;
+                for target in &var_targets {
+                    let update = old_bn.get_update_function(*target).as_ref().unwrap();
+                    if update.collect_arguments().contains(&var) {
+                        is_used = true;
+                        break;
+                    }
+                }
+                if !is_used {
+                    // No need to rename the parameter if it is skipped.
+                    rename_parameter = None;
+                    continue;
+                }
+            }
             let parameter = old_bn.get_parameter(id);
             new_bn
                 .add_parameter(&parameter.name, parameter.arity)
@@ -672,11 +713,13 @@ impl BooleanNetwork {
                 (it, new_bn.as_graph().find_variable(name).unwrap())
             })
             .collect::<HashMap<_, _>>();
+        // This needs to be a filter-map, because we might have skipped the parameter of the
+        // inlined variable if it is never used.
         let new_param_id = old_bn
             .parameters()
-            .map(|it| {
+            .filter_map(|it| {
                 let name = &old_bn.get_parameter(it).name;
-                (it, new_bn.find_parameter(name).unwrap())
+                new_bn.find_parameter(name).map(|new_id| (it, new_id))
             })
             .collect::<HashMap<_, _>>();
 
@@ -704,19 +747,22 @@ impl BooleanNetwork {
             }
         }
 
+        if let Some((p_id, name)) = rename_parameter {
+            new_bn.rename_parameter(p_id, name.as_str()).unwrap();
+        }
+
         // 7. If we don't want to fix the regulatory graph afterwards, we are done.
         //    However, if we do want to fix it, we will need to create a symbolic context
         //    and start building the network from scratch.
         //    This is essentially `infer_valid_graph`, but only for the relevant regulations.
         if !repair_graph {
-            Some(new_bn)
+            new_bn
         } else {
             let ctx = SymbolicContext::new(&new_bn).unwrap();
 
-            // This is always ok because we know that there is no self-regulation.
             let repair_targets = var_targets
                 .iter()
-                .map(|it| *new_var_id.get(it).unwrap())
+                .filter_map(|it| new_var_id.get(it).cloned())
                 .collect::<HashSet<_>>();
 
             let names = new_bn
@@ -741,7 +787,19 @@ impl BooleanNetwork {
                         reg.target,
                         &fun_bdd,
                     ) else {
-                        // This regulation is irrelevant.
+                        // This regulation is irrelevant, but *syntactically* we might
+                        // still need it if it appears in the update function, because
+                        // we cannot always easily remove it from the function.
+                        if fun.contains_variable(reg.regulator) {
+                            new_new_rg
+                                .add_raw_regulation(Regulation {
+                                    regulator: reg.regulator,
+                                    target: reg.target,
+                                    observable: false,
+                                    monotonicity: reg.monotonicity,
+                                })
+                                .unwrap();
+                        }
                         continue;
                     };
                     if new_reg.monotonicity.is_none() {
@@ -756,6 +814,12 @@ impl BooleanNetwork {
 
             // Finally, just copy all the functions to the new network. They should still be valid.
             let mut new_new_bn = BooleanNetwork::new(new_new_rg);
+            for param in new_bn.parameters() {
+                let param = new_bn.get_parameter(param);
+                new_new_bn
+                    .add_parameter(param.name.as_str(), param.arity)
+                    .unwrap();
+            }
             for var in new_bn.variables() {
                 let Some(update) = new_bn.get_update_function(var).as_ref() else {
                     continue;
@@ -765,7 +829,7 @@ impl BooleanNetwork {
                     .unwrap();
             }
 
-            Some(new_new_bn)
+            new_new_bn
         }
     }
 }
@@ -885,24 +949,35 @@ mod test {
 
             f ->? z
             z ->? z
-            # f cannot be erased because it does not appear in z
+            # f does not appear in z, hence it will just disappear.
+            # z is an input based on identity function, hence it will be inlined, but
+            # it isn't used either, so it will also disappear.
             $z: z
 
             g ->? w
-            # g cannot be erased because w does not have a function
+            # g will be inlined into a newly created function for w.
         ",
         )
         .unwrap();
 
-        let inlined = bn.inline_inputs();
+        let inlined = bn.inline_inputs(true);
 
-        assert_eq!(inlined.num_parameters(), 5);
-        assert_eq!(inlined.num_vars(), 7);
+        // Should be a,b,e,d,g,fn_w,fun.
+        assert_eq!(inlined.num_parameters(), 7);
+        // Should be c,w,x,y.
+        assert_eq!(inlined.num_vars(), 4);
+
         assert!(inlined.find_parameter("a").is_some());
         assert!(inlined.find_parameter("b").is_some());
         assert!(inlined.find_parameter("e").is_some());
         assert!(inlined.find_parameter("d").is_some());
+        assert!(inlined.find_parameter("g").is_some());
         assert!(inlined.find_parameter("fun").is_some());
+        assert!(inlined.find_parameter("fn_w").is_some());
+        assert!(inlined.as_graph().find_variable("c").is_some());
+        assert!(inlined.as_graph().find_variable("w").is_some());
+        assert!(inlined.as_graph().find_variable("x").is_some());
+        assert!(inlined.as_graph().find_variable("y").is_some());
     }
 
     #[test]
@@ -999,5 +1074,44 @@ mod test {
         .unwrap();
         let b = bn.as_graph().find_variable("b").unwrap();
         assert_eq!(bn.inline_variable(b, false), None);
+    }
+
+    #[test]
+    fn test_constant_inlining() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            b -> x
+            c -> x
+
+            # Only c is a constant, but it is enough to turn x into a constant.
+            b -> b
+            $b: b
+            $c: true
+
+            $x: b | c
+
+            # This will also inline because x is a constant.
+            x -> y
+            $y: (x & !x)
+
+            # Here, y will inline, but b should stay.
+            y -> z
+            b -| z
+            $z: !b | y
+        ",
+        )
+        .unwrap();
+
+        let expected = BooleanNetwork::try_from(
+            r"
+            b -> b
+            $b: b
+            b -| z
+            $z: !b | false
+            ",
+        )
+        .unwrap();
+
+        assert_eq!(bn.inline_constants(true), expected);
     }
 }

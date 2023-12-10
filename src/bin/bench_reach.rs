@@ -7,7 +7,7 @@ use biodivine_lib_param_bn::BooleanNetwork;
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true);
 
     println!(
         "Loaded model with {} variables and {} parameters.",
