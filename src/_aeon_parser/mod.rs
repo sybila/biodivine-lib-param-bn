@@ -31,7 +31,7 @@ pub(crate) struct RegulationTemp {
 pub(crate) enum FnUpdateTemp {
     Const(bool),
     Var(String),
-    Param(String, Vec<String>),
+    Param(String, Vec<FnUpdateTemp>),
     Not(Box<FnUpdateTemp>),
     Binary(BinaryOp, Box<FnUpdateTemp>, Box<FnUpdateTemp>),
 }

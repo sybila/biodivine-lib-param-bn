@@ -16,7 +16,14 @@ impl FnUpdateTemp {
                 r.unknown_variables_to_parameters(rg),
             ),
             Not(inner) => Not(inner.unknown_variables_to_parameters(rg)),
-            Param(name, args) => Param(name, args),
+            Param(name, args) => {
+                let args: Vec<FnUpdateTemp> = args
+                    .into_iter()
+                    .map(|it| *it.unknown_variables_to_parameters(rg))
+                    .collect();
+
+                Param(name, args)
+            }
             Var(name) => {
                 if rg.find_variable(&name).is_some() {
                     Var(name)
@@ -43,6 +50,10 @@ impl FnUpdateTemp {
             Param(name, args) => {
                 let arity = u32::try_from(args.len()).unwrap();
                 result.insert(Parameter::new(name, arity));
+
+                for arg in args {
+                    arg.dump_parameters(result);
+                }
             }
         }
     }
@@ -61,7 +72,7 @@ impl FnUpdateTemp {
             Const(_) => {}
             Param(_, args) => {
                 for arg in args {
-                    result.insert(arg.clone());
+                    arg.dump_variables(result);
                 }
             }
         }
@@ -82,7 +93,7 @@ impl FnUpdateTemp {
                 Self::check_parameter_arity(&bn[parameter_id], &args)?;
                 let mut arguments = Vec::with_capacity(args.len());
                 for arg in args {
-                    arguments.push(Self::get_variable(bn, &arg)?);
+                    arguments.push(*arg.into_fn_update(bn)?);
                 }
                 FnUpdate::Param(parameter_id, arguments)
             }
@@ -106,7 +117,7 @@ impl FnUpdateTemp {
 
     /// **(internal)** Generate an error message if the given `parameter` does not have
     /// arity matching the given `args` list.
-    fn check_parameter_arity(parameter: &Parameter, args: &[String]) -> Result<(), String> {
+    fn check_parameter_arity(parameter: &Parameter, args: &[FnUpdateTemp]) -> Result<(), String> {
         if parameter.get_arity() != u32::try_from(args.len()).unwrap() {
             Err(format!(
                 "`{}` has arity {}, but is used with {} arguments.",

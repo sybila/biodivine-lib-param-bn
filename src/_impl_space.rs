@@ -100,33 +100,4 @@ impl Space {
     pub fn count_any(&self) -> usize {
         self.0.iter().filter(|it| **it == Any).count()
     }
-
-    /// Check if this `Space` is a **trap** space within the given `BooleanNetwork`.
-    ///
-    /// A trap space is a `Space` in which every asynchronous transition from every state leads
-    /// to a state within the same `Space`.
-    pub fn is_trap_space(&self, network: &BooleanNetwork) -> bool {
-        for var in network.variables() {
-            let expected_value = self[var];
-            if expected_value.is_fixed() {
-                if let Some(update) = network.get_update_function(var) {
-                    let actual_value = update.eval_in_space(self);
-                    if expected_value != actual_value {
-                        // Since expected value is fixed, either actual value is a different
-                        // constant, or `Any`, in which case this is still not a trap space.
-                        return false;
-                    }
-                } else {
-                    // If the function is unknown, the whole thing is a giant parameter that we
-                    // know nothing about, hence the value cannot be fixed.
-                    return false;
-                }
-            } else {
-                // If the expected value is `Any`, then there can be no transitions escaping
-                // using this variable, so we can just skip it.
-            }
-        }
-
-        true
-    }
 }

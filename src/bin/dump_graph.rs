@@ -1,16 +1,10 @@
 #![allow(deprecated)]
 
-use biodivine_lib_bdd::{BddValuation, ValuationsOfClauseIterator};
-use biodivine_lib_param_bn::async_graph::AsyncGraph;
-use biodivine_lib_param_bn::bdd_params::BddParameterEncoder;
-use biodivine_lib_param_bn::biodivine_std::traits::{EvolutionOperator, Graph};
-use biodivine_lib_param_bn::BooleanNetwork;
-use std::convert::TryFrom;
-use std::io::Read;
-
 /// Dump aeon model from stdin as explicit coloured graph to stdout.
 /// Provides extra debug info on stderr...
 fn main() {
+    panic!("Dump graph feature is disabled. If you need it, please get in touch.");
+    /*
     let mut buffer = String::new();
     std::io::stdin().read_to_string(&mut buffer).unwrap();
 
@@ -51,5 +45,5 @@ fn main() {
                 println!();
             }
         }
-    }
+    }*/
 }
