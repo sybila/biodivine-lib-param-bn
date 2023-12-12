@@ -134,6 +134,64 @@ impl RegulationConstraint {
             monotonicity,
         })
     }
+
+    /// Similar to [Self::infer_sufficient_regulation], but it tries to keep the constraints
+    /// from the given `old_regulation` assuming they are satisfiable and more restrictive
+    /// than the inferred constraints.
+    pub fn fix_regulation(
+        ctx: &SymbolicContext,
+        old_regulation: &Regulation,
+        fn_is_true: &Bdd,
+    ) -> Option<Regulation> {
+        let obs = Self::mk_observability(ctx, fn_is_true, old_regulation.regulator);
+        let observable = if obs.is_true() {
+            // The regulation is used by every possible instantiation, it is always observable.
+            true
+        } else if !obs.is_false() {
+            // The regulation is used by *some* instantiations. It is observable if the old
+            // regulation is observable.
+            old_regulation.observable
+        } else {
+            // The regulation is *never* used, hence the regulation is irrelevant.
+            return None;
+        };
+
+        let act = Self::mk_activation(ctx, fn_is_true, old_regulation.regulator);
+        let inh = Self::mk_inhibition(ctx, fn_is_true, old_regulation.regulator);
+
+        let monotonicity = if act.is_true() {
+            // The function is *always* an activation.
+            Some(Monotonicity::Activation)
+        } else if inh.is_true() {
+            // The function is *always* an inhibition.
+            Some(Monotonicity::Inhibition)
+        } else {
+            // The function can have instantiations with different monotonicity, or possibly
+            // even dual monotonicity.
+            if old_regulation.monotonicity == Some(Monotonicity::Activation) && !act.is_false() {
+                // Old regulation is an activation and there are *some* activating instantiations.
+                // We can propagate the old constraint.
+                Some(Monotonicity::Activation)
+            } else if old_regulation.monotonicity == Some(Monotonicity::Inhibition)
+                && !inh.is_false()
+            {
+                // Old regulation is an inhibition and there are *some* inhibiting instantiations.
+                // We can propagate the old constraint.
+                Some(Monotonicity::Inhibition)
+            } else {
+                // Either the old activation is also non-monotonic, or the function contradicts
+                // the old monotonicity requirement.
+                None
+            }
+        };
+
+        Some(Regulation {
+            regulator: old_regulation.regulator,
+            target: old_regulation.target,
+            observable,
+            monotonicity,
+        })
+    }
 }
 
 /// Compute a `Bdd` which is a subset of the `initial` valuations that satisfies all

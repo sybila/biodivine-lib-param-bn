@@ -44,6 +44,9 @@ impl TryFrom<&str> for BooleanNetwork {
             variable_names.insert(reg.regulator.clone());
             variable_names.insert(reg.target.clone());
         }
+        for (name, _) in &update_functions {
+            variable_names.insert(name.clone());
+        }
         let mut variable_names: Vec<String> = variable_names.into_iter().collect();
         variable_names.sort();
 
@@ -113,7 +116,10 @@ mod tests {
             Box::new(FnUpdate::Var(VariableId(0))),
             Box::new(FnUpdate::Binary(
                 Imp,
-                Box::new(FnUpdate::Param(ParameterId(1), vec![VariableId(2)])),
+                Box::new(FnUpdate::Param(
+                    ParameterId(1),
+                    vec![FnUpdate::Var(VariableId(2))],
+                )),
                 Box::new(FnUpdate::Binary(
                     Or,
                     Box::new(FnUpdate::Var(VariableId(2))),
@@ -124,10 +130,13 @@ mod tests {
 
         let f2 = FnUpdate::Binary(
             Iff,
-            Box::new(FnUpdate::Param(ParameterId(1), vec![VariableId(0)])),
+            Box::new(FnUpdate::Param(
+                ParameterId(1),
+                vec![FnUpdate::Var(VariableId(0))],
+            )),
             Box::new(FnUpdate::Param(
                 ParameterId(2),
-                vec![VariableId(0), VariableId(0)],
+                vec![FnUpdate::Var(VariableId(0)), FnUpdate::Var(VariableId(0))],
             )),
         );
 
@@ -135,7 +144,7 @@ mod tests {
             Imp,
             Box::new(FnUpdate::Param(
                 ParameterId(2),
-                vec![VariableId(1), VariableId(1)],
+                vec![FnUpdate::Var(VariableId(1)), FnUpdate::Var(VariableId(1))],
             )),
             Box::new(FnUpdate::Not(Box::new(FnUpdate::Binary(
                 Xor,

@@ -102,6 +102,11 @@ impl RegulatoryGraph {
             ))
         }
     }
+
+    /// Copy the variable names from this graph into a separate vector.
+    pub fn variable_names(&self) -> Vec<String> {
+        self.variables.iter().map(|it| it.name.clone()).collect()
+    }
 }
 
 /// Some basic utility methods for inspecting the `RegulatoryGraph`.

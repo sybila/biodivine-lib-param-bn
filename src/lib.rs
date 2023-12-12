@@ -18,8 +18,6 @@ use std::collections::HashMap;
 use std::iter::Map;
 use std::ops::Range;
 
-pub mod async_graph;
-pub mod bdd_params;
 pub mod biodivine_std;
 pub mod fixed_points;
 pub mod sbml;
@@ -212,7 +210,7 @@ pub enum FnUpdate {
     /// References a network parameter (uninterpreted function).
     ///
     /// The variable list are the arguments of the function invocation.
-    Param(ParameterId, Vec<VariableId>),
+    Param(ParameterId, Vec<FnUpdate>),
     /// Negation.
     Not(Box<FnUpdate>),
     /// Binary boolean operation.
