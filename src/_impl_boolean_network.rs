@@ -275,105 +275,183 @@ impl BooleanNetwork {
             })
             .collect()
     }
+
+    /// Return a copy of this network where all unused parameters (uninterpreted functions)
+    /// are removed.
+    ///
+    /// Note that `VariableId` objects are still valid for the result network, but `ParameterId`
+    /// objects can now refer to different parameters.
+    pub fn prune_unused_parameters(&self) -> BooleanNetwork {
+        let mut used = HashSet::new();
+        for var in self.variables() {
+            if let Some(update) = self.get_update_function(var) {
+                used.extend(update.collect_parameters().into_iter());
+            }
+        }
+
+        if used.len() == self.num_parameters() {
+            // Skip analysis if all parameters are used.
+            return self.clone();
+        }
+
+        // Ensure the parameter ordering is as similar as possible.
+        let mut used = Vec::from_iter(used);
+        used.sort();
+
+        let mut new_bn = BooleanNetwork::new(self.graph.clone());
+        let mut old_to_new_map = HashMap::new();
+        for old_id in used {
+            let old_param = &self[old_id];
+            let new_id = new_bn
+                .add_parameter(old_param.name.as_str(), old_param.arity)
+                .unwrap_or_else(|_| {
+                    unreachable!("Parameter was valid in the old BN.");
+                });
+            old_to_new_map.insert(old_id, new_id);
+        }
+
+        let empty = HashMap::new();
+        for var in self.variables() {
+            if let Some(update) = self.get_update_function(var) {
+                let update = update.rename_all(&empty, &old_to_new_map);
+                new_bn
+                    .set_update_function(var, Some(update))
+                    .unwrap_or_else(|_| unreachable!("Function was valid in the old BN."));
+            }
+        }
+
+        new_bn
+    }
 }
 
 impl BooleanNetwork {
-    /// Infer a *sufficient* regulatory graph based on the update functions of
+    /// Infer a *sufficient local regulatory graph* based on the update functions of
     /// this `BooleanNetwork`.
     ///
-    /// The resulting graph is solely based on the information that can be inferred from the
-    /// update functions. In particular, if the BN contains uninterpreted functions,
-    /// the monotonicity of variables appearing within these functions is unknown. Overall,
-    /// the method is typically only useful for fully specified networks with minor errors
-    /// in the regulatory graph.
+    /// ## Notes
     ///
-    /// The BN still has to satisfy basic integrity constraints. In particular, every uninterpreted
-    /// function must be used, and must be used consistently (i.e. correct arity). Also, every
-    /// update function may only use variables declared as regulators. Otherwise, an error
-    /// is returned.
+    ///  - The method will simplify the update functions when it detects that a variable
+    ///    is not an essential input of the update function (for any instantiation).
+    ///  - This also removes any unused parameters (uninterpreted functions), or parameters that
+    ///    become unused due to the transformation.
+    ///  - For fully specified update functions, the method simply updates the regulations to
+    ///    match the actual behaviour of the function (i.e. any non-essential regulations are
+    ///    removed, monotonicity is always specified unless the input is truly non-monotonic).
+    ///  - For regulations that interact with uninterpreted functions:
+    ///     - Observability: If there are no instantiations where the regulation is essential,
+    ///       we remove the regulation completely. Otherwise, we preserve the original
+    ///       observability constraint.
+    ///     - Monotonicity: Similarly, if every instantiation of the function has a known
+    ///       monotonicity, then we use this monotonicity. Otherwise, if the original constraint
+    ///       is still satisfied for a subset of all instantiations, we use the original one.
     ///
-    /// The method can also fail if a non-observable regulator is removed from a partially
-    /// specified function, because in such case we cannot always transform the function
-    /// in a way that is valid.
+    /// ## Limitations
+    ///
+    /// The result only guarantees that the constraints are *locally consistent**, meaning they
+    /// are valid when applied to the singular update function, not necessarily the whole model.
+    /// In other words, uninterpreted functions that are used by multiple variables can still cause
+    /// the model to be invalid if they use contradictory constraints, but this usually cannot be
+    /// resolved deterministically.
+    ///
+    /// ## Output
+    ///
+    /// The function can fail we, for whatever reason, cannot create [SymbolicContext] for
+    /// the old network.
+    ///
     pub fn infer_valid_graph(&self) -> Result<BooleanNetwork, String> {
-        let ctx = SymbolicContext::new(self)?;
+        let mut old_bn = self.prune_unused_parameters();
+        let ctx = SymbolicContext::new(&old_bn)?;
 
-        // This should ensure the variable IDs in the old and the new network are compatible,
-        // so that we can reuse Regulation and FnUpdate objects.
-        let var_names = self
-            .variables()
-            .map(|id| self.get_variable_name(id))
-            .cloned()
-            .collect::<Vec<_>>();
+        // Copying the old variable names means VariableId objects should be still valid.
+        let var_names = old_bn.as_graph().variable_names();
 
+        // Now we can recreate the regulatory graph from scratch:
         let mut new_rg = RegulatoryGraph::new(var_names);
-        for target_var in self.variables() {
-            if let Some(function) = self.get_update_function(target_var) {
+        for target_var in old_bn.variables() {
+            if let Some(function) = old_bn.get_update_function(target_var) {
                 let fn_is_true = ctx.mk_fn_update_true(function);
-                for regulator_var in self.as_graph().regulators(target_var) {
-                    let Some(regulation) = RegulationConstraint::infer_sufficient_regulation(
-                        &ctx,
-                        regulator_var,
-                        target_var,
-                        &fn_is_true,
-                    ) else {
+
+                for regulator_var in old_bn.regulators(target_var) {
+                    let old_regulation = old_bn
+                        .as_graph()
+                        .find_regulation(regulator_var, target_var)
+                        .unwrap_or_else(|| {
+                            unreachable!("Regulation must exist.");
+                        });
+
+                    let Some(regulation) =
+                        RegulationConstraint::fix_regulation(&ctx, old_regulation, &fn_is_true)
+                    else {
+                        // The regulator is completely unused. We can replace it with a constant
+                        // and simplify the function.
+                        let function = old_bn
+                            .get_update_function(target_var)
+                            .as_ref()
+                            .unwrap_or_else(|| {
+                                unreachable!("We already know `target_var` has a function.");
+                            });
+                        let function = function
+                            .substitute_variable(regulator_var, &FnUpdate::Const(false))
+                            .simplify_constants();
+                        old_bn
+                            .set_update_function(target_var, Some(function))
+                            .unwrap_or_else(|_| {
+                                unreachable!("Transformed function should be also valid.");
+                            });
                         continue;
                     };
 
-                    new_rg.add_raw_regulation(regulation).unwrap();
+                    new_rg.add_raw_regulation(regulation).unwrap_or_else(|_| {
+                        unreachable!("The regulation must be valid.");
+                    })
                 }
             } else {
-                // If the update function is missing, just copy the existing regulators, but
-                // remove any monotonicity/observability.
-                for regulator_var in self.as_graph().regulators(target_var) {
+                // If the update function is missing, just copy the existing regulators.
+                // Any constraint is satisfiable with an unknown function.
+                for regulator_var in old_bn.regulators(target_var) {
+                    let old_regulation = old_bn
+                        .as_graph()
+                        .find_regulation(regulator_var, target_var)
+                        .unwrap_or_else(|| {
+                            unreachable!("Regulation must exist.");
+                        });
                     new_rg
-                        .add_raw_regulation(Regulation {
-                            regulator: regulator_var,
-                            target: target_var,
-                            observable: false,
-                            monotonicity: None,
-                        })
-                        .unwrap();
+                        .add_raw_regulation(old_regulation.clone())
+                        .unwrap_or_else(|_| {
+                            unreachable!("The regulation must be valid.");
+                        });
                 }
             }
         }
 
+        // Next, we create a new BN and copy over the (potentially simplified) functions.
         let mut new_bn = BooleanNetwork::new(new_rg);
 
         // Copy over existing parameters
-        for parameter_id in self.parameters() {
-            let parameter = &self[parameter_id];
+        for parameter_id in old_bn.parameters() {
+            let parameter = &old_bn[parameter_id];
             new_bn
                 .add_parameter(&parameter.name, parameter.arity)
-                .unwrap();
+                .unwrap_or_else(|_| {
+                    unreachable!("Parameter was valid in the old network.");
+                });
         }
 
-        for var in self.variables() {
-            let name = self.get_variable_name(var);
-            if let Some(update) = self.get_update_function(var) {
-                // At the moment, there is no way to "fix" the function in a way that
-                // works with logical parameters if one of the arguments is non-observable.
-                // As such, we first try to copy the function with no change. then we try to
-                // run it through a string translation, but this only works on functions without
-                // parameters. If this fails, the conversion fails.
-                let Err(_) = new_bn.set_update_function(var, Some(update.clone())) else {
-                    continue;
-                };
-                let fn_bdd = ctx.mk_fn_update_true(update);
-                let fn_string = fn_bdd
-                    .to_boolean_expression(ctx.bdd_variable_set())
-                    .to_string();
-                let Err(_) = new_bn.add_string_update_function(name, &fn_string) else {
-                    continue;
-                };
-                return Err(format!(
-                    "Cannot translate function for variable {} due to elimianted arguments.",
-                    name
-                ));
+        for var in old_bn.variables() {
+            if let Some(update) = old_bn.get_update_function(var) {
+                // At this point, all non-essential variables are already removed from the
+                // function and we can thus safely copy it into the new network.
+                new_bn
+                    .set_update_function(var, Some(update.clone()))
+                    .unwrap_or_else(|_| {
+                        unreachable!("The transformed function must be valid.");
+                    });
             }
         }
 
-        Ok(new_bn)
+        // In the end, we still have to prune the network in case we just made some uninterpreted
+        // function irrelevant by eliminating unused inputs.
+        Ok(new_bn.prune_unused_parameters())
     }
 
     /// Similar to [BooleanNetwork::inline_inputs], but inlines constant values (i.e. `x=true` or
@@ -806,6 +884,8 @@ impl BooleanNetwork {
                         // If "sufficient_regulation" is not monotonous, we can use the old
                         // monotonicity, because that constraint comes from the old regulations,
                         // hence it cannot be inferred from BDD alone.
+
+                        // TODO: This might not be correct if the new function has dual monotonicity?!
                         new_reg.monotonicity = reg.monotonicity;
                     }
                     new_new_rg.add_raw_regulation(new_reg).unwrap();
@@ -895,32 +975,49 @@ mod test {
     fn test_rg_inference_with_parameters() {
         let bn = BooleanNetwork::try_from(
             r"
-                a -> c
-                b -| c
-                $c: f(a, b)
+                a ->? c
+                b -? c
+                d -> c
+                $d: true
+                $c: f(a, b, d | !d)
             ",
         )
         .unwrap();
         let expected = BooleanNetwork::try_from(
             r"
-                a -?? c
-                b -?? c
-                $c: f(a, b)
+                a ->? c
+                b -? c
+                $c: f(a, b, true)
+                $d: true
             ",
         )
         .unwrap();
 
         assert_eq!(expected, bn.infer_valid_graph().unwrap());
 
-        let invalid = BooleanNetwork::try_from(
+        let bn = BooleanNetwork::try_from(
             r"
                 a -> c
+                # This monotonicity is intentionally wrong.
                 b -| c
-                $c: b & x & (a | !a)
+                $a: true
+                $b: true
+                # x is a parameter.
+                $c: b & ((a | !a) | x)
             ",
         )
         .unwrap();
-        assert!(invalid.infer_valid_graph().is_err());
+
+        let expected = BooleanNetwork::try_from(
+            r"
+                b -> c
+                $a: true
+                $b: true
+                $c: b
+            ",
+        )
+        .unwrap();
+        assert_eq!(expected, bn.infer_valid_graph().unwrap());
     }
 
     #[test]

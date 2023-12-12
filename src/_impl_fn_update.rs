@@ -1,4 +1,5 @@
 use crate::symbolic_async_graph::SymbolicContext;
+use crate::BinaryOp::{And, Iff, Imp, Or, Xor};
 use crate::FnUpdate::*;
 use crate::_aeon_parser::FnUpdateTemp;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
@@ -55,27 +56,27 @@ impl FnUpdate {
 
     /// Create a conjunction.
     pub fn and(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::And, self, other)
+        FnUpdate::mk_binary(And, self, other)
     }
 
     /// Create a disjunction.
     pub fn or(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Or, self, other)
+        FnUpdate::mk_binary(Or, self, other)
     }
 
     /// Create an exclusive or.
     pub fn xor(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Xor, self, other)
+        FnUpdate::mk_binary(Xor, self, other)
     }
 
     /// Create an implication.
     pub fn implies(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Imp, self, other)
+        FnUpdate::mk_binary(Imp, self, other)
     }
 
     /// Create an equivalence.
     pub fn iff(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Iff, self, other)
+        FnUpdate::mk_binary(Iff, self, other)
     }
 
     /// If `Const`, return the value, otherwise return `None`.
@@ -183,7 +184,7 @@ impl FnUpdate {
             let mut clause = build_literal(map, literals.next().unwrap());
             for literal in literals {
                 let literal = build_literal(map, literal);
-                clause = FnUpdate::mk_binary(BinaryOp::And, clause, literal);
+                clause = FnUpdate::mk_binary(And, clause, literal);
             }
             clause
         }
@@ -192,7 +193,7 @@ impl FnUpdate {
         let mut result = build_clause(&state_variables, clauses.next().unwrap());
         for clause in clauses {
             let clause = build_clause(&state_variables, clause);
-            result = FnUpdate::mk_binary(BinaryOp::Or, result, clause);
+            result = FnUpdate::mk_binary(Or, result, clause);
         }
         result
     }
@@ -297,27 +298,27 @@ impl FnUpdate {
                 let left = left.evaluate(values);
                 let right = right.evaluate(values);
                 match op {
-                    BinaryOp::And => match (left, right) {
+                    And => match (left, right) {
                         (Some(false), _) => Some(false),
                         (_, Some(false)) => Some(false),
                         (Some(true), Some(true)) => Some(true),
                         _ => None,
                     },
-                    BinaryOp::Or => match (left, right) {
+                    Or => match (left, right) {
                         (Some(true), _) => Some(true),
                         (_, Some(true)) => Some(true),
                         (Some(false), Some(false)) => Some(false),
                         _ => None,
                     },
-                    BinaryOp::Iff => match (left, right) {
+                    Iff => match (left, right) {
                         (Some(left), Some(right)) => Some(left == right),
                         _ => None,
                     },
-                    BinaryOp::Xor => match (left, right) {
+                    Xor => match (left, right) {
                         (Some(left), Some(right)) => Some(left != right),
                         _ => None,
                     },
-                    BinaryOp::Imp => match (left, right) {
+                    Imp => match (left, right) {
                         (Some(false), _) => Some(true),
                         (_, Some(true)) => Some(true),
                         (Some(true), Some(false)) => Some(false),
@@ -467,18 +468,18 @@ impl FnUpdate {
                 let left = left.to_and_or_normal_form();
                 let right = right.to_and_or_normal_form();
                 match op {
-                    BinaryOp::And | BinaryOp::Or => FnUpdate::mk_binary(*op, left, right),
-                    BinaryOp::Imp => {
+                    And | Or => FnUpdate::mk_binary(*op, left, right),
+                    Imp => {
                         // !left | right
                         left.negation().or(right)
                     }
-                    BinaryOp::Xor => {
+                    Xor => {
                         // (left | right) & !(left & right)
                         let both = left.clone().and(right.clone());
                         let one = left.and(right);
                         one.and(both.negation())
                     }
-                    BinaryOp::Iff => {
+                    Iff => {
                         // (left & right) | (!left & !right)
                         let both = left.clone().and(right.clone());
                         let neither = left.negation().and(right.negation());
@@ -529,31 +530,31 @@ impl FnUpdate {
                     } else {
                         // Otherwise we must do magic.
                         match op {
-                            BinaryOp::And => {
+                            And => {
                                 // !(left & right) = (!left | !right)
                                 let left = recursion(left, true);
                                 let right = recursion(right, true);
                                 left.or(right)
                             }
-                            BinaryOp::Or => {
+                            Or => {
                                 // !(left | right) = (!left & !right)
                                 let left = recursion(left, true);
                                 let right = recursion(right, true);
                                 left.and(right)
                             }
-                            BinaryOp::Imp => {
+                            Imp => {
                                 // !(left => right) = (left & !right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, true);
                                 left.and(right)
                             }
-                            BinaryOp::Xor => {
+                            Xor => {
                                 // !(left ^ right) = (left <=> right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, false);
                                 left.iff(right)
                             }
-                            BinaryOp::Iff => {
+                            Iff => {
                                 // !(left <=> right) = (left ^ right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, false);
@@ -566,6 +567,74 @@ impl FnUpdate {
         }
 
         recursion(self, false)
+    }
+
+    /// Utility function that eliminates unnecessary constants from this update function
+    /// using standard syntactic transformations.
+    pub fn simplify_constants(&self) -> FnUpdate {
+        match self {
+            Const(value) => Const(*value),
+            Var(id) => Var(*id),
+            Param(id, args) => {
+                let args = args
+                    .iter()
+                    .map(|it| it.simplify_constants())
+                    .collect::<Vec<_>>();
+                Param(*id, args)
+            }
+            Not(inner) => {
+                // !true = false
+                // !false = true
+                let inner = inner.simplify_constants();
+                if let Some(inner_const) = inner.as_const() {
+                    Const(!inner_const)
+                } else {
+                    Not(Box::new(inner))
+                }
+            }
+            Binary(op, left, right) => {
+                let left = left.simplify_constants();
+                let right = right.simplify_constants();
+                match op {
+                    And => match (left.as_const(), right.as_const()) {
+                        (Some(false), _) | (_, Some(false)) => Const(false),
+                        (Some(true), _) => right,
+                        (_, Some(true)) => left,
+                        _ => left.and(right),
+                    },
+                    Or => match (left.as_const(), right.as_const()) {
+                        (Some(true), _) | (_, Some(true)) => Const(true),
+                        (Some(false), _) => right,
+                        (_, Some(false)) => left,
+                        _ => left.or(right),
+                    },
+                    Xor => match (left.as_const(), right.as_const()) {
+                        (Some(true), Some(true)) | (Some(false), Some(false)) => Const(false),
+                        (Some(false), Some(true)) | (Some(true), Some(false)) => Const(true),
+                        (Some(false), _) => right,
+                        (_, Some(false)) => left,
+                        (Some(true), _) => FnUpdate::mk_not(right),
+                        (_, Some(true)) => FnUpdate::mk_not(left),
+                        _ => left.xor(right),
+                    },
+                    Iff => match (left.as_const(), right.as_const()) {
+                        (Some(true), Some(true)) | (Some(false), Some(false)) => Const(true),
+                        (Some(false), Some(true)) | (Some(true), Some(false)) => Const(false),
+                        (Some(true), _) => right,
+                        (_, Some(true)) => left,
+                        (Some(false), _) => FnUpdate::mk_not(right),
+                        (_, Some(false)) => FnUpdate::mk_not(left),
+                        _ => left.iff(right),
+                    },
+                    Imp => match (left.as_const(), right.as_const()) {
+                        (Some(false), _) | (_, Some(true)) => Const(true),
+                        (Some(true), _) => right,
+                        (_, Some(false)) => FnUpdate::mk_not(left),
+                        _ => left.implies(right),
+                    },
+                }
+            }
+        }
     }
 }
 
@@ -767,5 +836,165 @@ mod tests {
         let a = bn.as_graph().find_variable("a").unwrap();
         assert_eq!(fn3, fn1.substitute_variable(a, &fn2));
         assert_eq!(fn5, fn4.substitute_variable(a, &fn2));
+    }
+
+    #[test]
+    pub fn test_constant_simplification() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            a -> c
+            $c: f(a, b) | g(a, b)
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(
+            FnUpdate::try_from_str("true & b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b & true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false & b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("false", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b & false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("false", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b | false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false | b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b | true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true | b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b ^ true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true ^ b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b ^ false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false ^ b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b <=> true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true <=> b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b <=> false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false <=> b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b => false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false => b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b => true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true => b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true & f(b & false, c) => g(a, b) | (a <=> true)", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("f(false, c) => g(a, b) | a", &bn).unwrap(),
+        );
     }
 }
