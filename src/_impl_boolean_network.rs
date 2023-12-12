@@ -460,7 +460,8 @@ impl BooleanNetwork {
     /// By default, the constant check is purely syntactic, but we do perform basic constant
     /// propagation (e.g. `x | true = true`) in order to catch the most obvious non-trivial cases.
     /// However, you can set `infer_constants` to `true`, in which case a symbolic method will
-    /// be used to check if the variable uses a constant function.
+    /// be used to check if the variable uses a constant function. Note that this can also
+    /// eliminate parameters in some cases (e.g. inlining `x=true` into `y=x | f(z)`).
     ///
     /// Furthermore, similar to [BooleanNetwork::inline_inputs], you can set `repair_graph` to
     /// `true` in order to fix any inconsistent regulations that arise due to the inlining
@@ -944,7 +945,12 @@ impl BooleanNetwork {
             new_bn.rename_parameter(p_id, name.as_str()).unwrap();
         }
 
-        // 7. If we don't want to fix the regulatory graph afterwards, we are done.
+        // 7. Prune unused parameters. This is necessary because if we are inlining an output
+        //    variable, we might delete the last occurrence of a parameter, in which case we
+        //    ideally want to remove it from the network completely.
+        new_bn = new_bn.prune_unused_parameters();
+
+        // 8. If we don't want to fix the regulatory graph afterwards, we are done.
         //    However, if we do want to fix it, we will need to create a symbolic context
         //    and start building the network from scratch.
         //    This is essentially `infer_valid_graph`, but only for the relevant regulations.
@@ -1008,7 +1014,10 @@ impl BooleanNetwork {
                     .unwrap();
             }
 
-            new_new_bn
+            // In very rare instances, we can eliminate a parameter by detecting an unused
+            // regulation and simplifying the variable away (e.g. `x & !x & f(z)` simplifies
+            // to `false`). Hence we have to prune parameters again here.
+            new_new_bn.prune_unused_parameters()
         }
     }
 }
@@ -1290,6 +1299,25 @@ mod test {
         .unwrap();
         let b = bn.as_graph().find_variable("b").unwrap();
         assert_eq!(bn.inline_variable(b, false), None);
+
+        // Test that a parameter is indeed removed if it is no longer relevant.
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            $a: true
+            $b: f(a)
+        ",
+        )
+        .unwrap();
+        let expected = BooleanNetwork::try_from(
+            r"
+            $a: true
+        ",
+        )
+        .unwrap();
+        let b = bn.as_graph().find_variable("b").unwrap();
+
+        assert_eq!(expected, bn.inline_variable(b, true).unwrap());
     }
 
     #[test]
