@@ -229,6 +229,7 @@ mod tests {
         assert!(minimal_traps.is_subset(&essential_traps));
         assert!(maximal_traps.is_subset(&essential_traps));
         assert_eq!(7.0, essential_traps.approx_cardinality());
+        assert_eq!(7, essential_traps.spaces().iter().count());
         assert_eq!(1.0, minimal_traps.approx_cardinality());
         assert_eq!(1.0, maximal_traps.approx_cardinality());
 

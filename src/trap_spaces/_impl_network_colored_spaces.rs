@@ -50,12 +50,6 @@ impl NetworkColoredSpaces {
         BddSet::exact_cardinality(self)
     }
 
-    /// Return `true` if the set can be described by a single conjunction of literals. That is,
-    /// the set is a hypercube in the $\mathbb{B}^n$ space.
-    pub fn is_subspace(&self) -> bool {
-        self.bdd.is_clause()
-    }
-
     /// Return `true` if the set represents a single space-color pair.
     pub fn is_singleton(&self) -> bool {
         if !self.bdd.is_clause() {
@@ -206,5 +200,38 @@ impl BddSet for NetworkColoredSpaces {
     fn active_variables(&self) -> u16 {
         let x = self.dual_variables.len() * 2 + self.parameter_variables.len();
         u16::try_from(x).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::trap_spaces::SymbolicSpaceContext;
+    use crate::BooleanNetwork;
+    use num_bigint::BigInt;
+    use num_traits::One;
+
+    #[test]
+    fn basic_colored_spaces_set_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/005.aeon").unwrap();
+        let ctx = SymbolicSpaceContext::new(&bn);
+        let stg = SymbolicAsyncGraph::with_space_context(bn.clone(), &ctx).unwrap();
+
+        let unit = ctx.mk_unit_colored_spaces(&stg);
+        assert!(!unit.is_singleton());
+        assert_eq!(unit, unit.copy(unit.clone().into_bdd()));
+
+        let singleton = unit.pick_singleton();
+        assert_eq!(1.0, singleton.approx_cardinality());
+        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        let singleton_color = singleton.colors();
+        let singleton_space = singleton.spaces();
+        assert!(singleton_color.is_singleton());
+        assert!(singleton_space.is_singleton());
+        assert!(!unit.intersect_colors(&singleton_color).is_singleton());
+        // There is only one color, hence this holds. Otherwise this should not hold.
+        assert!(unit.intersect_spaces(&singleton_space).is_singleton());
+        assert!(unit.minus_colors(&singleton_color).is_empty());
     }
 }

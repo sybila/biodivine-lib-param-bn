@@ -160,3 +160,26 @@ impl Iterator for SpaceIterator {
         Some(space)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::trap_spaces::SymbolicSpaceContext;
+    use crate::BooleanNetwork;
+    use num_bigint::BigInt;
+    use num_traits::One;
+
+    #[test]
+    fn basic_spaces_set_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/005.aeon").unwrap();
+        let ctx = SymbolicSpaceContext::new(&bn);
+
+        let unit = ctx.mk_unit_spaces();
+        assert!(!unit.is_singleton());
+        assert_eq!(unit, unit.copy(unit.clone().into_bdd()));
+
+        let singleton = unit.pick_singleton();
+        assert_eq!(1.0, singleton.approx_cardinality());
+        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        assert_eq!(1, singleton.iter().count());
+    }
+}
