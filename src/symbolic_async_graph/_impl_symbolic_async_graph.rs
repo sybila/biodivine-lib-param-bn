@@ -499,6 +499,11 @@ impl SymbolicAsyncGraph {
             })
             .collect::<Vec<_>>();
 
+        let sub_to_main_map = sub_network
+            .variables()
+            .zip(sub_to_main.clone())
+            .collect::<HashMap<_, _>>();
+
         {
             // 2.1 Verify that the sub-network has the same parameters as the main network.
             for param in sub_network.parameters() {
@@ -522,6 +527,11 @@ impl SymbolicAsyncGraph {
                 main_network.find_parameter(name).unwrap()
             })
             .collect::<Vec<_>>();
+
+        let param_sub_to_main_map = sub_network
+            .parameters()
+            .zip(param_sub_to_main.clone())
+            .collect::<HashMap<_, _>>();
 
         {
             // 3.1 Verify that every regulation from main is in sub.
@@ -572,7 +582,8 @@ impl SymbolicAsyncGraph {
             let name = main_network.get_variable_name(main_var);
             if let Some(sub_fun) = sub_network.get_update_function(sub_var) {
                 if let Some(main_fun) = main_network.get_update_function(main_var) {
-                    let sub_fun_in_main = sub_fun.substitute(&sub_to_main, &param_sub_to_main);
+                    let sub_fun_in_main =
+                        sub_fun.rename_all(&sub_to_main_map, &param_sub_to_main_map);
                     if &sub_fun_in_main != main_fun {
                         return Err(format!("Functions of `{}` are different.", name));
                     }
@@ -620,7 +631,7 @@ impl SymbolicAsyncGraph {
                     .get_implicit_function_table(main_var);
                 let function_args = main_network.regulators(main_var);
                 let specialised_function =
-                    specialised_function.substitute(&sub_to_main, &param_sub_to_main);
+                    specialised_function.rename_all(&sub_to_main_map, &param_sub_to_main_map);
 
                 let mut valuation = main_network
                     .variables()
@@ -1236,7 +1247,7 @@ mod tests {
         let g1_b = bn.as_graph().find_variable("b").unwrap();
         let g1_c = bn.as_graph().find_variable("c").unwrap();
 
-        let bn_reduced = bn.inline_variable(g1_b).unwrap();
+        let bn_reduced = bn.inline_variable(g1_b, false).unwrap();
 
         let g2_a = bn_reduced.as_graph().find_variable("a").unwrap();
         let g2_c = bn_reduced.as_graph().find_variable("c").unwrap();

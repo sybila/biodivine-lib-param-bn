@@ -128,7 +128,7 @@ impl BooleanNetwork {
             FnUpdate::Param(id, args) => {
                 write!(out, "<apply><csymbol>{}</csymbol>", self[*id].get_name())?;
                 for arg in args {
-                    write!(out, "<ci>{}</ci>", self[*arg].get_name())?;
+                    self.write_update_function(out, arg)?;
                 }
                 write!(out, "</apply>")?;
             }

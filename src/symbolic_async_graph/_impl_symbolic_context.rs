@@ -244,7 +244,7 @@ impl SymbolicContext {
     pub fn mk_uninterpreted_function_is_true(
         &self,
         parameter: ParameterId,
-        args: &[VariableId],
+        args: &[FnUpdate],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.mk_function_table_true(table, &self.prepare_args(args))
@@ -262,7 +262,8 @@ impl SymbolicContext {
                 variable
             );
         });
-        self.mk_function_table_true(table, &self.prepare_args(args))
+        let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
+        self.mk_function_table_true(table, &self.prepare_args(&args))
     }
 
     /// Create a `Bdd` that is true when given `FnUpdate` evaluates to true.
@@ -346,7 +347,8 @@ impl SymbolicContext {
                 variable
             );
         });
-        self.instantiate_function_table(valuation, table, &self.prepare_args(args))
+        let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
+        self.instantiate_function_table(valuation, table, &self.prepare_args(&args))
     }
 
     /// Create a `Bdd` which represents the instantiated explicit uninterpreted function.
@@ -354,7 +356,7 @@ impl SymbolicContext {
         &self,
         valuation: &BddValuation,
         parameter: ParameterId,
-        args: &[VariableId],
+        args: &[FnUpdate],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.instantiate_function_table(valuation, table, &self.prepare_args(args))
@@ -383,12 +385,9 @@ impl SymbolicContext {
         }
     }
 
-    /// **(internal)** Utility method for converting `VariableId` arguments to `Bdd` arguments.
-    fn prepare_args(&self, args: &[VariableId]) -> Vec<Bdd> {
-        return args
-            .iter()
-            .map(|v| self.mk_state_variable_is_true(*v))
-            .collect();
+    /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
+    fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
+        return args.iter().map(|v| self.mk_fn_update_true(v)).collect();
     }
 
     /// This is similar to [BddVariableSet::transfer_from], but applied at the level of

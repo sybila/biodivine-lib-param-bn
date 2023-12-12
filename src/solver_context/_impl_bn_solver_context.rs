@@ -286,10 +286,11 @@ impl<'z3> BnSolverContext<'z3> {
                 let args: Vec<Bool> = args
                     .iter()
                     .map(|it| {
-                        variable_constructors[it.to_index()]
-                            .apply(&[])
-                            .as_bool()
-                            .unwrap()
+                        self.translate_update_function(
+                            it,
+                            variable_constructors,
+                            parameter_constructors,
+                        )
                     })
                     .collect::<Vec<_>>();
                 let arg_refs: Vec<&dyn Ast<'z3>> = args.iter().map(|it| it as &dyn Ast).collect();

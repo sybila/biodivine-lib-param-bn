@@ -46,8 +46,16 @@ fn flatten_fn_update(network: &mut BooleanNetwork, update: &FnUpdate) -> FnUpdat
         FnUpdate::Var(id) => FnUpdate::Var(*id),
         FnUpdate::Not(update) => flatten_fn_update(network, update).negation(),
         FnUpdate::Param(id, args) => {
+            let mut var_args = Vec::new();
+            for arg in args {
+                if let FnUpdate::Var(id) = arg {
+                    var_args.push(*id);
+                } else {
+                    panic!("Cannot process models with nested function calls.");
+                }
+            }
             let name = network.get_parameter(*id).get_name().clone();
-            explode_function(network, args, format!("{}_", name))
+            explode_function(network, &var_args, format!("{}_", name))
         }
         FnUpdate::Binary(op, left, right) => FnUpdate::Binary(
             *op,
