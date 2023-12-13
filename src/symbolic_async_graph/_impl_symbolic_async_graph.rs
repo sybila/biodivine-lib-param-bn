@@ -168,6 +168,11 @@ impl SymbolicAsyncGraph {
         &self.fn_update[variable.to_index()]
     }
 
+    /// Return the string name of the specified [VariableId].
+    pub fn get_variable_name(&self, variable: VariableId) -> String {
+        self.symbolic_context().get_network_variable_name(variable)
+    }
+
     /// Return a reference to the symbolic context of this graph.
     pub fn symbolic_context(&self) -> &SymbolicContext {
         &self.symbolic_context
@@ -316,7 +321,7 @@ impl SymbolicAsyncGraph {
     }
 
     pub fn variables(&self) -> VariableIdIterator {
-        (0..self.num_vars()).map(VariableId::from_index)
+        self.symbolic_context().network_variables()
     }
 
     /// Compute a subset of the unit vertex set that is specified using the given list
@@ -384,6 +389,57 @@ impl SymbolicAsyncGraph {
             self.unit_bdd.select(partial_valuation),
             &self.symbolic_context,
         )
+    }
+
+    /// Create a new [SymbolicAsyncGraph] which inlines [VariableId] into all target update functions.
+    ///
+    /// The inlining is currently not allowed on variables that have a self-regulation.
+    ///
+    /// The new [SymbolicAsyncGraph] has no associated [BooleanNetwork].
+    pub fn inline_symbolic(&self, variable: VariableId) -> Option<SymbolicAsyncGraph> {
+        let remove_index = variable.to_index();
+        let var_symbolic = self.symbolic_context.get_state_variable(variable);
+        let fn_support = self.fn_update[remove_index].support_set();
+        if fn_support.contains(&var_symbolic) {
+            // There is a self regulation.
+            return None;
+        }
+
+        let new_context = self.symbolic_context.eliminate(variable);
+
+        // State variables should not matter that much in the unit set, we can just erase it. The important
+        // part is that we use the new symbolic context.
+        let new_unit = self.unit_bdd.var_exists(var_symbolic);
+        let new_unit_set = GraphColoredVertices::new(new_unit.clone(), &new_context);
+        let new_empty_set = GraphColoredVertices::new(new_context.bdd.mk_false(), &new_context);
+
+        let mut new_fn_update = self.fn_update.clone();
+        let to_inline = new_fn_update.remove(remove_index);
+        for var in new_context.network_variables() {
+            let function = new_fn_update.get_mut(var.to_index()).unwrap();
+            *function = function.substitute(var_symbolic, &to_inline);
+        }
+
+        // There is probably a way to also inline the fn_transition stuff, but best approach for now seems to be
+        // to recompute it completely:
+        let mut new_fn_transition = Vec::new();
+        for var in new_context.network_variables() {
+            let function = &new_fn_update[var.to_index()];
+            let var_is_true = new_context.mk_state_variable_is_true(var);
+            new_fn_transition.push(var_is_true.xor(function));
+        }
+
+        Some(SymbolicAsyncGraph {
+            // The network is unknown. We could compute it by inlining, but that can blow up the expression size.
+            network: None,
+            symbolic_context: new_context,
+            vertex_space: (new_empty_set.vertices(), new_unit_set.vertices()),
+            color_space: (new_empty_set.colors(), new_unit_set.colors()),
+            colored_vertex_space: (new_empty_set, new_unit_set),
+            unit_bdd: new_unit,
+            fn_update: new_fn_update,
+            fn_transition: new_fn_transition,
+        })
     }
 
     /// Create a copy of this `SymbolicAsyncGraph` where the vertex space is restricted to
@@ -840,6 +896,7 @@ impl SymbolicAsyncGraph {
 mod tests {
     use crate::biodivine_std::bitvector::BitVector;
     use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
     use crate::BooleanNetwork;
     use std::collections::HashMap;
@@ -1405,5 +1462,35 @@ mod tests {
         // This space is not compatible because it uses the reduced variable
         let g1_space = g1.mk_subspace(&[(g1_a, true), (g1_b, false)]);
         assert_eq!(None, g2.transfer_from(&g1_space, &g1));
+    }
+
+    #[test]
+    fn test_symbolic_inlining() {
+        let bn = BooleanNetwork::try_from_file(
+            "sbml_models/real_world/[v28]__[r45]__[CALZONE-CELL-FATE]__[ginsim]/model.aeon",
+        )
+        .unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+
+        let to_reduce = ["TNF", "RIP1", "cFLIP", "BCL2", "NFkB", "CASP8"];
+
+        let mut reduced = stg.clone();
+        for var in to_reduce {
+            let id = reduced
+                .symbolic_context()
+                .find_network_variable(var)
+                .unwrap();
+            reduced = reduced.inline_symbolic(id).unwrap();
+        }
+
+        let fixed_points = FixedPoints::symbolic(&reduced, reduced.unit_colored_vertices());
+        let fixed_points_true = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
+        let fixed_points_transferred = stg.transfer_from(&fixed_points, &reduced).unwrap();
+        assert!(fixed_points_true.is_subset(&fixed_points_transferred));
+        let fixed_points_restricted = FixedPoints::symbolic(&stg, &fixed_points_transferred);
+        assert!(fixed_points_true
+            .as_bdd()
+            .iff(fixed_points_restricted.as_bdd())
+            .is_true());
     }
 }

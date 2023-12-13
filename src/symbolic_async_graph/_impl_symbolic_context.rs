@@ -1,5 +1,5 @@
 use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId, VariableIdIterator};
 use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
@@ -133,6 +133,46 @@ impl SymbolicContext {
             explicit_function_tables,
             implicit_function_tables,
         })
+    }
+
+    /// Obtain a [VariableId] of a state variable, assuming such state variable exists.
+    pub fn find_network_variable(&self, name: &str) -> Option<VariableId> {
+        self.bdd
+            .var_by_name(name)
+            .and_then(|bdd_var| self.find_state_variable(bdd_var))
+    }
+
+    /// Obtain the name of a specific state variable.
+    pub fn get_network_variable_name(&self, variable: VariableId) -> String {
+        self.bdd.name_of(self.state_variables[variable.to_index()])
+    }
+
+    /// Iterator over all [VariableId] network variables managed by this [SymbolicContext].
+    pub fn network_variables(&self) -> VariableIdIterator {
+        (0..self.num_state_variables()).map(VariableId::from_index)
+    }
+
+    /// Create a new [SymbolicContext] which is compatible with the current context (it uses the same
+    /// [BddVariableSet]), but is missing the given [VariableId].
+    ///
+    /// The new context uses the same [ParameterId] identifiers as the old context, but has different
+    /// [VariableId] identifiers, since one of the variables is no longer used, and [VariableId] identifiers
+    /// must be always a contiguous sequence. You should use variable names to "translate" [VariableId] identifiers
+    /// between the two symbolic context. Of course, [SymbolicContext::transfer_from] should also still work.
+    ///
+    /// Note that the extra state variables and parameter variables do not disappear, even if they are only used
+    /// by the eliminated variable. However, you cannot access them using the normal methods
+    /// (e.g. [SymbolicContext::get_extra_state_variable]), only through the full list
+    /// (i.e. [SymbolicContext::all_extra_state_variables]).
+    pub fn eliminate(&self, variable: VariableId) -> SymbolicContext {
+        let index = variable.to_index();
+        let mut result = self.clone();
+        // Remove the variable from all variable-indexed lists. The symbolic variables still remain in the
+        // general lists though. Explicit parameters are unchanged.
+        result.state_variables.remove(index);
+        result.extra_state_variables.remove(index);
+        result.implicit_function_tables.remove(index);
+        result
     }
 
     /// The number of state variables (should be equal to the number of network variables).
