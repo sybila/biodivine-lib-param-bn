@@ -1,5 +1,7 @@
+use crate::symbolic_async_graph::SymbolicContext;
 use crate::ExtendedBoolean::{Any, One, Zero};
 use crate::{BooleanNetwork, ExtendedBoolean, Space, VariableId};
+use biodivine_lib_bdd::BddVariable;
 use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 use std::ops::{Index, IndexMut};
@@ -75,7 +77,18 @@ impl Space {
         let mut result = Vec::new();
         for (k, v) in self.0.iter().enumerate() {
             if let Some(v) = v.try_as_bool() {
-                result.push((VariableId::from_index(k), v))
+                result.push((VariableId::from_index(k), v));
+            }
+        }
+        result
+    }
+
+    /// The same as [Self::to_values], but uses [BddVariable] instead of [VariableId]. Internal for now.
+    pub(crate) fn to_symbolic_values(&self, context: &SymbolicContext) -> Vec<(BddVariable, bool)> {
+        let mut result = Vec::new();
+        for (k, v) in self.0.iter().enumerate() {
+            if let Some(v) = v.try_as_bool() {
+                result.push((context.state_variables()[k], v));
             }
         }
         result
