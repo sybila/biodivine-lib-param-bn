@@ -405,7 +405,7 @@ impl SymbolicAsyncGraph {
             return None;
         }
 
-        let new_context = self.symbolic_context.eliminate(variable);
+        let new_context = self.symbolic_context.eliminate_network_variable(variable);
 
         // State variables should not matter that much in the unit set, we can just erase it. The important
         // part is that we use the new symbolic context.

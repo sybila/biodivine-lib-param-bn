@@ -15,7 +15,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let stg = SymbolicAsyncGraph::new(&model.clone()).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let mut universe = stg.mk_unit_colored_vertices();
     while !universe.is_empty() {

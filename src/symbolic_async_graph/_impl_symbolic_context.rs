@@ -164,7 +164,7 @@ impl SymbolicContext {
     /// by the eliminated variable. However, you cannot access them using the normal methods
     /// (e.g. [SymbolicContext::get_extra_state_variable]), only through the full list
     /// (i.e. [SymbolicContext::all_extra_state_variables]).
-    pub fn eliminate(&self, variable: VariableId) -> SymbolicContext {
+    pub fn eliminate_network_variable(&self, variable: VariableId) -> SymbolicContext {
         let index = variable.to_index();
         let mut result = self.clone();
         // Remove the variable from all variable-indexed lists. The symbolic variables still remain in the
