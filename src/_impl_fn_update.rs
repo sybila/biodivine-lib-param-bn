@@ -3,7 +3,7 @@ use crate::BinaryOp::{And, Iff, Imp, Or, Xor};
 use crate::FnUpdate::*;
 use crate::_aeon_parser::FnUpdateTemp;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
-use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable};
+use biodivine_lib_bdd::{Bdd, BddVariable};
 use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
@@ -118,6 +118,26 @@ impl FnUpdate {
             _ => None,
         }
     }
+
+    /// Build an expression which is equivalent to the conjunction of the given expressions.
+    pub fn mk_conjunction(items: &[FnUpdate]) -> FnUpdate {
+        let Some(first) = items.get(0) else {
+            // Empty conjunction is `true`.
+            return Self::mk_true();
+        };
+        let rest = &items[1..];
+        rest.iter().fold(first.clone(), |a, b| a.and(b.clone()))
+    }
+
+    /// Build an expression which is equivalent to the disjunction of the given expressions.
+    pub fn mk_disjunction(items: &[FnUpdate]) -> FnUpdate {
+        let Some(first) = items.get(0) else {
+            // Empty disjunction is `false`.
+            return Self::mk_false();
+        };
+        let rest = &items[1..];
+        rest.iter().fold(first.clone(), |a, b| a.or(b.clone()))
+    }
 }
 
 /// Other utility methods.
@@ -148,54 +168,40 @@ impl FnUpdate {
             return FnUpdate::mk_false();
         }
 
-        let state_variables: HashMap<BddVariable, VariableId> = context
+        let translation_map: HashMap<BddVariable, VariableId> = context
             .state_variables()
             .iter()
             .enumerate()
             .map(|(i, v)| (*v, VariableId::from_index(i)))
             .collect();
-        let support = bdd.support_set();
-        for k in &support {
-            if !state_variables.contains_key(k) {
-                panic!("Non-state variables found in the provided BDD.")
-            }
+
+        // All variables must be state variables.
+        for var in bdd.support_set() {
+            assert!(translation_map.contains_key(&var));
         }
 
-        // Because the BDD isn't constant, there must be at least one clause and each clause
-        // must have at least one literal.
-
-        fn build_clause(
-            map: &HashMap<BddVariable, VariableId>,
-            clause: BddPartialValuation,
-        ) -> FnUpdate {
-            fn build_literal(
-                map: &HashMap<BddVariable, VariableId>,
-                literal: (BddVariable, bool),
-            ) -> FnUpdate {
-                let var = FnUpdate::mk_var(*map.get(&literal.0).unwrap());
-                if literal.1 {
-                    var
-                } else {
-                    FnUpdate::mk_not(var)
-                }
-            }
-
-            let mut literals = clause.to_values().into_iter();
-            let mut clause = build_literal(map, literals.next().unwrap());
-            for literal in literals {
-                let literal = build_literal(map, literal);
-                clause = FnUpdate::mk_binary(And, clause, literal);
-            }
-            clause
-        }
-
-        let mut clauses = bdd.sat_clauses();
-        let mut result = build_clause(&state_variables, clauses.next().unwrap());
-        for clause in clauses {
-            let clause = build_clause(&state_variables, clause);
-            result = FnUpdate::mk_binary(Or, result, clause);
-        }
-        result
+        // Now, we transform the BDD into DNF and that into a FnUpdate.
+        let dnf = bdd.to_dnf();
+        let dnf = dnf
+            .into_iter()
+            .map(|valuation| {
+                let literals = valuation
+                    .to_values()
+                    .into_iter()
+                    .map(|(var, value)| {
+                        let bn_var = translation_map[&var];
+                        let literal = FnUpdate::mk_var(bn_var);
+                        if value {
+                            literal
+                        } else {
+                            literal.negation()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                FnUpdate::mk_conjunction(&literals)
+            })
+            .collect::<Vec<_>>();
+        FnUpdate::mk_disjunction(&dnf)
     }
 
     /// Return a sorted vector of all variables that are actually used as inputs in this function.
@@ -254,25 +260,48 @@ impl FnUpdate {
 
     /// Convert this update function to a string, taking names from the provided `BooleanNetwork`.
     pub fn to_string(&self, context: &BooleanNetwork) -> String {
-        match self {
-            Const(value) => value.to_string(),
-            Var(id) => context.get_variable_name(*id).to_string(),
-            Not(inner) => format!("!{}", inner.to_string(context)),
-            Binary(op, l, r) => {
-                format!("({} {} {})", l.to_string(context), op, r.to_string(context))
-            }
-            Param(id, args) => {
-                if args.is_empty() {
-                    context[*id].get_name().to_string()
-                } else {
-                    let mut arg_string = format!("({}", args[0].to_string(context));
-                    for arg in args.iter().skip(1) {
-                        arg_string = format!("{}, {}", arg_string, arg.to_string(context));
+        fn to_string_rec(function: &FnUpdate, context: &BooleanNetwork, no_paren: bool) -> String {
+            match function {
+                Const(value) => value.to_string(),
+                Var(id) => context.get_variable_name(*id).to_string(),
+                Not(inner) => format!("!{}", to_string_rec(inner, context, false)),
+                Binary(op, l, r) => {
+                    // And/Or have special treatments so that chains don't produce
+                    // unnecessary parenthesis.
+                    let l_nested_and = *op == And && matches!(**l, Binary(And, _, _));
+                    let r_nested_and = *op == And && matches!(**r, Binary(And, _, _));
+                    let l_nested_or = *op == Or && matches!(**l, Binary(Or, _, _));
+                    let r_nested_or = *op == Or && matches!(**r, Binary(Or, _, _));
+
+                    let l_no_paren = l_nested_and || l_nested_or;
+                    let r_no_paren = r_nested_and || r_nested_or;
+
+                    let l = to_string_rec(l, context, l_no_paren);
+                    let r = to_string_rec(r, context, r_no_paren);
+
+                    if no_paren {
+                        format!("{} {} {}", l, op, r)
+                    } else {
+                        format!("({} {} {})", l, op, r)
                     }
-                    format!("{}{})", context[*id].get_name(), arg_string)
+                }
+                Param(id, args) => {
+                    if args.is_empty() {
+                        context[*id].get_name().to_string()
+                    } else {
+                        // No need for top-level parenthesis in parameters, since commas
+                        // serve the same purpose.
+                        let mut arg_string = format!("({}", to_string_rec(&args[0], context, true));
+                        for arg in args.iter().skip(1) {
+                            arg_string =
+                                format!("{}, {}", arg_string, to_string_rec(arg, context, true));
+                        }
+                        format!("{}{})", context[*id].get_name(), arg_string)
+                    }
                 }
             }
         }
+        to_string_rec(self, context, true)
     }
 
     /// If possible, evaluate this function using the given network variable valuation.
@@ -995,6 +1024,24 @@ mod tests {
                 .unwrap()
                 .simplify_constants(),
             FnUpdate::try_from_str("f(false, c) => g(a, b) | a", &bn).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_operator_coalescing() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+        ",
+        )
+        .unwrap();
+        assert_eq!(
+            FnUpdate::try_from_str("(a & !b & c) | (!a & b) | c", &bn)
+                .unwrap()
+                .to_string(&bn),
+            "(a & !b & c) | (!a & b) | c"
         );
     }
 }

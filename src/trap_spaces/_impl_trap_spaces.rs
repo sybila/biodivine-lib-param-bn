@@ -219,7 +219,7 @@ mod tests {
     fn test_trap_spaces() {
         let network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
         let ctx = SymbolicSpaceContext::new(&network);
-        let stg = SymbolicAsyncGraph::with_space_context(network.clone(), &ctx).unwrap();
+        let stg = SymbolicAsyncGraph::with_space_context(&network, &ctx).unwrap();
         let unit = ctx.mk_unit_colored_spaces(&stg);
 
         let essential_traps = TrapSpaces::essential_symbolic(&network, &ctx, &unit);

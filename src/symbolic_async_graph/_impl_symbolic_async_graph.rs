@@ -1,30 +1,34 @@
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
+use crate::symbolic_async_graph::_impl_symbolic_async_graph_operators::a_and_b_and_c;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
 use crate::trap_spaces::SymbolicSpaceContext;
-use crate::{BooleanNetwork, FnUpdate, VariableId};
+use crate::{
+    BooleanNetwork, FnUpdate, Regulation, RegulatoryGraph, VariableId, VariableIdIterator,
+};
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
 use std::collections::HashMap;
 
 impl SymbolicAsyncGraph {
-    /// Create a `SymbolicAsyncGraph` based on the default symbolic encoding of the supplied
-    /// `BooleanNetwork` as implemented by `SymbolicContext`.
-    pub fn new(network: BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
-        let context = SymbolicContext::new(&network)?;
+    /// Create a [SymbolicAsyncGraph] based on the default symbolic encoding of the supplied
+    /// [BooleanNetwork] as implemented by the default [SymbolicContext].
+    pub fn new(network: &BooleanNetwork) -> Result<SymbolicAsyncGraph, String> {
+        let context = SymbolicContext::new(network)?;
         let unit = context.mk_constant(true);
         Self::with_custom_context(network, context, unit)
     }
 
     /// Create a [SymbolicAsyncGraph] that is compatible with an existing [SymbolicSpaceContext].
     ///
-    /// The `network` argument must be the same as used for the creation of the `context` object.
+    /// The [BooleanNetwork] argument must be the same as used for the creation of the
+    /// [SymbolicSpaceContext] object.
     pub fn with_space_context(
-        network: BooleanNetwork,
+        network: &BooleanNetwork,
         context: &SymbolicSpaceContext,
     ) -> Result<SymbolicAsyncGraph, String> {
         let context = context.inner_context().clone();
@@ -32,29 +36,29 @@ impl SymbolicAsyncGraph {
         Self::with_custom_context(network, context, unit)
     }
 
-    /// Create a `SymbolicAsyncGraph` using a given `network`, the symbolic `context` (encoding)
-    /// of said network (possibly with extra symbolic variables), and an initial `unit_bdd` which
-    /// is used to restrict all valid BDDs corresponding to this graph.
+    /// Create a [SymbolicAsyncGraph] based on the given [BooleanNetwork] and a [SymbolicContext]
+    /// (i.e. the network's encoding, possibly with extra symbolic variables). Also takes an
+    /// initial "unit" [Bdd] representing the full set of vertices and colors.
     ///
-    /// However, note that we do not validate that the provided `SymbolicContext` and `Bdd` are
-    /// compatible with the provided network. If you use a context that was not created for the
+    /// However, note that we do not validate that the provided [SymbolicContext] and the [Bdd] are
+    /// compatible with the [BooleanNetwork]. If you use a context that was not created for the
     /// given network, the behaviour is undefined (you'll likely see something fail rather
     /// quickly though).
     ///
     /// Several notes to keep in mind while using this method:
     ///  1. The `unit_bdd` is used as an "initial value" for the set of all states and colors of
     ///     this graph. However, it is still modified to only allow valid parameter valuations,
-    ///     so you can use it to reduce the space of valid states/colors, but it is not necessarily
-    ///     the final "unit set" of the graph.
+    ///     so you can use it to reduce the space of valid states/colors, but it is not
+    ///     necessarily the final "unit set" of the graph.
     ///  2. The presence of extra symbolic variables can modify the semantics of symbolic
     ///     operations implemented on `SymbolicAsyncGraph`, `GraphVertices`, `GraphColors` and
     ///     `GraphColoredVertices`. The `SymbolicAsyncGraph` will not use or depend on the extra
     ///     variables in any capacity. Hence, as long as the extra variables remain unused, all
-    ///     operations should behave as expected. However, once you introduce the variables externally
-    ///     (e.g. using a "raw" BDD operation instead of the "high level" API), you should verify
-    ///     that the semantics of symbolic operations are really what you expect them to be. For
-    ///     example, an intersection on sets will now also depend on the values of the extra
-    ///     variables, not just states and colors.
+    ///     operations should behave as expected. However, once you introduce the variables
+    ///     externally (e.g. using a "raw" BDD operation instead of the "high level" API), you
+    ///     should verify that the semantics of symbolic operations are really what you expect
+    ///     them to be. For example, an intersection on sets will now also depend on the values
+    ///     of the extra variables, not just states and colors.
     ///  3. In general, `unit_bdd` should be a cartesian product of a set of vertices, a set
     ///     of colors, and a set of valuations on the extra variables. If you don't follow this
     ///     requirement, almost everything remains valid, but ultimately, some symbolic operations
@@ -68,52 +72,100 @@ impl SymbolicAsyncGraph {
     ///     subset of states/colors without the cartesian product requirement. Also, we should be
     ///     able to be more transparent/explicit about the presence of extra symbolic variables.
     pub fn with_custom_context(
-        network: BooleanNetwork,
+        network: &BooleanNetwork,
         context: SymbolicContext,
         unit_bdd: Bdd,
     ) -> Result<SymbolicAsyncGraph, String> {
         assert_eq!(network.num_vars(), context.num_state_variables());
-        let unit_bdd = apply_regulation_constraints(unit_bdd, &network, &context)?;
+        let unit_bdd = apply_regulation_constraints(unit_bdd, network, &context)?;
 
-        // For each variable, pre-compute contexts where the update function can be applied, i.e.
-        // (F = 1 & var = 0) | (F = 0 & var = 1)
         let update_functions = network
-            .graph
             .variables()
-            .map(|variable| {
-                let regulators = network.regulators(variable);
-                let function_is_one = network
-                    .get_update_function(variable)
-                    .as_ref()
-                    .map(|fun| context.mk_fn_update_true(fun))
-                    .unwrap_or_else(|| context.mk_implicit_function_is_true(variable, &regulators));
-                let variable_is_zero = context.mk_state_variable_is_true(variable).not();
-                bdd!(variable_is_zero <=> function_is_one)
+            .map(|var| {
+                if let Some(function) = network.get_update_function(var) {
+                    context.mk_fn_update_true(function)
+                } else {
+                    let regulators = network.regulators(var);
+                    context.mk_implicit_function_is_true(var, &regulators)
+                }
             })
-            .collect();
+            .collect::<Vec<_>>();
 
-        Ok(SymbolicAsyncGraph {
-            vertex_space: (
-                GraphColoredVertices::new(context.bdd.mk_false(), &context),
-                GraphColoredVertices::new(unit_bdd.clone(), &context),
-            ),
-            color_space: (
-                GraphColors::new(context.bdd.mk_false(), &context),
-                GraphColors::new(unit_bdd.clone(), &context),
-            ),
-            symbolic_context: context,
-            unit_bdd,
+        unsafe {
+            Ok(SymbolicAsyncGraph::new_raw(
+                Some(network.clone()),
+                context,
+                unit_bdd,
+                update_functions,
+            ))
+        }
+    }
+
+    /// Construct a new [SymbolicAsyncGraph] completely using raw [Bdd] values. You can also
+    /// supply an optional [BooleanNetwork], but this will not be used in any meaningful way.
+    ///
+    ///  - Here, the `unit_bdd` will be used as the set of colors/vertices without any further
+    ///    postprocessing.
+    ///  - The `functions` vector should contains a BDD for each variable which is true if and
+    ///    only if the update function of said variable is true.
+    ///
+    /// # Safety
+    ///
+    /// This is an unsafe function because it is extremely easy to use to create an invalid graph.
+    pub unsafe fn new_raw(
+        network: Option<BooleanNetwork>,
+        symbolic_context: SymbolicContext,
+        unit_bdd: Bdd,
+        functions: Vec<Bdd>,
+    ) -> SymbolicAsyncGraph {
+        assert_eq!(functions.len(), symbolic_context.state_variables().len());
+
+        let fn_update = functions;
+        let fn_transition = fn_update
+            .iter()
+            .enumerate()
+            .map(|(i, fun)| {
+                let var = VariableId::from_index(i);
+                let var = symbolic_context.mk_state_variable_is_true(var);
+                // Either (var=0 and fun=1), or (var=1 and fun=0).
+                bdd!(var ^ fun)
+            })
+            .collect::<Vec<_>>();
+        let colored_vertex_space = (
+            GraphColoredVertices::new(symbolic_context.mk_constant(false), &symbolic_context),
+            GraphColoredVertices::new(unit_bdd.clone(), &symbolic_context),
+        );
+        let vertex_space = (
+            colored_vertex_space.0.vertices(),
+            colored_vertex_space.1.vertices(),
+        );
+        let color_space = (
+            colored_vertex_space.0.colors(),
+            colored_vertex_space.1.colors(),
+        );
+        SymbolicAsyncGraph {
             network,
-            update_functions,
-        })
+            symbolic_context,
+            colored_vertex_space,
+            vertex_space,
+            color_space,
+            unit_bdd,
+            fn_update,
+            fn_transition,
+        }
     }
 }
 
 /// Examine the general properties of the graph.
 impl SymbolicAsyncGraph {
-    /// Return a reference to the original Boolean network.
-    pub fn as_network(&self) -> &BooleanNetwork {
-        &self.network
+    /// Return a reference to the original Boolean network, if there is any.
+    pub fn as_network(&self) -> Option<&BooleanNetwork> {
+        self.network.as_ref()
+    }
+
+    /// Get the symbolic representation of the update function for the given [VariableId].
+    pub fn get_symbolic_fn_update(&self, variable: VariableId) -> &Bdd {
+        &self.fn_update[variable.to_index()]
     }
 
     /// Return a reference to the symbolic context of this graph.
@@ -156,32 +208,51 @@ impl SymbolicAsyncGraph {
             panic!("Cannot create witness for empty color set.");
         }
         let witness_valuation = colors.bdd.sat_witness().unwrap();
-        let mut witness = self.network.clone();
-        for variable in witness.graph.variables() {
-            if let Some(function) = &mut witness.update_functions[variable.0] {
-                let instantiated_expression = self
-                    .symbolic_context
-                    .instantiate_fn_update(&witness_valuation, function);
 
-                *function =
-                    FnUpdate::build_from_bdd(self.symbolic_context(), &instantiated_expression);
-            } else {
-                let regulators = self.network.regulators(variable);
-                let instantiated_expression = self.symbolic_context.instantiate_implicit_function(
-                    &witness_valuation,
-                    variable,
-                    &regulators,
-                );
-                witness.update_functions[variable.0] = Some(FnUpdate::build_from_bdd(
-                    self.symbolic_context(),
-                    &instantiated_expression,
-                ));
+        let mut regulators: Vec<Vec<VariableId>> = Vec::new();
+        let mut fn_update: Vec<FnUpdate> = Vec::new();
+        for fn_bdd in &self.fn_update {
+            let dnf = self
+                .symbolic_context
+                .mk_instantiated_fn_update(&witness_valuation, fn_bdd);
+            let regs = dnf.collect_arguments();
+            fn_update.push(dnf);
+            regulators.push(regs);
+        }
+
+        let variables = self
+            .symbolic_context
+            .state_variables()
+            .iter()
+            .map(|it| self.symbolic_context.bdd_variable_set().name_of(*it))
+            .collect::<Vec<_>>();
+        let mut rg = RegulatoryGraph::new(variables);
+        for (i, regs) in regulators.into_iter().enumerate() {
+            let target = VariableId::from_index(i);
+            for regulator in regs {
+                rg.add_raw_regulation(Regulation {
+                    regulator,
+                    target,
+                    observable: false,
+                    monotonicity: None,
+                })
+                .unwrap_or_else(|_| {
+                    unreachable!("Unconstrained regulation should be always allowed here.");
+                });
             }
         }
-        // Remove all explicit parameters since they have been eliminated.
-        witness.parameters.clear();
-        witness.parameter_to_index.clear();
-        witness
+        let mut bn = BooleanNetwork::new(rg);
+        for (i, function) in fn_update.into_iter().enumerate() {
+            let var = VariableId::from_index(i);
+            bn.set_update_function(var, Some(function))
+                .unwrap_or_else(|_| {
+                    unreachable!("Instantiated update function should be always valid here.");
+                })
+        }
+
+        bn.infer_valid_graph().unwrap_or_else(|_| {
+            unreachable!("Symbolic context already exists, so it must not fail.")
+        })
     }
 
     /// Reference to an empty color set.
@@ -191,7 +262,7 @@ impl SymbolicAsyncGraph {
 
     /// Make a new copy of empty color set.
     pub fn mk_empty_colors(&self) -> GraphColors {
-        self.color_space.0.clone()
+        self.empty_colors().clone()
     }
 
     /// Reference to a unit color set.
@@ -201,27 +272,51 @@ impl SymbolicAsyncGraph {
 
     /// Make a new copy of unit color set.
     pub fn mk_unit_colors(&self) -> GraphColors {
-        self.color_space.1.clone()
+        self.unit_colors().clone()
     }
 
     /// Reference to an empty colored vertex set.
-    pub fn empty_vertices(&self) -> &GraphColoredVertices {
-        &self.vertex_space.0
+    pub fn empty_colored_vertices(&self) -> &GraphColoredVertices {
+        &self.colored_vertex_space.0
     }
 
     /// Make a new copy of empty vertex set.
-    pub fn mk_empty_vertices(&self) -> GraphColoredVertices {
-        self.vertex_space.0.clone()
+    pub fn mk_empty_colored_vertices(&self) -> GraphColoredVertices {
+        self.empty_colored_vertices().clone()
     }
 
     /// Reference to a unit colored vertex set.
     pub fn unit_colored_vertices(&self) -> &GraphColoredVertices {
-        &self.vertex_space.1
+        &self.colored_vertex_space.1
     }
 
     /// Make a new copy of unit vertex set.
     pub fn mk_unit_colored_vertices(&self) -> GraphColoredVertices {
-        self.vertex_space.1.clone()
+        self.unit_colored_vertices().clone()
+    }
+
+    pub fn empty_vertices(&self) -> &GraphVertices {
+        &self.vertex_space.0
+    }
+
+    pub fn mk_empty_vertices(&self) -> GraphVertices {
+        self.empty_vertices().clone()
+    }
+
+    pub fn unit_vertices(&self) -> &GraphVertices {
+        &self.vertex_space.1
+    }
+
+    pub fn mk_unit_vertices(&self) -> GraphVertices {
+        self.unit_vertices().clone()
+    }
+
+    pub fn num_vars(&self) -> usize {
+        self.symbolic_context.num_state_variables()
+    }
+
+    pub fn variables(&self) -> VariableIdIterator {
+        (0..self.num_vars()).map(VariableId::from_index)
     }
 
     /// Compute a subset of the unit vertex set that is specified using the given list
@@ -268,7 +363,7 @@ impl SymbolicAsyncGraph {
     /// Construct a vertex set that only contains one vertex, but all colors
     ///
     pub fn vertex(&self, state: &ArrayBitVector) -> GraphColoredVertices {
-        assert_eq!(state.len(), self.network.num_vars());
+        assert_eq!(state.len(), self.num_vars());
         // TODO: When breaking changes will be possible, this should add a `mk_` prefix.
         let partial_valuation: Vec<(BddVariable, bool)> = state
             .values()
@@ -302,11 +397,17 @@ impl SymbolicAsyncGraph {
         SymbolicAsyncGraph {
             network: self.network.clone(),
             symbolic_context: self.symbolic_context.clone(),
-            vertex_space: (self.mk_empty_vertices(), set.clone()),
+            colored_vertex_space: (self.mk_empty_colored_vertices(), set.clone()),
+            vertex_space: (self.mk_empty_vertices(), set.vertices()),
             color_space: (self.mk_empty_colors(), set.colors()),
-            unit_bdd: set.bdd.clone(),
-            update_functions: self
-                .update_functions
+            unit_bdd: set.as_bdd().clone(),
+            // We do not restrict the update functions in any way, because they are still the same,
+            // even in the restricted state space
+            fn_update: self.fn_update.clone(),
+            // However, we restrict the transitions to ensure the source/target state are both
+            // present in the new graph.
+            fn_transition: self
+                .fn_transition
                 .iter()
                 .enumerate()
                 .map(|(i, function)| {
@@ -318,16 +419,7 @@ impl SymbolicAsyncGraph {
                         (&set.bdd, None),
                         (&set.bdd, Some(symbolic_var)),
                         None,
-                        |a, b, c| {
-                            // a & b & c
-                            match (a, b, c) {
-                                (Some(true), Some(true), Some(true)) => Some(true),
-                                (Some(false), _, _) => Some(false),
-                                (_, Some(false), _) => Some(false),
-                                (_, _, Some(false)) => Some(false),
-                                _ => None,
-                            }
-                        },
+                        a_and_b_and_c,
                     )
                 })
                 .collect(),
@@ -349,11 +441,11 @@ impl SymbolicAsyncGraph {
         ) -> GraphColoredVertices {
             let bdd_var = stg.symbolic_context().get_state_variable(var);
             let relaxed_bdd = cube.as_bdd().var_exists(bdd_var);
-            stg.empty_vertices().copy(relaxed_bdd)
+            stg.empty_colored_vertices().copy(relaxed_bdd)
         }
 
         let mut result = set.clone();
-        for var in self.as_network().variables() {
+        for var in self.variables() {
             let var_true = self.fix_network_variable(var, true);
             let var_false = self.fix_network_variable(var, false);
             if !(result.is_subset(&var_true) || result.is_subset(&var_false)) {
@@ -366,8 +458,8 @@ impl SymbolicAsyncGraph {
     /// Find the smallest subspace (hypercube) that contains the given set of vertices.
     pub fn wrap_in_subspace(&self, set: &GraphVertices) -> Space {
         let clause = set.bdd.necessary_clause().unwrap();
-        let mut result = Space::new(self.as_network());
-        for var in self.as_network().variables() {
+        let mut result = Space::new_raw(self.num_vars());
+        for var in self.variables() {
             let bdd_var = self.symbolic_context.state_variables[var.to_index()];
             if let Some(value) = clause.get_value(bdd_var) {
                 if value {
@@ -385,20 +477,24 @@ impl SymbolicAsyncGraph {
     /// update functions no longer depend on it.
     pub fn restrict_variable_in_graph(&self, var: VariableId, value: bool) -> SymbolicAsyncGraph {
         let bdd_var = self.symbolic_context.state_variables[var.0];
+        let new_unit = self.unit_bdd.var_restrict(bdd_var, value);
+        let new_unit_set = GraphColoredVertices::new(new_unit, self.symbolic_context());
         SymbolicAsyncGraph {
             network: self.network.clone(),
             symbolic_context: self.symbolic_context.clone(),
-            vertex_space: (
-                self.mk_empty_vertices(),
-                self.unit_colored_vertices()
-                    .restrict_network_variable(var, value),
-            ),
-            color_space: (self.mk_empty_colors(), self.mk_unit_colors()),
-            unit_bdd: self.unit_bdd.var_restrict(bdd_var, value),
-            update_functions: self
-                .update_functions
+            colored_vertex_space: (self.mk_empty_colored_vertices(), new_unit_set.clone()),
+            vertex_space: (self.mk_empty_vertices(), new_unit_set.vertices()),
+            color_space: (self.mk_empty_colors(), new_unit_set.colors()),
+            unit_bdd: new_unit_set.into_bdd(),
+            fn_update: self
+                .fn_update
                 .iter()
-                .map(|f| f.var_restrict(bdd_var, value))
+                .map(|it| it.var_restrict(bdd_var, value))
+                .collect(),
+            fn_transition: self
+                .fn_transition
+                .iter()
+                .map(|it| it.var_restrict(bdd_var, value))
                 .collect(),
         }
     }
@@ -459,8 +555,14 @@ impl SymbolicAsyncGraph {
     /// instantiations of the sub-network represented using the main network encoding. Otherwise,
     /// an error indicates which conditions were not met.
     ///
+    /// ## Panics
+    ///
+    /// The method requires that [Self::as_network] is `Some`.
+    ///
     pub fn mk_subnetwork_colors(&self, network: &BooleanNetwork) -> Result<GraphColors, String> {
-        let main_network = self.as_network();
+        let main_network = self.as_network().unwrap_or_else(|| {
+            panic!("Requires original network to compute sub-network colors.");
+        });
         let sub_network = network;
         {
             // 1.1 Verify that the networks have the same variables.
@@ -608,7 +710,7 @@ impl SymbolicAsyncGraph {
         }
 
         // 5. Check that the sub-network is valid.
-        let sub_network_graph = SymbolicAsyncGraph::new(sub_network.clone());
+        let sub_network_graph = SymbolicAsyncGraph::new(sub_network);
         if sub_network_graph.is_err() {
             return Err("Sub-network is not consistent with the regulatory graph.".to_string());
         }
@@ -757,11 +859,11 @@ mod tests {
         ",
         )
         .unwrap();
-        let sg = SymbolicAsyncGraph::new(network_1).unwrap();
+        let sg = SymbolicAsyncGraph::new(&network_1).unwrap();
 
         assert_eq!(
             sg.mk_unit_colors(),
-            sg.mk_subnetwork_colors(sg.as_network()).unwrap()
+            sg.mk_subnetwork_colors(&network_1).unwrap()
         );
 
         // Fixes only the function of `a`, not the remaining variables:
@@ -801,7 +903,7 @@ mod tests {
         let sub_colors = sg.mk_subnetwork_colors(&network_3).unwrap();
         assert_eq!(2.0, sub_colors.approx_cardinality());
 
-        let sg_2 = SymbolicAsyncGraph::new(network_2).unwrap();
+        let sg_2 = SymbolicAsyncGraph::new(&network_2).unwrap();
         let sub_colors = sg_2.mk_subnetwork_colors(&network_3).unwrap();
         assert_eq!(2.0, sub_colors.approx_cardinality());
 
@@ -956,22 +1058,22 @@ mod tests {
     #[test]
     fn test_constraints_1() {
         let network = BooleanNetwork::try_from("a -> t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(1.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -| t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(1.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a ->? t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(3.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -|? t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(3.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -? t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(2.0, graph.unit_colors().approx_cardinality());
         let network = BooleanNetwork::try_from("a -?? t \n $a: true").unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(4.0, graph.unit_colors().approx_cardinality());
     }
 
@@ -989,7 +1091,7 @@ mod tests {
             $a: true \n $b: true
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(3.0, graph.unit_colors().approx_cardinality());
     }
 
@@ -1002,7 +1104,7 @@ mod tests {
             $a: true \n $b: true
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(6.0, graph.unit_colors().approx_cardinality());
     }
 
@@ -1013,7 +1115,7 @@ mod tests {
             $a: true \n $b: true \n $c: true
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(20.0, graph.unit_colors().approx_cardinality());
     }
 
@@ -1024,7 +1126,7 @@ mod tests {
             $a: true \n $b: true \n $c: true \n $d: true
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert_eq!(168.0, graph.unit_colors().approx_cardinality());
     }
 
@@ -1035,7 +1137,7 @@ mod tests {
             $a: true \n $b: true \n $t: b
         ";
         let network = BooleanNetwork::try_from(network).unwrap();
-        let graph = SymbolicAsyncGraph::new(network);
+        let graph = SymbolicAsyncGraph::new(&network);
         assert!(graph.is_err());
     }
 
@@ -1053,9 +1155,9 @@ mod tests {
         ",
         )
         .unwrap();
-        let graph = SymbolicAsyncGraph::new(bn).unwrap();
-        let a = graph.as_network().as_graph().find_variable("A").unwrap();
-        let c = graph.as_network().as_graph().find_variable("C").unwrap();
+        let graph = SymbolicAsyncGraph::new(&bn).unwrap();
+        let a = bn.as_graph().find_variable("A").unwrap();
+        let c = bn.as_graph().find_variable("C").unwrap();
         let sub_space_a = graph.fix_network_variable(a, true);
         let sub_space_c = graph.fix_network_variable(c, false);
         let sub_space = sub_space_a.intersect(&sub_space_c);
@@ -1081,10 +1183,10 @@ mod tests {
         ",
         )
         .unwrap();
-        let graph = SymbolicAsyncGraph::new(bn).unwrap();
-        let a = graph.as_network().as_graph().find_variable("A").unwrap();
-        let b = graph.as_network().as_graph().find_variable("B").unwrap();
-        let c = graph.as_network().as_graph().find_variable("C").unwrap();
+        let graph = SymbolicAsyncGraph::new(&bn).unwrap();
+        let a = bn.as_graph().find_variable("A").unwrap();
+        let b = bn.as_graph().find_variable("B").unwrap();
+        let c = bn.as_graph().find_variable("C").unwrap();
 
         let original_a = graph
             .var_can_post(a, graph.unit_colored_vertices())
@@ -1137,7 +1239,7 @@ mod tests {
         ",
         )
         .unwrap();
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
         assert_eq!(32.0, stg.unit_colored_vertices().approx_cardinality());
         assert_eq!(
             8.0,
@@ -1147,12 +1249,12 @@ mod tests {
             4.0,
             stg.unit_colored_vertices().colors().approx_cardinality()
         );
-        assert!(stg.empty_vertices().is_empty());
+        assert!(stg.empty_colored_vertices().is_empty());
         assert!(stg.mk_empty_colors().is_empty());
         assert_eq!(stg.mk_unit_colors(), stg.unit_colored_vertices().colors());
-        assert_eq!(3, stg.as_network().num_vars());
+        assert_eq!(3, bn.num_vars());
 
-        let id_a = stg.as_network().as_graph().find_variable("A").unwrap();
+        let id_a = bn.as_graph().find_variable("A").unwrap();
         stg.fix_network_variable(id_a, true);
         let witness = stg.pick_witness(stg.unit_colors());
         assert_eq!(0, witness.parameters().count());
@@ -1204,7 +1306,7 @@ mod tests {
         let context = SymbolicContext::with_extra_state_variables(&bn, &extra_vars).unwrap();
         // Only allow states where a=1
         let unit = context.mk_state_variable_is_true(a);
-        let stg = SymbolicAsyncGraph::with_custom_context(bn, context, unit).unwrap();
+        let stg = SymbolicAsyncGraph::with_custom_context(&bn, context, unit).unwrap();
 
         // It's not 8, but 4, since the state space is restricted.
         let states = stg.unit_colored_vertices().vertices();
@@ -1253,13 +1355,15 @@ mod tests {
         let g2_c = bn_reduced.as_graph().find_variable("c").unwrap();
 
         // These two graphs should be compatible.
-        let g1 = SymbolicAsyncGraph::new(bn).unwrap();
-        let g2 = SymbolicAsyncGraph::new(bn_reduced).unwrap();
+        let g1 = SymbolicAsyncGraph::new(&bn).unwrap();
+        let g2 = SymbolicAsyncGraph::new(&bn_reduced).unwrap();
 
         // Basic set translation:
         assert_eq!(
-            g1.empty_vertices().as_bdd(),
-            g1.transfer_from(g2.empty_vertices(), &g2).unwrap().as_bdd(),
+            g1.empty_colored_vertices().as_bdd(),
+            g1.transfer_from(g2.empty_colored_vertices(), &g2)
+                .unwrap()
+                .as_bdd(),
         );
         assert_eq!(
             g1.unit_colored_vertices().as_bdd(),

@@ -116,17 +116,25 @@ pub struct GraphVertexIterator {
 /// Provides standard pre/post operations for exploring the graph symbolically.
 #[derive(Clone)]
 pub struct SymbolicAsyncGraph {
-    network: BooleanNetwork,
+    // If available, provides the original network that was used to create the graph.
+    // We should not rely on the network being available though, as the graph can be created
+    // in different ways as well.
+    network: Option<BooleanNetwork>,
     symbolic_context: SymbolicContext,
     // Empty and unit vertex set.
-    vertex_space: (GraphColoredVertices, GraphColoredVertices),
+    colored_vertex_space: (GraphColoredVertices, GraphColoredVertices),
+    // Empty and unit vertex set.
+    vertex_space: (GraphVertices, GraphVertices),
     // Empty and unit color set.
     color_space: (GraphColors, GraphColors),
     // General symbolic unit bdd.
     unit_bdd: Bdd,
+    // A `Bdd` which stores the exact asynchronous update function `f_i(x)` for
+    // each variable `x_i`.
+    fn_update: Vec<Bdd>,
     // For every update function, stores `x_i != f_i(x)` (used for pre/post).
-    // In other words, symbolically this is the set of states where a transition is enabled.
-    update_functions: Vec<Bdd>,
+    // In other words, this is the symbolic set of states where a transition is enabled.
+    fn_transition: Vec<Bdd>,
 }
 
 /// Symbolic context manages the mapping between entities of the Boolean network
@@ -234,7 +242,7 @@ mod tests {
         ",
         )
         .unwrap();
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
         let components = scc(&stg);
         assert_eq!(7, components.len());
         assert_eq!(2.0, components[0].vertices().approx_cardinality());

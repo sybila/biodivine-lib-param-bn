@@ -246,7 +246,7 @@ mod tests {
     #[test]
     fn basic_colored_spaces_set_test() {
         let bn = BooleanNetwork::try_from_file("aeon_models/005.aeon").unwrap();
-        let stg = SymbolicAsyncGraph::new(bn.clone()).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let unit = stg.mk_unit_colored_vertices();
         assert!(!unit.is_singleton());

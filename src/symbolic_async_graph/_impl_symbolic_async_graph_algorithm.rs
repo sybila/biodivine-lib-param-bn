@@ -14,7 +14,7 @@ impl SymbolicAsyncGraph {
     pub fn reach_forward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
         let mut result = initial.clone();
         'fwd: loop {
-            for var in self.network.variables().rev() {
+            for var in self.variables().rev() {
                 let step = self.var_post_out(var, &result);
                 if !step.is_empty() {
                     result = result.union(&step);
@@ -32,7 +32,7 @@ impl SymbolicAsyncGraph {
     pub fn reach_backward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
         let mut result = initial.clone();
         'bwd: loop {
-            for var in self.network.variables().rev() {
+            for var in self.variables().rev() {
                 let step = self.var_pre_out(var, &result);
                 if !step.is_empty() {
                     result = result.union(&step);
@@ -51,7 +51,7 @@ impl SymbolicAsyncGraph {
     pub fn trap_forward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
         let mut result = initial.clone();
         'fwd: loop {
-            for var in self.network.variables().rev() {
+            for var in self.variables().rev() {
                 let step = self.var_can_post_out(var, &result);
                 if !step.is_empty() {
                     result = result.minus(&step);
@@ -70,7 +70,7 @@ impl SymbolicAsyncGraph {
     pub fn trap_backward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
         let mut result = initial.clone();
         'bwd: loop {
-            for var in self.network.variables().rev() {
+            for var in self.variables().rev() {
                 let step = self.var_can_pre_out(var, &result);
                 if !step.is_empty() {
                     result = result.minus(&step);
@@ -105,7 +105,7 @@ mod tests {
         )
         .unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let pivot = stg.unit_colored_vertices().pick_vertex();
         let fwd = stg.reach_forward(&pivot);

@@ -204,9 +204,9 @@ a -?? a
 b -|? c
 c -? a
 c -> d
-$a: (a & (p(c) => (c | c)))
-$b: (p(a) <=> q(a, a))
-$c: (q(b, b) => !(b ^ k))
+$a: a & (p(c) => (c | c))
+$b: p(a) <=> q(a, a)
+$c: q(b, b) => !(b ^ k)
 ";
 
         assert_eq!(

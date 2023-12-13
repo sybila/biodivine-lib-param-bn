@@ -15,7 +15,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
     let stg = Arc::new(stg);
 
     let dimensions = usize::from(stg.symbolic_context().bdd_variable_set().num_vars());

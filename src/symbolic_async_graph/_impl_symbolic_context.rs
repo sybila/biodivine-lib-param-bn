@@ -196,6 +196,15 @@ impl SymbolicContext {
         self.state_variables[variable.0]
     }
 
+    /// Try to find a [VariableId] which corresponds to the given [BddVariable], assuming
+    /// the [BddVariable] is one of the [Self::state_variables].
+    pub fn find_state_variable(&self, symbolic_variable: BddVariable) -> Option<VariableId> {
+        self.state_variables
+            .iter()
+            .position(|it| *it == symbolic_variable)
+            .map(VariableId::from_index)
+    }
+
     /// Get the `BddVariable` extra symbolic variable associated with a particular BN variable
     /// and an offset (within the domain of said variable).
     pub fn get_extra_state_variable(&self, variable: VariableId, offset: usize) -> BddVariable {
@@ -385,6 +394,20 @@ impl SymbolicContext {
         }
     }
 
+    /// Build a DNF representation of an instantiated update function (given as [Bdd]).
+    pub fn mk_instantiated_fn_update(&self, valuation: &BddValuation, function: &Bdd) -> FnUpdate {
+        let parameter_valuation = self
+            .parameter_variables()
+            .iter()
+            .map(|it| (*it, valuation[*it]))
+            .collect::<Vec<_>>();
+
+        // This should fix all parameters to their respective values.
+        let restricted = function.restrict(&parameter_valuation);
+
+        FnUpdate::build_from_bdd(self, &restricted)
+    }
+
     /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
     fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
         return args.iter().map(|v| self.mk_fn_update_true(v)).collect();
@@ -446,7 +469,7 @@ mod tests {
     fn hmox_pathway() {
         let model = std::fs::read_to_string("aeon_models/hmox_pathway.aeon").unwrap();
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert!(!graph.unit_colored_vertices().is_empty());
     }
 

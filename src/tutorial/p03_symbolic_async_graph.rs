@@ -44,7 +44,7 @@
 //! // At this point, the implementation checks if there is at least one parametrisation which
 //! // satisfies all the requirements imposed by the RegulatoryGraph. If no such parametrisation
 //! // exists, an error is returned, typically also with an explanation why.
-//! let stg = SymbolicAsyncGraph::new(bn)?;
+//! let stg = SymbolicAsyncGraph::new(&bn)?;
 //!
 //! // Once we have a `SymbolicAsyncGraph`, we can access the `GraphVertices`, `GraphColors`
 //! // and `GraphColoredVertices`. Basic methods return a reference, `mk_*` methods create
@@ -52,18 +52,20 @@
 //! assert_eq!(32.0, stg.unit_colored_vertices().approx_cardinality());
 //! assert_eq!(8.0, stg.unit_colored_vertices().vertices().approx_cardinality());
 //! assert_eq!(4.0, stg.unit_colored_vertices().colors().approx_cardinality());
-//! assert!(stg.empty_vertices().is_empty());
+//! assert!(stg.empty_colored_vertices().is_empty());
 //! assert!(stg.mk_empty_colors().is_empty());
 //! assert_eq!(stg.mk_unit_colors(), stg.unit_colored_vertices().colors());
 //! // WARNING: Remember that floating point numbers may not be exact for larger values.
 //! // In fact, for some very large models, the set size can be simply approximated to infinity.
 //!
 //! // You can still access the underlying network of the graph:
-//! assert_eq!(3, stg.as_network().num_vars());
+//! assert_eq!(3, stg.as_network().unwrap().num_vars());
+//! // Just note that in some advanced instances, the network may not exist, in which case
+//! // `as_network` returns `None`
 //!
 //! // You can also obtain a set where all vertices have a Boolean variable set
 //! // to the given value:
-//! let id_a = stg.as_network().as_graph().find_variable("A").unwrap();
+//! let id_a = bn.as_graph().find_variable("A").unwrap();
 //! let a_is_true: GraphColoredVertices = stg.fix_network_variable(id_a, true);
 //! // This can be used to (for example) construct a set of initial states specified by the user.
 //!
@@ -131,8 +133,8 @@
 //! #     A -| A
 //! #     $A: C | f(A, B)
 //! # ").unwrap();
-//! # let stg = SymbolicAsyncGraph::new(bn)?;
-//! let id_b = stg.as_network().as_graph().find_variable("B").unwrap();
+//! # let stg = SymbolicAsyncGraph::new(&bn)?;
+//! let id_b = bn.as_graph().find_variable("B").unwrap();
 //! let b_is_true = stg.fix_network_variable(id_b, true);
 //! let b_is_false = stg.fix_network_variable(id_b, false);
 //!

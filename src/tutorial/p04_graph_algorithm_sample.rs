@@ -94,7 +94,7 @@
 //!     A -| A
 //!     $A: C | f(A, B)
 //! ").unwrap();
-//! let stg = SymbolicAsyncGraph::new(bn).unwrap();
+//! let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 //!
 //! // Note that since the symbolic graph contains different transitions for different colors,
 //! // this will create SCCs that overlap for some colors but are completely different for others.

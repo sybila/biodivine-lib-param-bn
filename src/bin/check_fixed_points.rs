@@ -26,7 +26,7 @@ fn main() {
         model.num_vars(),
         model.num_parameters()
     );
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let start = SystemTime::now();
     println!("Search for fixed-point colors...");
