@@ -110,15 +110,15 @@ impl GraphColoredVertices {
     ///
     /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
     /// should only depend on *state and parameter variables* (i.e. not on extra state variables).
-    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+    pub fn raw_projection(&self, eliminate: &[BddVariable]) -> RawProjection {
         let mut retained = Vec::new();
         for v in &self.state_variables {
-            if !variables.contains(v) {
+            if !eliminate.contains(v) {
                 retained.push(*v);
             }
         }
         for v in &self.parameter_variables {
-            if !variables.contains(v) {
+            if !eliminate.contains(v) {
                 retained.push(*v);
             }
         }

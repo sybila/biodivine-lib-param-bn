@@ -83,13 +83,13 @@ impl NetworkSpaces {
         true
     }
 
-    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+    pub fn raw_projection(&self, eliminate: &[BddVariable]) -> RawProjection {
         let mut retained = Vec::new();
         for (t_var, f_var) in &self.dual_variables {
-            if variables.contains(t_var) {
+            if !eliminate.contains(t_var) {
                 retained.push(*t_var);
             }
-            if variables.contains(f_var) {
+            if !eliminate.contains(f_var) {
                 retained.push(*f_var);
             }
         }
@@ -181,5 +181,10 @@ mod tests {
         assert_eq!(1.0, singleton.approx_cardinality());
         assert_eq!(BigInt::one(), singleton.exact_cardinality());
         assert_eq!(1, singleton.iter().count());
+
+        // There are 28 network variables and we are eliminating 22 of them, so 6 should be left.
+        let dual_vars = ctx.inner_context().all_extra_state_variables();
+        let project = unit.raw_projection(&dual_vars[0..44]);
+        assert_eq!(project.iter().count(), 3_usize.pow(6));
     }
 }
