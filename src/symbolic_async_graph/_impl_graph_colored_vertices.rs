@@ -234,3 +234,54 @@ impl BddSet for GraphColoredVertices {
         u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::BooleanNetwork;
+    use num_bigint::BigInt;
+    use num_traits::One;
+
+    #[test]
+    fn basic_colored_spaces_set_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/005.aeon").unwrap();
+        let stg = SymbolicAsyncGraph::new(bn.clone()).unwrap();
+
+        let unit = stg.mk_unit_colored_vertices();
+        assert!(!unit.is_singleton());
+        assert_eq!(unit, unit.copy(unit.clone().into_bdd()));
+
+        let singleton = unit.pick_singleton();
+        assert_eq!(1.0, singleton.approx_cardinality());
+        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        let singleton_color = singleton.colors();
+        let singleton_vertices = singleton.vertices();
+        assert!(singleton_color.is_singleton());
+        assert!(singleton_vertices.is_singleton());
+        assert!(!unit.intersect_colors(&singleton_color).is_singleton());
+        // There is only one color, hence this holds. Otherwise this should not hold.
+        assert!(unit.intersect_vertices(&singleton_vertices).is_singleton());
+        assert!(unit.minus_colors(&singleton_color).is_empty());
+        assert!(unit.minus_vertices(&singleton_vertices).is_subset(&unit));
+
+        let var = bn.as_graph().find_variable("v_XPF").unwrap();
+        let selected = unit.fix_network_variable(var, true);
+        assert_eq!(
+            unit.approx_cardinality() / 2.0,
+            selected.approx_cardinality()
+        );
+        let restricted = unit.restrict_network_variable(var, true);
+        assert_eq!(unit.approx_cardinality(), restricted.approx_cardinality());
+        let restricted = singleton.restrict_network_variable(var, false);
+        assert_eq!(
+            singleton.approx_cardinality() * 2.0,
+            restricted.approx_cardinality()
+        );
+        assert!(singleton.restrict_network_variable(var, true).is_empty());
+
+        // There are 28 variables and we are eliminating 22 of them, so 6 should be left.
+        let project = unit.raw_projection(&stg.symbolic_context().state_variables()[0..22]);
+        assert_eq!(project.iter().count(), 2_usize.pow(6));
+    }
+}

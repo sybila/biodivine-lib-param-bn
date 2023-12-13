@@ -77,15 +77,15 @@ impl NetworkColoredSpaces {
     pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
         let mut retained = Vec::new();
         for p_var in &self.parameter_variables {
-            if variables.contains(p_var) {
+            if !variables.contains(p_var) {
                 retained.push(*p_var);
             }
         }
         for (t_var, f_var) in &self.dual_variables {
-            if variables.contains(t_var) {
+            if !variables.contains(t_var) {
                 retained.push(*t_var);
             }
-            if variables.contains(f_var) {
+            if !variables.contains(f_var) {
                 retained.push(*f_var);
             }
         }
@@ -233,5 +233,11 @@ mod tests {
         // There is only one color, hence this holds. Otherwise this should not hold.
         assert!(unit.intersect_spaces(&singleton_space).is_singleton());
         assert!(unit.minus_colors(&singleton_color).is_empty());
+        assert!(unit.minus_spaces(&singleton_space).is_subset(&unit));
+
+        // There are 28 network variables and we are eliminating 22 of them, so 6 should be left.
+        let dual_vars = ctx.inner_context().all_extra_state_variables();
+        let project = unit.raw_projection(&dual_vars[0..44]);
+        assert_eq!(project.iter().count(), 3_usize.pow(6));
     }
 }
