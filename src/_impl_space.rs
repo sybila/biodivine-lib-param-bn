@@ -57,7 +57,7 @@ impl Space {
         Space(vec![Any; network.num_vars()])
     }
 
-    /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space".
+    /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space" object.
     pub fn from_values(bn: &BooleanNetwork, values: Vec<(VariableId, bool)>) -> Space {
         let mut result = Self::new(bn);
         for (k, v) in values {
@@ -66,6 +66,7 @@ impl Space {
         result
     }
 
+    /// Convert a space into a list of values compatible with the normal `SymbolicAsyncGraph`.
     pub fn to_values(&self) -> Vec<(VariableId, bool)> {
         let mut result = Vec::new();
         for (k, v) in self.0.iter().enumerate() {
@@ -76,6 +77,7 @@ impl Space {
         result
     }
 
+    /// Try to intersect two spaces. If the result is empty, returns `None`.
     pub fn intersect(&self, other: &Space) -> Option<Space> {
         let mut result = self.clone();
         for i in 0..self.0.len() {
@@ -97,7 +99,13 @@ impl Space {
         Some(result)
     }
 
+    /// Count the number of `*` in this space.
     pub fn count_any(&self) -> usize {
         self.0.iter().filter(|it| **it == Any).count()
+    }
+
+    /// Count the number of `0` and `1` in this space.
+    pub fn count_fixed(&self) -> usize {
+        self.0.iter().filter(|it| **it != Any).count()
     }
 }

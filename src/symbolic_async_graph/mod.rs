@@ -28,10 +28,9 @@
 //! any custom BDD operations, but it should be used with caution.
 //!
 
+use crate::symbolic_async_graph::projected_iteration::{OwnedRawSymbolicIterator, RawProjection};
 use crate::BooleanNetwork;
-use biodivine_lib_bdd::{
-    Bdd, BddSatisfyingValuations, BddVariable, BddVariableSet, ValuationsOfClauseIterator,
-};
+use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet, ValuationsOfClauseIterator};
 use std::iter::Enumerate;
 
 /// **(internal)** Implementing conversion between `FnUpdate` and `BooleanExpression`.
@@ -64,15 +63,15 @@ pub mod projected_iteration;
 ///
 /// These methods should eventually replace code that was previously duplicated across multiple
 /// set objects but is kept there for now due to compatibility.
-mod bdd_set;
+pub(crate) mod bdd_set;
 
 /// Symbolic representation of a color set.
 ///
 /// Implementation contains all symbolic variables, but state variables are unconstrained.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
 pub struct GraphColors {
-    bdd: Bdd,
-    parameter_variables: Vec<BddVariable>,
+    pub(crate) bdd: Bdd,
+    pub(crate) parameter_variables: Vec<BddVariable>,
 }
 
 /// Symbolic representation of a coloured set of graph vertices, i.e. a subset of $V \times C$.
@@ -97,15 +96,18 @@ pub struct GraphVertices {
 ///
 /// Internally, this struct contains a `Bdd` that has all parameter variables fixed to false,
 /// so that we only iterate over vertices and can safely disregard colors.
+///
+/// **This object is now deprecated and you can call [GraphVertices::into_iter] directly.**
 #[derive(Clone)]
+#[deprecated]
 pub struct IterableVertices {
-    materialized_bdd: Bdd,
+    projection: RawProjection,
     state_variables: Vec<BddVariable>,
 }
 
-/// Iterator over graph vertices.
-pub struct GraphVertexIterator<'a> {
-    iterator: BddSatisfyingValuations<'a>,
+/// Iterator over the states/vertices of a [GraphVertices] set.
+pub struct GraphVertexIterator {
+    inner_iterator: OwnedRawSymbolicIterator,
     state_variables: Vec<BddVariable>,
 }
 

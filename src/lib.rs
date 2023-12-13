@@ -24,6 +24,7 @@ pub mod sbml;
 #[cfg(feature = "solver-z3")]
 pub mod solver_context;
 pub mod symbolic_async_graph;
+pub mod trap_spaces;
 pub mod tutorial;
 
 /// **(internal)** Implements `.aeon` parser for `BooleanNetwork` and `RegulatoryGraph` objects.
