@@ -225,6 +225,7 @@ fn read_args(data: &[Token]) -> Result<Vec<FnUpdateTemp>, String> {
 
 #[cfg(test)]
 mod tests {
+    use crate::BinaryOp;
     use crate::_aeon_parser::FnUpdateTemp;
     use std::convert::TryFrom;
 
@@ -266,6 +267,17 @@ mod tests {
             FnUpdateTemp::try_from("true").unwrap(),
             FnUpdateTemp::Const(true)
         );
+        assert_eq!(
+            FnUpdateTemp::try_from("0 | f(0,1)").unwrap(),
+            FnUpdateTemp::Binary(
+                BinaryOp::Or,
+                Box::new(FnUpdateTemp::Const(false)),
+                Box::new(FnUpdateTemp::Param(
+                    "f".to_string(),
+                    vec![FnUpdateTemp::Const(false), FnUpdateTemp::Const(true),]
+                ))
+            )
+        )
     }
 
     #[test]
