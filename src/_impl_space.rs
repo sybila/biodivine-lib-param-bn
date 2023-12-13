@@ -54,7 +54,11 @@ impl Space {
     /// Create a new space tracking the variables of the given network, where all values are
     /// initially assigned as `Any`.
     pub fn new(network: &BooleanNetwork) -> Space {
-        Space(vec![Any; network.num_vars()])
+        Self::new_raw(network.num_vars())
+    }
+
+    pub fn new_raw(num_vars: usize) -> Space {
+        Space(vec![Any; num_vars])
     }
 
     /// Convert a list of values (such as used by `SymbolicAsyncGraph`) into a proper "space" object.

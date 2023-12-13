@@ -1,5 +1,5 @@
 use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId, VariableIdIterator};
 use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
@@ -135,6 +135,46 @@ impl SymbolicContext {
         })
     }
 
+    /// Obtain a [VariableId] of a state variable, assuming such state variable exists.
+    pub fn find_network_variable(&self, name: &str) -> Option<VariableId> {
+        self.bdd
+            .var_by_name(name)
+            .and_then(|bdd_var| self.find_state_variable(bdd_var))
+    }
+
+    /// Obtain the name of a specific state variable.
+    pub fn get_network_variable_name(&self, variable: VariableId) -> String {
+        self.bdd.name_of(self.state_variables[variable.to_index()])
+    }
+
+    /// Iterator over all [VariableId] network variables managed by this [SymbolicContext].
+    pub fn network_variables(&self) -> VariableIdIterator {
+        (0..self.num_state_variables()).map(VariableId::from_index)
+    }
+
+    /// Create a new [SymbolicContext] which is compatible with the current context (it uses the same
+    /// [BddVariableSet]), but is missing the given [VariableId].
+    ///
+    /// The new context uses the same [ParameterId] identifiers as the old context, but has different
+    /// [VariableId] identifiers, since one of the variables is no longer used, and [VariableId] identifiers
+    /// must be always a contiguous sequence. You should use variable names to "translate" [VariableId] identifiers
+    /// between the two symbolic context. Of course, [SymbolicContext::transfer_from] should also still work.
+    ///
+    /// Note that the extra state variables and parameter variables do not disappear, even if they are only used
+    /// by the eliminated variable. However, you cannot access them using the normal methods
+    /// (e.g. [SymbolicContext::get_extra_state_variable]), only through the full list
+    /// (i.e. [SymbolicContext::all_extra_state_variables]).
+    pub fn eliminate_network_variable(&self, variable: VariableId) -> SymbolicContext {
+        let index = variable.to_index();
+        let mut result = self.clone();
+        // Remove the variable from all variable-indexed lists. The symbolic variables still remain in the
+        // general lists though. Explicit parameters are unchanged.
+        result.state_variables.remove(index);
+        result.extra_state_variables.remove(index);
+        result.implicit_function_tables.remove(index);
+        result
+    }
+
     /// The number of state variables (should be equal to the number of network variables).
     pub fn num_state_variables(&self) -> usize {
         self.state_variables.len()
@@ -194,6 +234,15 @@ impl SymbolicContext {
     /// Get the `BddVariable` representing the network variable with the given `VariableId`.
     pub fn get_state_variable(&self, variable: VariableId) -> BddVariable {
         self.state_variables[variable.0]
+    }
+
+    /// Try to find a [VariableId] which corresponds to the given [BddVariable], assuming
+    /// the [BddVariable] is one of the [Self::state_variables].
+    pub fn find_state_variable(&self, symbolic_variable: BddVariable) -> Option<VariableId> {
+        self.state_variables
+            .iter()
+            .position(|it| *it == symbolic_variable)
+            .map(VariableId::from_index)
     }
 
     /// Get the `BddVariable` extra symbolic variable associated with a particular BN variable
@@ -385,6 +434,20 @@ impl SymbolicContext {
         }
     }
 
+    /// Build a DNF representation of an instantiated update function (given as [Bdd]).
+    pub fn mk_instantiated_fn_update(&self, valuation: &BddValuation, function: &Bdd) -> FnUpdate {
+        let parameter_valuation = self
+            .parameter_variables()
+            .iter()
+            .map(|it| (*it, valuation[*it]))
+            .collect::<Vec<_>>();
+
+        // This should fix all parameters to their respective values.
+        let restricted = function.restrict(&parameter_valuation);
+
+        FnUpdate::build_from_bdd(self, &restricted)
+    }
+
     /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
     fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
         return args.iter().map(|v| self.mk_fn_update_true(v)).collect();
@@ -446,7 +509,7 @@ mod tests {
     fn hmox_pathway() {
         let model = std::fs::read_to_string("aeon_models/hmox_pathway.aeon").unwrap();
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert!(!graph.unit_colored_vertices().is_empty());
     }
 

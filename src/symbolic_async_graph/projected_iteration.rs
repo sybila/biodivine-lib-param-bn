@@ -353,49 +353,31 @@ fn instantiate_functions(
 ) -> Vec<(VariableId, FnUpdate)> {
     let mut data = Vec::new();
     for var in retained {
-        let symbolic_instance = if let Some(function) = context.network.get_update_function(*var) {
-            context
-                .symbolic_context()
-                .instantiate_fn_update(valuation, function)
-        } else {
-            let arguments = context.as_network().regulators(*var);
-            context
-                .symbolic_context()
-                .instantiate_implicit_function(valuation, *var, &arguments)
-        };
-        let fn_update = FnUpdate::build_from_bdd(context.symbolic_context(), &symbolic_instance);
+        let symbolic_function = &context.fn_update[var.to_index()];
+        let fn_update = context
+            .symbolic_context()
+            .mk_instantiated_fn_update(valuation, symbolic_function);
         data.push((*var, fn_update));
     }
     data
 }
 
-/// Collect the symbolic variables that are necessary to instantiate the `retained` update
-/// functions of the network from `context`.
+/// Collect the symbolic parameter variables that are necessary to instantiate the
+/// `retained` update functions of the network from `context`.
 fn collect_fn_update_parameters(
     context: &SymbolicAsyncGraph,
     retained: &[VariableId],
 ) -> HashSet<BddVariable> {
     let symbolic_context = context.symbolic_context();
     let mut retained_symbolic = HashSet::new();
+    // First, collect all variables that are relevant.
     for var in retained {
-        if let Some(fn_update) = context.as_network().get_update_function(*var) {
-            // Retain all symbolic variables of the function's parameters.
-            for param in fn_update.collect_parameters() {
-                for s_var in symbolic_context
-                    .get_explicit_function_table(param)
-                    .symbolic_variables()
-                {
-                    retained_symbolic.insert(*s_var);
-                }
-            }
-        } else {
-            for s_var in symbolic_context
-                .get_implicit_function_table(*var)
-                .symbolic_variables()
-            {
-                retained_symbolic.insert(*s_var);
-            }
-        }
+        let update = context.get_symbolic_fn_update(*var);
+        retained_symbolic.extend(update.support_set());
+    }
+    // Then remove state variables to only keep parameter variables.
+    for state_var in symbolic_context.state_variables() {
+        retained_symbolic.remove(state_var);
     }
     retained_symbolic
 }
@@ -422,7 +404,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let a0b0 = stg.mk_subspace(&[(a, false), (b, false)]);
         let b1c1 = stg.mk_subspace(&[(b, true), (c, true)]);
@@ -432,23 +414,20 @@ mod tests {
         let ab_projection = union.state_projection(&[a, b]).iter().collect::<Vec<_>>();
         let bc_projection = union.state_projection(&[b, c]).iter().collect::<Vec<_>>();
 
-        assert_eq!(
-            ab_projection,
-            vec![
-                vec![(a, false), (b, false)],
-                vec![(a, false), (b, true)],
-                vec![(a, true), (b, true)],
-            ]
-        );
+        let ab_expected = vec![
+            vec![(a, false), (b, false)],
+            vec![(a, false), (b, true)],
+            vec![(a, true), (b, true)],
+        ];
 
-        assert_eq!(
-            bc_projection,
-            vec![
-                vec![(b, false), (c, false)],
-                vec![(b, false), (c, true)],
-                vec![(b, true), (c, true)]
-            ]
-        );
+        let bc_expected = vec![
+            vec![(b, false), (c, false)],
+            vec![(b, false), (c, true)],
+            vec![(b, true), (c, true)],
+        ];
+
+        assert_eq!(ab_projection, ab_expected);
+        assert_eq!(bc_projection, bc_expected);
 
         // The same should be true for vertices only:
 
@@ -457,23 +436,8 @@ mod tests {
         let ab_projection = union.state_projection(&[a, b]).iter().collect::<Vec<_>>();
         let bc_projection = union.state_projection(&[b, c]).iter().collect::<Vec<_>>();
 
-        assert_eq!(
-            ab_projection,
-            vec![
-                vec![(a, false), (b, false)],
-                vec![(a, false), (b, true)],
-                vec![(a, true), (b, true)],
-            ]
-        );
-
-        assert_eq!(
-            bc_projection,
-            vec![
-                vec![(b, false), (c, false)],
-                vec![(b, false), (c, true)],
-                vec![(b, true), (c, true)]
-            ]
-        );
+        assert_eq!(ab_projection, ab_expected);
+        assert_eq!(bc_projection, bc_expected);
     }
 
     #[test]
@@ -493,7 +457,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let can_update_a = stg.var_can_post(a, stg.unit_colored_vertices());
         let can_update_b = stg.var_can_post(b, stg.unit_colored_vertices());
@@ -567,7 +531,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let can_update_a = stg.var_can_post(a, stg.unit_colored_vertices());
         let can_update_b = stg.var_can_post(b, stg.unit_colored_vertices());

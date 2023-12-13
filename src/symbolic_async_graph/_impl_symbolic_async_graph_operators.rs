@@ -44,7 +44,7 @@ impl SymbolicAsyncGraph {
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_binary_flip_op(
             (&initial.bdd, None),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
             biodivine_lib_bdd::op_function::and,
         );
@@ -66,7 +66,7 @@ impl SymbolicAsyncGraph {
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_binary_flip_op(
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             None,
             biodivine_lib_bdd::op_function::and,
         );
@@ -88,20 +88,11 @@ impl SymbolicAsyncGraph {
         // flip(set & !flip(set) & can_apply_function)
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_ternary_flip_op(
-            (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&initial.bdd, None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
-            |a, b, c| {
-                // a & !b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(true), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(false), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            not_a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -123,18 +114,9 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             None,
-            |a, b, c| {
-                // !a & b & c
-                match (a, b, c) {
-                    (Some(true), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(false), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            not_a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -156,18 +138,9 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
-            |a, b, c| {
-                // a & b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -189,18 +162,9 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             None,
-            |a, b, c| {
-                // a & b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -218,7 +182,7 @@ impl SymbolicAsyncGraph {
     ) -> GraphColoredVertices {
         // set & can_apply_function
         GraphColoredVertices::new(
-            initial.bdd.and(&self.update_functions[variable.0]),
+            initial.bdd.and(&self.fn_transition[variable.0]),
             &self.symbolic_context,
         )
     }
@@ -238,7 +202,7 @@ impl SymbolicAsyncGraph {
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_binary_flip_op(
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
             biodivine_lib_bdd::op_function::and,
         );
@@ -260,20 +224,11 @@ impl SymbolicAsyncGraph {
         // set & !flip(set) & can_apply_function
         let symbolic_var = self.symbolic_context.state_variables[variable.0];
         let output = Bdd::fused_ternary_flip_op(
-            (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&initial.bdd, None),
+            (&self.fn_transition[variable.0], None),
             None,
-            |a, b, c| {
-                // a & !b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(true), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(false), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            not_a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -295,18 +250,9 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
-            |a, b, c| {
-                // !a & b & c
-                match (a, b, c) {
-                    (Some(true), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(false), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            not_a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -328,18 +274,9 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             None,
-            |a, b, c| {
-                // a & b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
     }
@@ -361,20 +298,33 @@ impl SymbolicAsyncGraph {
         let output = Bdd::fused_ternary_flip_op(
             (&initial.bdd, None),
             (&initial.bdd, Some(symbolic_var)),
-            (&self.update_functions[variable.0], None),
+            (&self.fn_transition[variable.0], None),
             Some(symbolic_var),
-            |a, b, c| {
-                // a & b & c
-                match (a, b, c) {
-                    (Some(false), _, _) => Some(false),
-                    (_, Some(false), _) => Some(false),
-                    (_, _, Some(false)) => Some(false),
-                    (Some(true), Some(true), Some(true)) => Some(true),
-                    _ => None,
-                }
-            },
+            a_and_b_and_c,
         );
         GraphColoredVertices::new(output, &self.symbolic_context)
+    }
+}
+
+pub(crate) fn a_and_b_and_c(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool> {
+    // a & b & c
+    match (a, b, c) {
+        (Some(false), _, _) => Some(false),
+        (_, Some(false), _) => Some(false),
+        (_, _, Some(false)) => Some(false),
+        (Some(true), Some(true), Some(true)) => Some(true),
+        _ => None,
+    }
+}
+
+pub(crate) fn not_a_and_b_and_c(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool> {
+    // !a & b & c
+    match (a, b, c) {
+        (Some(true), _, _) => Some(false),
+        (_, Some(false), _) => Some(false),
+        (_, _, Some(false)) => Some(false),
+        (Some(false), Some(true), Some(true)) => Some(true),
+        _ => None,
     }
 }
 
@@ -398,36 +348,32 @@ impl SymbolicAsyncGraph {
 impl SymbolicAsyncGraph {
     /// Compute the result of applying `post` with *all* update functions to the `initial` set.
     pub fn post(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_post(v, initial))
             })
     }
 
     /// Compute the result of applying `pre` with *all* update functions to the `initial` set.
     pub fn pre(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_pre(v, initial))
             })
     }
 
     /// Compute the subset of `set` that can perform *some* `post` operation.
     pub fn can_post(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_post(v, set))
             })
     }
 
     /// Compute the subset of `set` that can perform *some* `pre` operation.
     pub fn can_pre(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_pre(v, set))
             })
     }
@@ -435,9 +381,8 @@ impl SymbolicAsyncGraph {
     /// Compute the subset of `set` that can perform *some* `post` operation which leads
     /// to a state within `set`.
     pub fn can_post_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_post_within(v, set))
             })
     }
@@ -447,17 +392,15 @@ impl SymbolicAsyncGraph {
     ///
     /// Note that this also includes states which cannot perform any `post` operation.
     pub fn will_post_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
+        self.variables()
             .fold(set.clone(), |r, v| r.minus(&self.var_can_post_out(v, set)))
     }
 
     /// Compute the subset of `set` that can perform *some* `pre` operation which leads
     /// to a state within `set`.
     pub fn can_pre_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_pre_within(v, set))
             })
     }
@@ -467,17 +410,15 @@ impl SymbolicAsyncGraph {
     ///
     /// Note that this also includes states which cannot perform any `pre` operation.
     pub fn will_pre_within(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
+        self.variables()
             .fold(set.clone(), |r, v| r.minus(&self.var_can_pre_out(v, set)))
     }
 
     /// Compute the subset of `set` that can perform *some* `post` operation which leads
     /// to a state outside of `set`.
     pub fn can_post_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_post_out(v, set))
             })
     }
@@ -487,7 +428,7 @@ impl SymbolicAsyncGraph {
     ///
     /// Note that this also includes states which cannot perform any `post` operation.
     pub fn will_post_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network.variables().fold(set.clone(), |r, v| {
+        self.variables().fold(set.clone(), |r, v| {
             r.minus(&self.var_can_post_within(v, set))
         })
     }
@@ -495,9 +436,8 @@ impl SymbolicAsyncGraph {
     /// Compute the subset of `set` that can perform *some* `pre` operation which leads
     /// to a state outside of `set`.
     pub fn can_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network
-            .variables()
-            .fold(self.mk_empty_vertices(), |r, v| {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
                 r.union(&self.var_can_pre_out(v, set))
             })
     }
@@ -507,7 +447,7 @@ impl SymbolicAsyncGraph {
     ///
     /// Note that this also includes states which cannot perform any `pre` operation.
     pub fn will_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
-        self.network.variables().fold(set.clone(), |r, v| {
+        self.variables().fold(set.clone(), |r, v| {
             r.minus(&self.var_can_pre_within(v, set))
         })
     }
@@ -535,8 +475,8 @@ mod tests {
         ",
         )
         .unwrap();
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
-        let id_b = stg.as_network().as_graph().find_variable("B").unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let id_b = bn.as_graph().find_variable("B").unwrap();
         let b_is_true = stg.fix_network_variable(id_b, true);
         let b_is_false = stg.fix_network_variable(id_b, false);
 

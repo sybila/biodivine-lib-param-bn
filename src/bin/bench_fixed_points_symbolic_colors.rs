@@ -14,7 +14,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let fixed_points = FixedPoints::symbolic_colors(&stg, stg.unit_colored_vertices());
     println!(
