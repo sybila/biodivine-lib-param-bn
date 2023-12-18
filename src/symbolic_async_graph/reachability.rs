@@ -2,7 +2,7 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::VariableId;
 use std::cmp::max;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 pub struct Reachability {
     _dummy: (),
@@ -53,12 +53,11 @@ impl Reachability {
         }
 
         let mut result = initial.clone();
-        let network = graph.as_network();
 
         let mut max_size = 0;
 
         'reach: loop {
-            for var in network.variables().rev() {
+            for var in graph.variables().rev() {
                 let step = step(graph, &result, var);
                 if !step.is_empty() {
                     result = result.union(&step);
@@ -109,12 +108,30 @@ impl Reachability {
             );
         }
 
+        // Construct a symbolic regulators relation (this is more accurate than the normal regulatory graph,
+        // and does not require an underlying Boolean network).
+        let targets_of_var = graph
+            .variables()
+            .map(|regulator| {
+                let targets = graph
+                    .variables()
+                    .filter(|var| {
+                        let update = graph.get_symbolic_fn_update(*var);
+                        let state_variable = graph.symbolic_context().get_state_variable(regulator);
+                        update.support_set().contains(&state_variable)
+                    })
+                    .collect::<Vec<_>>();
+                (regulator, targets)
+            })
+            .collect::<HashMap<_, _>>();
+
         let mut result = initial.clone();
         let mut max_size = 0;
-        let network = graph.as_network();
+
+        // A set of saturated variables. We can only remove a variable from here if it's regulator has been changed.
         let mut saturated = HashSet::new();
         'reach: loop {
-            for var in network.variables().rev() {
+            for var in graph.variables().rev() {
                 let next_step = step(graph, &result, var);
                 if next_step.is_empty() {
                     saturated.insert(var);
@@ -128,7 +145,7 @@ impl Reachability {
                         println!(
                             " >> [{}/{} saturated] Reach progress: {}[nodes:{}] candidates ({:.2} log-%).",
                             saturated.len(),
-                            network.num_vars(),
+                            graph.num_vars(),
                             result.approx_cardinality(),
                             result.symbolic_size(),
                             (current.log2() / max.log2()) * 100.0
@@ -136,8 +153,8 @@ impl Reachability {
                     }
 
                     if !saturated.contains(&var) {
-                        for t in network.targets(var) {
-                            saturated.remove(&t);
+                        for t in &targets_of_var[&var] {
+                            saturated.remove(t);
                         }
                         continue 'reach;
                     }
