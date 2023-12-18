@@ -6,7 +6,7 @@ fn main() {
     let args = Vec::from_iter(std::env::args());
     let path = &args[1];
     let model = BooleanNetwork::try_from_file(path).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true, true);
 
     println!(
         "Loaded model with {} variables and {} parameters.",
@@ -14,7 +14,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let fixed_points = FixedPoints::symbolic_colors(&stg, stg.unit_colored_vertices());
     println!(

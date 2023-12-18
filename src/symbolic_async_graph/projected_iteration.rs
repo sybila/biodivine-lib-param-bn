@@ -38,6 +38,7 @@ use std::collections::HashSet;
 /// has all non-retained variables fixed to `False`. This ensures that when we iterate through
 /// its valuations, we do not repeat valuations that only differ in variables that
 /// are not retained.
+#[derive(Clone)]
 pub struct RawProjection {
     retained_variables: Vec<BddVariable>,
     bdd: Bdd,
@@ -48,6 +49,27 @@ pub struct RawProjection {
 pub struct RawSymbolicIterator<'a> {
     raw_projection: &'a RawProjection,
     inner_iterator: BddSatisfyingValuations<'a>,
+}
+
+/// A version of [RawSymbolicIterator] which actually owns the underlying [RawProjection].
+/// This means the iterator is not tied to the lifetime of the projection.
+///
+/// Note that due to our unfortunate API design, this `struct` has to use a minor "hack" to
+/// make it work. In particular, we have to "fake" a `'static` lifetime on
+/// the [BddSatisfyingValuations] iterator. In our case, this is safe because (a) we don't
+/// leak the inner iterator anywhere, so the hack is contained to our private code, and (b)
+/// we still own the original projection, so it actually lives as long as the iterator.
+/// Finally, (c), the destruction of the iterator is passive and does not perform any actions
+/// on the underlying projection (which may have been destroyed at this time, depending
+/// on the destructor invocation order).
+///
+/// Also note that the `Box` around `RawProjection` is essential! When we are constructing
+/// the inner iterator, we need to reference the final memory location of the `RawProjection`.
+/// Hence we need a heap pointer that will stay the same after we move the projection into
+/// the [OwnedRawSymbolicIterator].
+pub struct OwnedRawSymbolicIterator {
+    raw_projection: Box<RawProjection>,
+    inner_iterator: BddSatisfyingValuations<'static>,
 }
 
 impl RawProjection {
@@ -63,10 +85,10 @@ impl RawProjection {
             .into_iter()
             .filter(|it| !retained.contains(it))
             .collect();
-        let projection = bdd.project(&to_eliminate);
+        let projection = bdd.exists(&to_eliminate);
         // Then fix everything that is not retained to `False` to ensure succinct enumeration.
         let all_false = BddValuation::all_false(projection.num_vars());
-        let parameters_false = Bdd::from(all_false).project(&retained);
+        let parameters_false = Bdd::from(all_false).exists(&retained);
         RawProjection {
             retained_variables: retained,
             bdd: projection.and(&parameters_false),
@@ -81,18 +103,51 @@ impl RawProjection {
     }
 }
 
+impl IntoIterator for RawProjection {
+    type Item = BddPartialValuation;
+    type IntoIter = OwnedRawSymbolicIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let iterable = Box::new(self);
+        let static_iterable = unsafe {
+            (iterable.as_ref() as *const RawProjection)
+                .as_ref()
+                .unwrap()
+        };
+        OwnedRawSymbolicIterator {
+            raw_projection: iterable,
+            inner_iterator: static_iterable.bdd.sat_valuations(),
+        }
+    }
+}
+
+/// Restrict a BDD valuation only to the provided "retained" variables.
+fn restrict_valuation(valuation: BddValuation, retain: &[BddVariable]) -> BddPartialValuation {
+    let mut partial = BddPartialValuation::empty();
+    for var in retain {
+        partial.set_value(*var, valuation[*var]);
+    }
+    partial
+}
+
 impl<'a> Iterator for RawSymbolicIterator<'a> {
     type Item = BddPartialValuation;
 
     fn next(&mut self) -> Option<Self::Item> {
         // Extract only the symbolic variables that are actually retained in this projection.
-        self.inner_iterator.next().map(|valuation| {
-            let mut partial_valuation = BddPartialValuation::empty();
-            for var in &self.raw_projection.retained_variables {
-                partial_valuation.set_value(*var, valuation.value(*var))
-            }
-            partial_valuation
-        })
+        self.inner_iterator
+            .next()
+            .map(|valuation| restrict_valuation(valuation, &self.raw_projection.retained_variables))
+    }
+}
+
+impl Iterator for OwnedRawSymbolicIterator {
+    type Item = BddPartialValuation;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner_iterator
+            .next()
+            .map(|valuation| restrict_valuation(valuation, &self.raw_projection.retained_variables))
     }
 }
 
@@ -210,7 +265,7 @@ impl<'a, 'b> Iterator for FnUpdateProjectionIterator<'a, 'b> {
 /// the network variables and some of the update functions.
 ///
 /// This type of projection can be used to relate a specific state to a specific update function.
-/// For example, how does a phenotype variable changes with a particular update function?
+/// For example, how does a phenotype variable change with a particular update function?
 ///
 /// Note that the same considerations regarding `FnUpdate` uniqueness as for `FnUpdateProjection`
 /// apply here as well.
@@ -298,49 +353,31 @@ fn instantiate_functions(
 ) -> Vec<(VariableId, FnUpdate)> {
     let mut data = Vec::new();
     for var in retained {
-        let symbolic_instance = if let Some(function) = context.network.get_update_function(*var) {
-            context
-                .symbolic_context()
-                .instantiate_fn_update(valuation, function)
-        } else {
-            let arguments = context.as_network().regulators(*var);
-            context
-                .symbolic_context()
-                .instantiate_implicit_function(valuation, *var, &arguments)
-        };
-        let fn_update = FnUpdate::build_from_bdd(context.symbolic_context(), &symbolic_instance);
+        let symbolic_function = &context.fn_update[var.to_index()];
+        let fn_update = context
+            .symbolic_context()
+            .mk_instantiated_fn_update(valuation, symbolic_function);
         data.push((*var, fn_update));
     }
     data
 }
 
-/// Collect the symbolic variables that are necessary to instantiate the `retained` update
-/// functions of the network from `context`.
+/// Collect the symbolic parameter variables that are necessary to instantiate the
+/// `retained` update functions of the network from `context`.
 fn collect_fn_update_parameters(
     context: &SymbolicAsyncGraph,
     retained: &[VariableId],
 ) -> HashSet<BddVariable> {
     let symbolic_context = context.symbolic_context();
     let mut retained_symbolic = HashSet::new();
+    // First, collect all variables that are relevant.
     for var in retained {
-        if let Some(fn_update) = context.as_network().get_update_function(*var) {
-            // Retain all symbolic variables of the function's parameters.
-            for param in fn_update.collect_parameters() {
-                for s_var in symbolic_context
-                    .get_explicit_function_table(param)
-                    .symbolic_variables()
-                {
-                    retained_symbolic.insert(*s_var);
-                }
-            }
-        } else {
-            for s_var in symbolic_context
-                .get_implicit_function_table(*var)
-                .symbolic_variables()
-            {
-                retained_symbolic.insert(*s_var);
-            }
-        }
+        let update = context.get_symbolic_fn_update(*var);
+        retained_symbolic.extend(update.support_set());
+    }
+    // Then remove state variables to only keep parameter variables.
+    for state_var in symbolic_context.state_variables() {
+        retained_symbolic.remove(state_var);
     }
     retained_symbolic
 }
@@ -367,7 +404,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let a0b0 = stg.mk_subspace(&[(a, false), (b, false)]);
         let b1c1 = stg.mk_subspace(&[(b, true), (c, true)]);
@@ -377,23 +414,20 @@ mod tests {
         let ab_projection = union.state_projection(&[a, b]).iter().collect::<Vec<_>>();
         let bc_projection = union.state_projection(&[b, c]).iter().collect::<Vec<_>>();
 
-        assert_eq!(
-            ab_projection,
-            vec![
-                vec![(a, false), (b, false)],
-                vec![(a, false), (b, true)],
-                vec![(a, true), (b, true)],
-            ]
-        );
+        let ab_expected = vec![
+            vec![(a, false), (b, false)],
+            vec![(a, false), (b, true)],
+            vec![(a, true), (b, true)],
+        ];
 
-        assert_eq!(
-            bc_projection,
-            vec![
-                vec![(b, false), (c, false)],
-                vec![(b, false), (c, true)],
-                vec![(b, true), (c, true)]
-            ]
-        );
+        let bc_expected = vec![
+            vec![(b, false), (c, false)],
+            vec![(b, false), (c, true)],
+            vec![(b, true), (c, true)],
+        ];
+
+        assert_eq!(ab_projection, ab_expected);
+        assert_eq!(bc_projection, bc_expected);
 
         // The same should be true for vertices only:
 
@@ -402,23 +436,8 @@ mod tests {
         let ab_projection = union.state_projection(&[a, b]).iter().collect::<Vec<_>>();
         let bc_projection = union.state_projection(&[b, c]).iter().collect::<Vec<_>>();
 
-        assert_eq!(
-            ab_projection,
-            vec![
-                vec![(a, false), (b, false)],
-                vec![(a, false), (b, true)],
-                vec![(a, true), (b, true)],
-            ]
-        );
-
-        assert_eq!(
-            bc_projection,
-            vec![
-                vec![(b, false), (c, false)],
-                vec![(b, false), (c, true)],
-                vec![(b, true), (c, true)]
-            ]
-        );
+        assert_eq!(ab_projection, ab_expected);
+        assert_eq!(bc_projection, bc_expected);
     }
 
     #[test]
@@ -438,7 +457,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let can_update_a = stg.var_can_post(a, stg.unit_colored_vertices());
         let can_update_b = stg.var_can_post(b, stg.unit_colored_vertices());
@@ -512,7 +531,7 @@ mod tests {
         let b = v.next().unwrap();
         let c = v.next().unwrap();
 
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let can_update_a = stg.var_can_post(a, stg.unit_colored_vertices());
         let can_update_b = stg.var_can_post(b, stg.unit_colored_vertices());

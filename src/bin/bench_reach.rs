@@ -7,7 +7,7 @@ use biodivine_lib_param_bn::BooleanNetwork;
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true, true);
 
     println!(
         "Loaded model with {} variables and {} parameters.",
@@ -15,7 +15,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let stg = SymbolicAsyncGraph::new(model.clone()).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let mut universe = stg.mk_unit_colored_vertices();
     while !universe.is_empty() {

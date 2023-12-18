@@ -49,6 +49,13 @@ impl RegulatoryGraph {
         Ok(())
     }
 
+    /// Add a new regulation using the [Regulation] object.
+    pub fn add_raw_regulation(&mut self, regulation: Regulation) -> Result<(), String> {
+        self.assert_no_regulation(regulation.regulator, regulation.target)?;
+        self.regulations.push(regulation);
+        Ok(())
+    }
+
     /// Set the name of a network variable. The name must not be used by any other variable.
     ///
     /// Note that you don't have to rename anything else in the network, since all other
@@ -94,6 +101,11 @@ impl RegulatoryGraph {
                 self.get_variable(target)
             ))
         }
+    }
+
+    /// Copy the variable names from this graph into a separate vector.
+    pub fn variable_names(&self) -> Vec<String> {
+        self.variables.iter().map(|it| it.name.clone()).collect()
     }
 }
 

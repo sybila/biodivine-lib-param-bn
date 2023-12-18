@@ -1,7 +1,9 @@
 use crate::symbolic_async_graph::SymbolicContext;
+use crate::BinaryOp::{And, Iff, Imp, Or, Xor};
 use crate::FnUpdate::*;
-use crate::{BinaryOp, BooleanNetwork, ExtendedBoolean, FnUpdate, ParameterId, Space, VariableId};
-use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable};
+use crate::_aeon_parser::FnUpdateTemp;
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use biodivine_lib_bdd::{Bdd, BddVariable};
 use std::collections::{HashMap, HashSet};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
@@ -22,10 +24,19 @@ impl FnUpdate {
         Var(id)
     }
 
-    /// Create a `p(x_1, ..., x_k)` formula where `p` is a parameter function and `x_1` through
-    /// `x_k` are its arguments.
-    pub fn mk_param(id: ParameterId, args: &[VariableId]) -> FnUpdate {
+    /// Create a `p(e_1, ..., e_k)` formula where `p` is a parameter function and `e_1` through
+    /// `e_k` are general argument expressions.
+    pub fn mk_param(id: ParameterId, args: &[FnUpdate]) -> FnUpdate {
         Param(id, args.to_vec())
+    }
+
+    /// Same as [Self::mk_param], but can take variable IDs as arguments directly.
+    pub fn mk_basic_param(id: ParameterId, args: &[VariableId]) -> FnUpdate {
+        let args = args
+            .iter()
+            .map(|it| FnUpdate::mk_var(*it))
+            .collect::<Vec<_>>();
+        Param(id, args)
     }
 
     /// Create a `!phi` formula, where `phi` is an inner `FnUpdate`.
@@ -45,27 +56,27 @@ impl FnUpdate {
 
     /// Create a conjunction.
     pub fn and(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::And, self, other)
+        FnUpdate::mk_binary(And, self, other)
     }
 
     /// Create a disjunction.
     pub fn or(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Or, self, other)
+        FnUpdate::mk_binary(Or, self, other)
     }
 
     /// Create an exclusive or.
     pub fn xor(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Xor, self, other)
+        FnUpdate::mk_binary(Xor, self, other)
     }
 
     /// Create an implication.
     pub fn implies(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Imp, self, other)
+        FnUpdate::mk_binary(Imp, self, other)
     }
 
     /// Create an equivalence.
     pub fn iff(self, other: FnUpdate) -> FnUpdate {
-        FnUpdate::mk_binary(BinaryOp::Iff, self, other)
+        FnUpdate::mk_binary(Iff, self, other)
     }
 
     /// If `Const`, return the value, otherwise return `None`.
@@ -85,7 +96,7 @@ impl FnUpdate {
     }
 
     /// If `Param`, return the id and args, otherwise return `None`.
-    pub fn as_param(&self) -> Option<(ParameterId, &[VariableId])> {
+    pub fn as_param(&self) -> Option<(ParameterId, &[FnUpdate])> {
         match self {
             Param(id, args) => Some((*id, args)),
             _ => None,
@@ -107,10 +118,38 @@ impl FnUpdate {
             _ => None,
         }
     }
+
+    /// Build an expression which is equivalent to the conjunction of the given expressions.
+    pub fn mk_conjunction(items: &[FnUpdate]) -> FnUpdate {
+        let Some(first) = items.get(0) else {
+            // Empty conjunction is `true`.
+            return Self::mk_true();
+        };
+        let rest = &items[1..];
+        rest.iter().fold(first.clone(), |a, b| a.and(b.clone()))
+    }
+
+    /// Build an expression which is equivalent to the disjunction of the given expressions.
+    pub fn mk_disjunction(items: &[FnUpdate]) -> FnUpdate {
+        let Some(first) = items.get(0) else {
+            // Empty disjunction is `false`.
+            return Self::mk_false();
+        };
+        let rest = &items[1..];
+        rest.iter().fold(first.clone(), |a, b| a.or(b.clone()))
+    }
 }
 
 /// Other utility methods.
 impl FnUpdate {
+    /// Try to parse an update function from a string expression using the provided `network`
+    /// as context.
+    pub fn try_from_str(expression: &str, network: &BooleanNetwork) -> Result<FnUpdate, String> {
+        let tmp = FnUpdateTemp::try_from(expression)?;
+        let update = tmp.into_fn_update(network)?;
+        Ok(*update)
+    }
+
     /// Build an update function from an instantiated `Bdd`.
     ///
     /// The support set of the `Bdd` must be a subset of the state variables, i.e. the `Bdd`
@@ -129,54 +168,40 @@ impl FnUpdate {
             return FnUpdate::mk_false();
         }
 
-        let state_variables: HashMap<BddVariable, VariableId> = context
+        let translation_map: HashMap<BddVariable, VariableId> = context
             .state_variables()
             .iter()
             .enumerate()
             .map(|(i, v)| (*v, VariableId::from_index(i)))
             .collect();
-        let support = bdd.support_set();
-        for k in &support {
-            if !state_variables.contains_key(k) {
-                panic!("Non-state variables found in the provided BDD.")
-            }
+
+        // All variables must be state variables.
+        for var in bdd.support_set() {
+            assert!(translation_map.contains_key(&var));
         }
 
-        // Because the BDD isn't constant, there must be at least one clause and each clause
-        // must have at least one literal.
-
-        fn build_clause(
-            map: &HashMap<BddVariable, VariableId>,
-            clause: BddPartialValuation,
-        ) -> FnUpdate {
-            fn build_literal(
-                map: &HashMap<BddVariable, VariableId>,
-                literal: (BddVariable, bool),
-            ) -> FnUpdate {
-                let var = FnUpdate::mk_var(*map.get(&literal.0).unwrap());
-                if literal.1 {
-                    var
-                } else {
-                    FnUpdate::mk_not(var)
-                }
-            }
-
-            let mut literals = clause.to_values().into_iter();
-            let mut clause = build_literal(map, literals.next().unwrap());
-            for literal in literals {
-                let literal = build_literal(map, literal);
-                clause = FnUpdate::mk_binary(BinaryOp::And, clause, literal);
-            }
-            clause
-        }
-
-        let mut clauses = bdd.sat_clauses();
-        let mut result = build_clause(&state_variables, clauses.next().unwrap());
-        for clause in clauses {
-            let clause = build_clause(&state_variables, clause);
-            result = FnUpdate::mk_binary(BinaryOp::Or, result, clause);
-        }
-        result
+        // Now, we transform the BDD into DNF and that into a FnUpdate.
+        let dnf = bdd.to_dnf();
+        let dnf = dnf
+            .into_iter()
+            .map(|valuation| {
+                let literals = valuation
+                    .to_values()
+                    .into_iter()
+                    .map(|(var, value)| {
+                        let bn_var = translation_map[&var];
+                        let literal = FnUpdate::mk_var(bn_var);
+                        if value {
+                            literal
+                        } else {
+                            literal.negation()
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                FnUpdate::mk_conjunction(&literals)
+            })
+            .collect::<Vec<_>>();
+        FnUpdate::mk_disjunction(&dnf)
     }
 
     /// Return a sorted vector of all variables that are actually used as inputs in this function.
@@ -188,8 +213,8 @@ impl FnUpdate {
                     args.insert(*id);
                 }
                 Param(_, p_args) => {
-                    for id in p_args {
-                        args.insert(*id);
+                    for fun in p_args {
+                        r_arguments(fun, args);
                     }
                 }
                 Not(inner) => r_arguments(inner, args),
@@ -213,8 +238,11 @@ impl FnUpdate {
             match function {
                 Const(_) => (),
                 Var(_) => (),
-                Param(id, _) => {
+                Param(id, args) => {
                     params.insert(*id);
+                    for fun in args {
+                        r_parameters(fun, params);
+                    }
                 }
                 Not(inner) => r_parameters(inner, params),
                 Binary(_, l, r) => {
@@ -232,25 +260,48 @@ impl FnUpdate {
 
     /// Convert this update function to a string, taking names from the provided `BooleanNetwork`.
     pub fn to_string(&self, context: &BooleanNetwork) -> String {
-        match self {
-            Const(value) => value.to_string(),
-            Var(id) => context.get_variable_name(*id).to_string(),
-            Not(inner) => format!("!{}", inner.to_string(context)),
-            Binary(op, l, r) => {
-                format!("({} {} {})", l.to_string(context), op, r.to_string(context))
-            }
-            Param(id, args) => {
-                if args.is_empty() {
-                    context[*id].get_name().to_string()
-                } else {
-                    let mut arg_string = format!("({}", context.get_variable_name(args[0]));
-                    for arg in args.iter().skip(1) {
-                        arg_string = format!("{}, {}", arg_string, context.get_variable_name(*arg));
+        fn to_string_rec(function: &FnUpdate, context: &BooleanNetwork, no_paren: bool) -> String {
+            match function {
+                Const(value) => value.to_string(),
+                Var(id) => context.get_variable_name(*id).to_string(),
+                Not(inner) => format!("!{}", to_string_rec(inner, context, false)),
+                Binary(op, l, r) => {
+                    // And/Or have special treatments so that chains don't produce
+                    // unnecessary parenthesis.
+                    let l_nested_and = *op == And && matches!(**l, Binary(And, _, _));
+                    let r_nested_and = *op == And && matches!(**r, Binary(And, _, _));
+                    let l_nested_or = *op == Or && matches!(**l, Binary(Or, _, _));
+                    let r_nested_or = *op == Or && matches!(**r, Binary(Or, _, _));
+
+                    let l_no_paren = l_nested_and || l_nested_or;
+                    let r_no_paren = r_nested_and || r_nested_or;
+
+                    let l = to_string_rec(l, context, l_no_paren);
+                    let r = to_string_rec(r, context, r_no_paren);
+
+                    if no_paren {
+                        format!("{} {} {}", l, op, r)
+                    } else {
+                        format!("({} {} {})", l, op, r)
                     }
-                    format!("{}{})", context[*id].get_name(), arg_string)
+                }
+                Param(id, args) => {
+                    if args.is_empty() {
+                        context[*id].get_name().to_string()
+                    } else {
+                        // No need for top-level parenthesis in parameters, since commas
+                        // serve the same purpose.
+                        let mut arg_string = format!("({}", to_string_rec(&args[0], context, true));
+                        for arg in args.iter().skip(1) {
+                            arg_string =
+                                format!("{}, {}", arg_string, to_string_rec(arg, context, true));
+                        }
+                        format!("{}{})", context[*id].get_name(), arg_string)
+                    }
                 }
             }
         }
+        to_string_rec(self, context, true)
     }
 
     /// If possible, evaluate this function using the given network variable valuation.
@@ -276,70 +327,33 @@ impl FnUpdate {
                 let left = left.evaluate(values);
                 let right = right.evaluate(values);
                 match op {
-                    BinaryOp::And => match (left, right) {
+                    And => match (left, right) {
                         (Some(false), _) => Some(false),
                         (_, Some(false)) => Some(false),
                         (Some(true), Some(true)) => Some(true),
                         _ => None,
                     },
-                    BinaryOp::Or => match (left, right) {
+                    Or => match (left, right) {
                         (Some(true), _) => Some(true),
                         (_, Some(true)) => Some(true),
                         (Some(false), Some(false)) => Some(false),
                         _ => None,
                     },
-                    BinaryOp::Iff => match (left, right) {
+                    Iff => match (left, right) {
                         (Some(left), Some(right)) => Some(left == right),
                         _ => None,
                     },
-                    BinaryOp::Xor => match (left, right) {
+                    Xor => match (left, right) {
                         (Some(left), Some(right)) => Some(left != right),
                         _ => None,
                     },
-                    BinaryOp::Imp => match (left, right) {
+                    Imp => match (left, right) {
                         (Some(false), _) => Some(true),
                         (_, Some(true)) => Some(true),
                         (Some(true), Some(false)) => Some(false),
                         _ => None,
                     },
                 }
-            }
-        }
-    }
-
-    /// Test that this update function is a syntactic specialisation of the provided `FnUpdate`.
-    ///
-    /// Syntactic specialisation is a function that has the same abstract syntax tree, except that
-    /// some occurrences of parameters can be substituted for more concrete Boolean functions.
-    ///
-    /// Note that this is not entirely bulletproof, as it does not check for usage of multiple
-    /// parameters within the same function, which could influence the semantics of the main
-    /// function, but does not influence the specialisation.
-    pub fn is_specialisation_of(&self, other: &FnUpdate) -> bool {
-        match other {
-            Const(_) => self == other,
-            Var(_) => self == other,
-            Not(inner) => {
-                if let Some(self_inner) = self.as_not() {
-                    self_inner.is_specialisation_of(inner)
-                } else {
-                    false
-                }
-            }
-            Binary(op, left, right) => {
-                if let Some((self_left, self_op, self_right)) = self.as_binary() {
-                    self_op == *op
-                        && self_left.is_specialisation_of(left)
-                        && self_right.is_specialisation_of(right)
-                } else {
-                    false
-                }
-            }
-            Param(_, args) => {
-                // Every argument in this sub-tree must be declared in the parameter.
-                self.collect_arguments()
-                    .iter()
-                    .all(|arg| args.contains(arg))
             }
         }
     }
@@ -355,7 +369,12 @@ impl FnUpdate {
     {
         match self {
             Const(_) => action(self),
-            Param(_, _) => action(self),
+            Param(_, args) => {
+                for arg in args {
+                    arg.walk_postorder(action);
+                }
+                action(self)
+            }
             Var(_) => action(self),
             Not(inner) => {
                 inner.walk_postorder(action);
@@ -369,24 +388,63 @@ impl FnUpdate {
         }
     }
 
-    /// Create a copy of this function which replaces every occurrence of every
-    /// `VariableId` with a new one supplied by the provided vector (original `VariableId`
-    /// is the index into the vector). Similarly replaces every `ParameterId`.
-    pub fn substitute(&self, vars: &[VariableId], params: &[ParameterId]) -> FnUpdate {
+    /// Create a copy of this [FnUpdate] with every occurrence of [VariableId] `var` substituted
+    /// for [FnUpdate] `expression`.
+    pub fn substitute_variable(&self, var: VariableId, expression: &FnUpdate) -> FnUpdate {
         match self {
             Const(_) => self.clone(),
-            Param(id, args) => {
-                let new_args = args.iter().map(|it| vars[it.0]).collect();
-                Param(params[id.0], new_args)
+            Param(p, args) => {
+                let new_args = args
+                    .iter()
+                    .map(|it| it.substitute_variable(var, expression))
+                    .collect::<Vec<_>>();
+                Param(*p, new_args)
             }
-            Var(id) => FnUpdate::mk_var(vars[id.0]),
+            Var(id) => {
+                if id == &var {
+                    expression.clone()
+                } else {
+                    self.clone()
+                }
+            }
             Not(inner) => {
-                let inner = inner.substitute(vars, params);
+                let inner = inner.substitute_variable(var, expression);
                 FnUpdate::mk_not(inner)
             }
             Binary(op, left, right) => {
-                let left = left.substitute(vars, params);
-                let right = right.substitute(vars, params);
+                let left = left.substitute_variable(var, expression);
+                let right = right.substitute_variable(var, expression);
+                FnUpdate::mk_binary(*op, left, right)
+            }
+        }
+    }
+
+    /// Rename all occurrences of the specified `variables` and `parameters` to new IDs.
+    pub fn rename_all(
+        &self,
+        variables: &HashMap<VariableId, VariableId>,
+        parameters: &HashMap<ParameterId, ParameterId>,
+    ) -> FnUpdate {
+        match self {
+            Const(_) => self.clone(),
+            Var(id) => match variables.get(id) {
+                Some(new_id) => Var(*new_id),
+                None => self.clone(),
+            },
+            Param(id, args) => {
+                let args = args
+                    .iter()
+                    .map(|it| it.rename_all(variables, parameters))
+                    .collect::<Vec<_>>();
+                match parameters.get(id) {
+                    Some(new_id) => Param(*new_id, args),
+                    None => Param(*id, args),
+                }
+            }
+            Not(inner) => inner.rename_all(variables, parameters).negation(),
+            Binary(op, left, right) => {
+                let left = left.rename_all(variables, parameters);
+                let right = right.rename_all(variables, parameters);
                 FnUpdate::mk_binary(*op, left, right)
             }
         }
@@ -407,10 +465,10 @@ impl FnUpdate {
     /// Returns true if this update function uses the given variable.
     pub fn contains_variable(&self, variable: VariableId) -> bool {
         let mut result = false;
-        let mut is_var = |it: &FnUpdate| match it {
-            Var(id) => result = result || (*id == variable),
-            Param(_, args) => result = result || args.contains(&variable),
-            _ => {}
+        let mut is_var = |it: &FnUpdate| {
+            if let Var(id) = it {
+                result = result || (*id == variable);
+            }
         };
         self.walk_postorder(&mut is_var);
         result
@@ -421,26 +479,36 @@ impl FnUpdate {
     ///
     /// Note that the result is neither a conjunction or disjunctive normal form, it just
     /// eliminates all operators other than conjunction and disjunction.
+    ///
+    /// Furthermore, when the function contains parameters with expression arguments, the
+    /// arguments are normalized as well.
     pub fn to_and_or_normal_form(&self) -> FnUpdate {
         match self {
-            Const(_) | Var(_) | Param(_, _) => self.clone(),
+            Const(_) | Var(_) => self.clone(),
+            Param(p, args) => {
+                let args = args
+                    .iter()
+                    .map(|it| it.to_and_or_normal_form())
+                    .collect::<Vec<_>>();
+                Param(*p, args)
+            }
             Not(inner) => inner.to_and_or_normal_form().negation(),
             Binary(op, left, right) => {
                 let left = left.to_and_or_normal_form();
                 let right = right.to_and_or_normal_form();
                 match op {
-                    BinaryOp::And | BinaryOp::Or => FnUpdate::mk_binary(*op, left, right),
-                    BinaryOp::Imp => {
+                    And | Or => FnUpdate::mk_binary(*op, left, right),
+                    Imp => {
                         // !left | right
                         left.negation().or(right)
                     }
-                    BinaryOp::Xor => {
+                    Xor => {
                         // (left | right) & !(left & right)
                         let both = left.clone().and(right.clone());
                         let one = left.and(right);
                         one.and(both.negation())
                     }
-                    BinaryOp::Iff => {
+                    Iff => {
                         // (left & right) | (!left & !right)
                         let both = left.clone().and(right.clone());
                         let neither = left.negation().and(right.negation());
@@ -457,6 +525,9 @@ impl FnUpdate {
     /// Note that constants will be automatically negated (true => false, false => true). Also,
     /// keep in mind that this will rewrite binary operators (and => or, iff => xor, etc.), so
     /// don't expect the function to look the same afterwards.
+    ///
+    /// Similar to [Self::to_and_or_normal_form], when the function contains parameters with
+    /// complex arguments, each argument is also normalized.
     pub fn distribute_negation(&self) -> FnUpdate {
         fn recursion(update: &FnUpdate, invert: bool) -> FnUpdate {
             match update {
@@ -469,10 +540,15 @@ impl FnUpdate {
                     }
                 }
                 Param(id, args) => {
+                    let args = args
+                        .iter()
+                        .map(|it| it.distribute_negation())
+                        .collect::<Vec<_>>();
+                    let param = Param(*id, args);
                     if invert {
-                        Param(*id, args.clone()).negation()
+                        param.negation()
                     } else {
-                        update.clone()
+                        param
                     }
                 }
                 Not(inner) => recursion(inner, !invert),
@@ -483,31 +559,31 @@ impl FnUpdate {
                     } else {
                         // Otherwise we must do magic.
                         match op {
-                            BinaryOp::And => {
+                            And => {
                                 // !(left & right) = (!left | !right)
                                 let left = recursion(left, true);
                                 let right = recursion(right, true);
                                 left.or(right)
                             }
-                            BinaryOp::Or => {
+                            Or => {
                                 // !(left | right) = (!left & !right)
                                 let left = recursion(left, true);
                                 let right = recursion(right, true);
                                 left.and(right)
                             }
-                            BinaryOp::Imp => {
+                            Imp => {
                                 // !(left => right) = (left & !right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, true);
                                 left.and(right)
                             }
-                            BinaryOp::Xor => {
+                            Xor => {
                                 // !(left ^ right) = (left <=> right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, false);
                                 left.iff(right)
                             }
-                            BinaryOp::Iff => {
+                            Iff => {
                                 // !(left <=> right) = (left ^ right)
                                 let left = recursion(left, false);
                                 let right = recursion(right, false);
@@ -522,33 +598,69 @@ impl FnUpdate {
         recursion(self, false)
     }
 
-    /// Perform partial evaluation of this function using extended Boolean values in the given
-    /// `Space`.
-
-    pub fn eval_in_space(&self, space: &Space) -> ExtendedBoolean {
+    /// Utility function that eliminates unnecessary constants from this update function
+    /// using standard syntactic transformations.
+    pub fn simplify_constants(&self) -> FnUpdate {
         match self {
-            Const(value) => {
-                if *value {
-                    ExtendedBoolean::One
+            Const(value) => Const(*value),
+            Var(id) => Var(*id),
+            Param(id, args) => {
+                let args = args
+                    .iter()
+                    .map(|it| it.simplify_constants())
+                    .collect::<Vec<_>>();
+                Param(*id, args)
+            }
+            Not(inner) => {
+                // !true = false
+                // !false = true
+                let inner = inner.simplify_constants();
+                if let Some(inner_const) = inner.as_const() {
+                    Const(!inner_const)
                 } else {
-                    ExtendedBoolean::Zero
+                    Not(Box::new(inner))
                 }
             }
-            Var(var) => space[*var],
-            Param(_, _) => {
-                // We assume that a parameter can evaluate to anything.
-                ExtendedBoolean::Any
-            }
-            Not(inner) => inner.eval_in_space(space).negate(),
             Binary(op, left, right) => {
-                let left = left.eval_in_space(space);
-                let right = right.eval_in_space(space);
+                let left = left.simplify_constants();
+                let right = right.simplify_constants();
                 match op {
-                    BinaryOp::Or => left.or(right),
-                    BinaryOp::And => left.and(right),
-                    BinaryOp::Imp => left.implies(right),
-                    BinaryOp::Iff => left.iff(right),
-                    BinaryOp::Xor => left.xor(right),
+                    And => match (left.as_const(), right.as_const()) {
+                        (Some(false), _) | (_, Some(false)) => Const(false),
+                        (Some(true), _) => right,
+                        (_, Some(true)) => left,
+                        _ => left.and(right),
+                    },
+                    Or => match (left.as_const(), right.as_const()) {
+                        (Some(true), _) | (_, Some(true)) => Const(true),
+                        (Some(false), _) => right,
+                        (_, Some(false)) => left,
+                        _ => left.or(right),
+                    },
+                    Xor => match (left.as_const(), right.as_const()) {
+                        (Some(true), Some(true)) | (Some(false), Some(false)) => Const(false),
+                        (Some(false), Some(true)) | (Some(true), Some(false)) => Const(true),
+                        (Some(false), _) => right,
+                        (_, Some(false)) => left,
+                        (Some(true), _) => FnUpdate::mk_not(right),
+                        (_, Some(true)) => FnUpdate::mk_not(left),
+                        _ => left.xor(right),
+                    },
+                    Iff => match (left.as_const(), right.as_const()) {
+                        (Some(true), Some(true)) | (Some(false), Some(false)) => Const(true),
+                        (Some(false), Some(true)) | (Some(true), Some(false)) => Const(false),
+                        (Some(true), _) => right,
+                        (_, Some(true)) => left,
+                        (Some(false), _) => FnUpdate::mk_not(right),
+                        (_, Some(false)) => FnUpdate::mk_not(left),
+                        _ => left.iff(right),
+                    },
+                    Imp => match (left.as_const(), right.as_const()) {
+                        (Some(false), _) | (_, Some(true)) => Const(true),
+                        (Some(true), _) => right,
+                        (_, Some(false)) => FnUpdate::mk_not(left),
+                        _ => left.implies(right),
+                    },
                 }
             }
         }
@@ -558,42 +670,10 @@ impl FnUpdate {
 #[cfg(test)]
 mod tests {
     use crate::symbolic_async_graph::SymbolicContext;
-    use crate::{BinaryOp, BooleanNetwork, FnUpdate, VariableId};
+    use crate::{BinaryOp, BooleanNetwork, FnUpdate, RegulatoryGraph, VariableId};
     use biodivine_lib_bdd::bdd;
     use std::collections::HashMap;
     use std::convert::TryFrom;
-
-    #[test]
-    fn fn_update_specialisation_test() {
-        let bn = BooleanNetwork::try_from(
-            r"
-                a -> c1
-                b -> c1
-                a -> c2
-                b -> c2
-                a -> c3
-                b -> c3
-                $c1: !(a => b) | f(a, b)
-                $c2: !(a => b) | ((a <=> b) & g(b))
-                $c3: (a => b) | f(a, b)
-            ",
-        )
-        .unwrap();
-
-        let c1 = bn.as_graph().find_variable("c1").unwrap();
-        let c2 = bn.as_graph().find_variable("c2").unwrap();
-        let c3 = bn.as_graph().find_variable("c3").unwrap();
-
-        let fn_c1 = bn.get_update_function(c1).as_ref().unwrap();
-        let fn_c2 = bn.get_update_function(c2).as_ref().unwrap();
-        let fn_c3 = bn.get_update_function(c3).as_ref().unwrap();
-
-        assert!(fn_c2.is_specialisation_of(fn_c1));
-        assert!(!fn_c1.is_specialisation_of(fn_c2));
-        assert!(!fn_c3.is_specialisation_of(fn_c1));
-        assert!(!fn_c3.is_specialisation_of(fn_c2));
-        assert!(fn_c3.is_specialisation_of(fn_c3));
-    }
 
     #[test]
     fn fn_update_eval_test() {
@@ -655,6 +735,13 @@ mod tests {
         let fun = bn.get_update_function(c).as_ref().unwrap();
         let fun_string = fun.to_string(&bn);
 
+        let fun_parse = FnUpdate::try_from_str(
+            "a & (a | (a ^ (a => (a <=> !(f(a, b) | (true | false))))))",
+            &bn,
+        )
+        .unwrap();
+        assert_eq!(fun, &fun_parse);
+
         assert_eq!(vec![a, b], fun.collect_arguments());
         assert_eq!(
             vec![bn.find_parameter("f").unwrap()],
@@ -686,7 +773,7 @@ mod tests {
         assert_eq!(fun, bn.get_update_function(c).as_ref().unwrap());
 
         // Construct a FnUpdate
-        let f_a_b = FnUpdate::mk_param(id_f, &vec![a, b]);
+        let f_a_b = FnUpdate::mk_param(id_f, &[FnUpdate::mk_var(a), FnUpdate::mk_var(b)]);
         let f_a = FnUpdate::mk_var(a);
         let mut fun_2 = f_a_b.or(FnUpdate::mk_true().or(FnUpdate::mk_false()));
         fun_2 = f_a.clone().iff(fun_2.negation());
@@ -711,7 +798,10 @@ mod tests {
         assert_eq!(a, l.as_var().unwrap());
         let inner = r.as_not().unwrap();
         let (l, _, r) = inner.as_binary().unwrap();
-        assert_eq!((id_f, vec![a, b].as_slice()), l.as_param().unwrap());
+        assert_eq!(
+            (id_f, vec![FnUpdate::Var(a), FnUpdate::Var(b)].as_slice()),
+            l.as_param().unwrap()
+        );
         let (l, _, r) = r.as_binary().unwrap();
         assert!(l.as_const().unwrap());
         assert!(!r.as_const().unwrap());
@@ -754,6 +844,204 @@ mod tests {
         assert_eq!(
             FnUpdate::mk_binary(BinaryOp::Or, not_a_and_b, a_and_b),
             FnUpdate::build_from_bdd(&ctx, &bdd)
+        );
+    }
+
+    #[test]
+    pub fn test_variable_substitution() {
+        let mut bn = BooleanNetwork::new(RegulatoryGraph::new(vec![
+            "a".to_string(),
+            "b".to_string(),
+            "c".to_string(),
+        ]));
+        bn.add_parameter("f", 2).unwrap();
+        let fn1 = FnUpdate::try_from_str("(a & b) | !(c & !a) & f(b, c)", &bn).unwrap();
+        let fn2 = FnUpdate::try_from_str("(b <=> c)", &bn).unwrap();
+        let fn3 =
+            FnUpdate::try_from_str("((b <=> c) & b) | !(c & !(b <=> c)) & f(b, c)", &bn).unwrap();
+        let fn4 = FnUpdate::try_from_str("(a & b & f(a, b))", &bn).unwrap();
+        let fn5 = FnUpdate::try_from_str("((b <=> c) & b & f((b <=> c), b))", &bn).unwrap();
+
+        let a = bn.as_graph().find_variable("a").unwrap();
+        assert_eq!(fn3, fn1.substitute_variable(a, &fn2));
+        assert_eq!(fn5, fn4.substitute_variable(a, &fn2));
+    }
+
+    #[test]
+    pub fn test_constant_simplification() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            a -> c
+            $c: f(a, b) | g(a, b)
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(
+            FnUpdate::try_from_str("true & b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b & true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false & b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("false", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b & false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("false", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b | false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false | b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b | true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true | b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b ^ true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true ^ b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b ^ false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false ^ b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b <=> true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true <=> b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b <=> false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false <=> b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b => false", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("!b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("false => b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("b => true", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("true", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true => b", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("b", &bn).unwrap(),
+        );
+
+        assert_eq!(
+            FnUpdate::try_from_str("true & f(b & false, c) => g(a, b) | (a <=> true)", &bn)
+                .unwrap()
+                .simplify_constants(),
+            FnUpdate::try_from_str("f(false, c) => g(a, b) | a", &bn).unwrap(),
+        );
+    }
+
+    #[test]
+    fn test_operator_coalescing() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+        ",
+        )
+        .unwrap();
+        assert_eq!(
+            FnUpdate::try_from_str("(a & !b & c) | (!a & b) | c", &bn)
+                .unwrap()
+                .to_string(&bn),
+            "(a & !b & c) | (!a & b) | c"
         );
     }
 }

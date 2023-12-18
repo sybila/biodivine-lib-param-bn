@@ -1,5 +1,5 @@
 use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
+use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId, VariableIdIterator};
 use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
@@ -135,6 +135,46 @@ impl SymbolicContext {
         })
     }
 
+    /// Obtain a [VariableId] of a state variable, assuming such state variable exists.
+    pub fn find_network_variable(&self, name: &str) -> Option<VariableId> {
+        self.bdd
+            .var_by_name(name)
+            .and_then(|bdd_var| self.find_state_variable(bdd_var))
+    }
+
+    /// Obtain the name of a specific state variable.
+    pub fn get_network_variable_name(&self, variable: VariableId) -> String {
+        self.bdd.name_of(self.state_variables[variable.to_index()])
+    }
+
+    /// Iterator over all [VariableId] network variables managed by this [SymbolicContext].
+    pub fn network_variables(&self) -> VariableIdIterator {
+        (0..self.num_state_variables()).map(VariableId::from_index)
+    }
+
+    /// Create a new [SymbolicContext] which is compatible with the current context (it uses the same
+    /// [BddVariableSet]), but is missing the given [VariableId].
+    ///
+    /// The new context uses the same [ParameterId] identifiers as the old context, but has different
+    /// [VariableId] identifiers, since one of the variables is no longer used, and [VariableId] identifiers
+    /// must be always a contiguous sequence. You should use variable names to "translate" [VariableId] identifiers
+    /// between the two symbolic context. Of course, [SymbolicContext::transfer_from] should also still work.
+    ///
+    /// Note that the extra state variables and parameter variables do not disappear, even if they are only used
+    /// by the eliminated variable. However, you cannot access them using the normal methods
+    /// (e.g. [SymbolicContext::get_extra_state_variable]), only through the full list
+    /// (i.e. [SymbolicContext::all_extra_state_variables]).
+    pub fn eliminate_network_variable(&self, variable: VariableId) -> SymbolicContext {
+        let index = variable.to_index();
+        let mut result = self.clone();
+        // Remove the variable from all variable-indexed lists. The symbolic variables still remain in the
+        // general lists though. Explicit parameters are unchanged.
+        result.state_variables.remove(index);
+        result.extra_state_variables.remove(index);
+        result.implicit_function_tables.remove(index);
+        result
+    }
+
     /// The number of state variables (should be equal to the number of network variables).
     pub fn num_state_variables(&self) -> usize {
         self.state_variables.len()
@@ -196,6 +236,15 @@ impl SymbolicContext {
         self.state_variables[variable.0]
     }
 
+    /// Try to find a [VariableId] which corresponds to the given [BddVariable], assuming
+    /// the [BddVariable] is one of the [Self::state_variables].
+    pub fn find_state_variable(&self, symbolic_variable: BddVariable) -> Option<VariableId> {
+        self.state_variables
+            .iter()
+            .position(|it| *it == symbolic_variable)
+            .map(VariableId::from_index)
+    }
+
     /// Get the `BddVariable` extra symbolic variable associated with a particular BN variable
     /// and an offset (within the domain of said variable).
     pub fn get_extra_state_variable(&self, variable: VariableId, offset: usize) -> BddVariable {
@@ -244,7 +293,7 @@ impl SymbolicContext {
     pub fn mk_uninterpreted_function_is_true(
         &self,
         parameter: ParameterId,
-        args: &[VariableId],
+        args: &[FnUpdate],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.mk_function_table_true(table, &self.prepare_args(args))
@@ -262,7 +311,8 @@ impl SymbolicContext {
                 variable
             );
         });
-        self.mk_function_table_true(table, &self.prepare_args(args))
+        let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
+        self.mk_function_table_true(table, &self.prepare_args(&args))
     }
 
     /// Create a `Bdd` that is true when given `FnUpdate` evaluates to true.
@@ -346,7 +396,8 @@ impl SymbolicContext {
                 variable
             );
         });
-        self.instantiate_function_table(valuation, table, &self.prepare_args(args))
+        let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
+        self.instantiate_function_table(valuation, table, &self.prepare_args(&args))
     }
 
     /// Create a `Bdd` which represents the instantiated explicit uninterpreted function.
@@ -354,7 +405,7 @@ impl SymbolicContext {
         &self,
         valuation: &BddValuation,
         parameter: ParameterId,
-        args: &[VariableId],
+        args: &[FnUpdate],
     ) -> Bdd {
         let table = &self.explicit_function_tables[parameter.0];
         self.instantiate_function_table(valuation, table, &self.prepare_args(args))
@@ -383,12 +434,35 @@ impl SymbolicContext {
         }
     }
 
-    /// **(internal)** Utility method for converting `VariableId` arguments to `Bdd` arguments.
-    fn prepare_args(&self, args: &[VariableId]) -> Vec<Bdd> {
-        return args
+    /// Build a DNF representation of an instantiated update function (given as [Bdd]).
+    pub fn mk_instantiated_fn_update(&self, valuation: &BddValuation, function: &Bdd) -> FnUpdate {
+        let parameter_valuation = self
+            .parameter_variables()
             .iter()
-            .map(|v| self.mk_state_variable_is_true(*v))
-            .collect();
+            .map(|it| (*it, valuation[*it]))
+            .collect::<Vec<_>>();
+
+        // This should fix all parameters to their respective values.
+        let restricted = function.restrict(&parameter_valuation);
+
+        FnUpdate::build_from_bdd(self, &restricted)
+    }
+
+    /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
+    fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
+        return args.iter().map(|v| self.mk_fn_update_true(v)).collect();
+    }
+
+    /// This is similar to [BddVariableSet::transfer_from], but applied at the level of
+    /// symbolic contexts.
+    ///
+    /// Note that in theory, this method *can* translate between different types of symbolic
+    /// objects (e.g. variable to parameter), but it requires that the two use equivalent names.
+    /// Hence it is not really possible to create such situation organically, because state,
+    /// parameter and extra variables are intentionally created with names that are incompatible.
+    ///
+    pub fn transfer_from(&self, bdd: &Bdd, ctx: &SymbolicContext) -> Option<Bdd> {
+        self.bdd.transfer_from(bdd, &ctx.bdd)
     }
 }
 
@@ -427,6 +501,7 @@ mod tests {
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
     use crate::BooleanNetwork;
+    use biodivine_lib_bdd::BddPartialValuation;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryFrom;
 
@@ -434,7 +509,7 @@ mod tests {
     fn hmox_pathway() {
         let model = std::fs::read_to_string("aeon_models/hmox_pathway.aeon").unwrap();
         let network = BooleanNetwork::try_from(model.as_str()).unwrap();
-        let graph = SymbolicAsyncGraph::new(network).unwrap();
+        let graph = SymbolicAsyncGraph::new(&network).unwrap();
         assert!(!graph.unit_colored_vertices().is_empty());
     }
 
@@ -479,5 +554,81 @@ mod tests {
         }
 
         assert_eq!(set, set2);
+    }
+
+    #[test]
+    fn dual_encoding() {
+        // The purpose of this test is just to have an example of a "dual" encoding that can be
+        // useful for trap space computation. However, we are not really testing anything that
+        // substantial.
+
+        let bn = BooleanNetwork::try_from_file("aeon_models/g2a_instantiated.aeon").unwrap();
+
+        // For each BN variable, we want to add two extra variables for the new "dual" encoding.
+        let extra_variables = bn
+            .variables()
+            .map(|var| (var, 2))
+            .collect::<HashMap<_, _>>();
+        let ctx = SymbolicContext::with_extra_state_variables(&bn, &extra_variables).unwrap();
+
+        // We separate the extra variables into "positive" and "negative" so that we can access
+        // them later.
+        let mut positive_encoded = Vec::new();
+        let mut negative_encoded = Vec::new();
+        for var in bn.variables() {
+            let extra_variables = ctx.extra_state_variables(var);
+            positive_encoded.push(extra_variables[0]);
+            negative_encoded.push(extra_variables[1]);
+        }
+
+        // We also prepare a "reverse" mapping from symbolic state variables to BN variables,
+        // so that we can tell which symbolic variable represents which BN variable.
+        let reverse_state_variables = ctx
+            .state_variables()
+            .iter()
+            .cloned()
+            .zip(bn.variables())
+            .collect::<HashMap<_, _>>();
+
+        // A helper function which transforms a DNF clause based on normal "state" variables into
+        // a DNF clause which uses the variables of our "dual" encoding.
+        let remap_clause = |mut clause: BddPartialValuation| {
+            for (bdd_var, is_positive) in clause.to_values() {
+                let bn_variable = reverse_state_variables.get(&bdd_var).unwrap();
+                let dual_variable = if is_positive {
+                    positive_encoded[bn_variable.to_index()]
+                } else {
+                    negative_encoded[bn_variable.to_index()]
+                };
+                // Remove old "state" variable.
+                clause.unset_value(bdd_var);
+                // Add one of the "dual" variables.
+                clause.set_value(dual_variable, true);
+            }
+            clause
+        };
+
+        // Now we can convert every function into positive condition (when a variable can
+        // grow from 0 to 1) and negative condition (when a variable can fall from 1 to 0).
+        for var in bn.variables() {
+            let var_update = bn.get_update_function(var).as_ref().unwrap();
+            let fn_bdd = ctx.mk_fn_update_true(var_update);
+
+            let positive_dnf = fn_bdd.sat_clauses().map(remap_clause).collect::<Vec<_>>();
+            let positive_bdd = ctx.bdd_variable_set().mk_dnf(&positive_dnf);
+
+            // Do the same thing for negation to obtain the negative condition.
+            let negative_dnf = fn_bdd
+                .not()
+                .sat_clauses()
+                .map(remap_clause)
+                .collect::<Vec<_>>();
+            let negative_bdd = ctx.bdd_variable_set().mk_dnf(&negative_dnf);
+
+            // In this particular test, we just assume these BDDs are not false, i.e.
+            // every variable can sometimes grow and sometimes fall.
+            assert!(!positive_bdd.is_false());
+            assert!(!negative_bdd.is_false());
+        }
     }
 }

@@ -203,33 +203,29 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     }
 }
 
-/// **(internal)** Parse a list of function arguments. All arguments must be names separated
+/// **(internal)** Parse a list of function arguments. All arguments must be expressions separated
 /// by commas.
-fn read_args(data: &[Token]) -> Result<Vec<String>, String> {
+///
+/// Note that commas *have to* separate individual arguments, because any comma which is a part
+/// of a "lower level" function call has to be enclosed in parentheses.
+fn read_args(data: &[Token]) -> Result<Vec<FnUpdateTemp>, String> {
     if data.is_empty() {
         return Ok(Vec::new());
     }
     let mut result = Vec::new();
-    let mut i = 0;
-    while let Token::Name(name) = &data[i] {
-        result.push(name.clone());
-        i += 1;
-        if data.len() == i {
-            return Ok(result);
+    for arg in data.split(|it| *it == Token::Comma) {
+        if arg.is_empty() {
+            return Err("Found empty function argument.".to_string());
         }
-        if data[i] != Token::Comma {
-            return Err(format!("Expected ',', found {:?}.", data[i]));
-        }
-        i += 1;
-        if data.len() == i {
-            return Err("Unexpected ',' at the end of an argument list.".to_string());
-        }
+        let arg = parse_update_function(arg)?;
+        result.push(*arg);
     }
-    Err(format!("Unexpected token {:?} in argument list.", data[i]))
+    Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::BinaryOp;
     use crate::_aeon_parser::FnUpdateTemp;
     use std::convert::TryFrom;
 
@@ -245,6 +241,8 @@ mod tests {
             "(a => b)",
             "(a <=> b)",
             "(a <=> !(f(a, b) => (c ^ d)))",
+            "f(a, f(b), c)",
+            "f((a & c))",
         ];
         for str in inputs {
             assert_eq!(str, format!("{}", FnUpdateTemp::try_from(str).unwrap()))
@@ -269,6 +267,17 @@ mod tests {
             FnUpdateTemp::try_from("true").unwrap(),
             FnUpdateTemp::Const(true)
         );
+        assert_eq!(
+            FnUpdateTemp::try_from("0 | f(0,1)").unwrap(),
+            FnUpdateTemp::Binary(
+                BinaryOp::Or,
+                Box::new(FnUpdateTemp::Const(false)),
+                Box::new(FnUpdateTemp::Param(
+                    "f".to_string(),
+                    vec![FnUpdateTemp::Const(false), FnUpdateTemp::Const(true),]
+                ))
+            )
+        )
     }
 
     #[test]
@@ -292,9 +301,7 @@ mod tests {
     fn test_malformed_args() {
         assert!(FnUpdateTemp::try_from("f(a b c)").is_err());
         assert!(FnUpdateTemp::try_from("f(a, b, c,)").is_err());
-        assert!(FnUpdateTemp::try_from("f(a & c)").is_err());
         assert!(FnUpdateTemp::try_from("f(a, & c)").is_err());
-        assert!(FnUpdateTemp::try_from("f(a, f(b), c)").is_err());
     }
 
     #[test]

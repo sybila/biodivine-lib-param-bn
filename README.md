@@ -9,7 +9,9 @@
 
 # Biodivine Parametrised Boolean Networks
 
-Rust library for working with parametrised Boolean networks. Supports: 
+ > You can now also access the full functionality of `lib-param-bn` from Python! The library is available as part of the [AEON.py](https://github.com/sybila/biodivine-aeon-py) package.
+
+Rust library for working with (parametrised) Boolean networks. Supports: 
  - Read/Write Boolean network models from `.aeon`, `.bnet`, and `.sbml` formats.
  - Basic static analysis, like monotonicity checking or network decomposition.
  - Network parameters and partially unknown update functions.

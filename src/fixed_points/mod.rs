@@ -31,7 +31,7 @@ use crate::Space;
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
 use crate::symbolic_async_graph::projected_iteration::MixedProjection;
-use crate::VariableId;
+use crate::{BooleanNetwork, VariableId};
 pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
@@ -74,7 +74,6 @@ impl FixedPoints {
         }
 
         let mut to_merge: Vec<GraphColoredVertices> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -157,7 +156,6 @@ impl FixedPoints {
         }
 
         let mut to_merge: Vec<Bdd> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -219,6 +217,7 @@ impl FixedPoints {
     /// to subset of states/functions. For now, we do not provide extra methods for this, as it
     /// is not a very common use case. But if you want it, get in touch.
     pub fn symbolic_projection<'a>(
+        network: &BooleanNetwork,
         stg: &'a SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
         retain_state: &[VariableId],
@@ -233,7 +232,6 @@ impl FixedPoints {
         }
 
         let mut to_merge: Vec<Bdd> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -260,7 +258,7 @@ impl FixedPoints {
             project.remove(&ctx.get_state_variable(*var));
         }
         for var in retain_function {
-            if let Some(function) = stg.as_network().get_update_function(*var) {
+            if let Some(function) = network.get_update_function(*var) {
                 for p_id in function.collect_parameters() {
                     for p in ctx.get_explicit_function_table(p_id).symbolic_variables() {
                         project.remove(p);
@@ -352,7 +350,7 @@ impl FixedPoints {
             for p_var in project.clone() {
                 let dependencies = dependency_map.get(&p_var).unwrap();
                 if dependencies.is_subset(&merged) {
-                    result = result.var_project(p_var);
+                    result = result.var_exists(p_var);
                     project.remove(&p_var);
 
                     if cfg!(feature = "print-progress") {
@@ -451,7 +449,6 @@ impl FixedPoints {
         }
 
         let mut to_merge: Vec<Bdd> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -482,7 +479,7 @@ impl FixedPoints {
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
-        let vertices = stg.empty_vertices().vertices().copy(bdd);
+        let vertices = stg.empty_colored_vertices().vertices().copy(bdd);
 
         if cfg!(feature = "print-progress") {
             println!(
@@ -510,7 +507,6 @@ impl FixedPoints {
         }
 
         let mut to_merge: Vec<Bdd> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -541,7 +537,7 @@ impl FixedPoints {
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
-        let colors = stg.empty_vertices().colors().copy(bdd);
+        let colors = stg.empty_colored_vertices().colors().copy(bdd);
 
         if cfg!(feature = "print-progress") {
             println!(
@@ -695,7 +691,7 @@ mod tests {
     #[test]
     pub fn simple_fixed_point_test() {
         let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").unwrap();
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let naive = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
         let symbolic = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
@@ -732,13 +728,14 @@ mod tests {
     #[test]
     pub fn simple_projected_fixed_point_test() {
         let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p9.aeon").unwrap();
-        let stg = SymbolicAsyncGraph::new(bn.clone()).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let ccr_m = bn.as_graph().find_variable("CcrM").unwrap();
         let dna = bn.as_graph().find_variable("DnaA").unwrap();
 
         // Compute how DnaA/CcrM fixed-points depend on the CcrM function.
         let projection = FixedPoints::symbolic_projection(
+            &bn,
             &stg,
             stg.unit_colored_vertices(),
             &[ccr_m, dna],

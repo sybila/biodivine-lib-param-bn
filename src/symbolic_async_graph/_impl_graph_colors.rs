@@ -5,9 +5,7 @@ use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph, SymbolicConte
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
 use std::convert::TryFrom;
-use std::ops::Shr;
 
 impl GraphColors {
     /// Make a new color set from a `bdd` and a symbolic `context`.
@@ -56,20 +54,17 @@ impl GraphColors {
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        BddSet::approx_cardinality(self)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        // Includes state variables and extra variables.
-        let unused_variables =
-            self.bdd.num_vars() - u16::try_from(self.parameter_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(unused_variables)
+        BddSet::exact_cardinality(self)
     }
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        self.bdd.size()
+        BddSet::symbolic_size(self)
     }
 
     /// Convert this set to a `.dot` graph.
@@ -102,10 +97,10 @@ impl GraphColors {
     ///
     /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
     /// should only depend on *parameter variables*.
-    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+    pub fn raw_projection(&self, eliminate: &[BddVariable]) -> RawProjection {
         let mut retained = Vec::new();
         for v in &self.parameter_variables {
-            if !variables.contains(v) {
+            if !eliminate.contains(v) {
                 retained.push(*v);
             }
         }

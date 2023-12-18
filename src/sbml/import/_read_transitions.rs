@@ -53,7 +53,6 @@ pub fn read_transitions(model: Node) -> Result<Vec<SbmlTransition>, String> {
 }
 
 pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
-    println!("Node: {:?}", transition);
     let id = transition
         .attribute((SBML_QUAL, "id"))
         .map(|it| it.to_string());

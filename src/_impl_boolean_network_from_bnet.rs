@@ -19,7 +19,7 @@ impl BooleanNetwork {
         for line in model_string.lines() {
             if line.trim().starts_with('#')
                 || line.trim().is_empty()
-                || line.trim().starts_with("targets,")
+                || line.trim().to_ascii_lowercase().starts_with("targets,")
             {
                 continue; // Skip comments, empty lines and header.
             } else {

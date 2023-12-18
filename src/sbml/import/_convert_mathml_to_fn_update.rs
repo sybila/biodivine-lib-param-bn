@@ -49,20 +49,16 @@ pub fn sbml_transition_to_update_function(
                 }
             }
             MathMl::SymbolApply(p_name, args) => {
-                let mut variables = Vec::new();
+                let mut fn_args = Vec::new();
                 for arg in args {
                     let update = math_to_update(arg, network, transition, id_to_var)?;
-                    if let FnUpdate::Var(v) = update {
-                        variables.push(v);
-                    } else {
-                        return Err(format!("(Transition `{:?}`) Uninterpreted functions can have only variables as arguments.", transition.id));
-                    }
+                    fn_args.push(update);
                 }
 
                 // This should already be created by parent function.
                 let param = network.find_parameter(p_name).unwrap();
 
-                Ok(FnUpdate::Param(param, variables))
+                Ok(FnUpdate::Param(param, fn_args))
             }
             MathMl::Apply(op, args) => {
                 match op.as_str() {

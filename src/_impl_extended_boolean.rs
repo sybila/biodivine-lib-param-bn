@@ -22,6 +22,15 @@ impl From<bool> for ExtendedBoolean {
     }
 }
 
+impl From<Option<bool>> for ExtendedBoolean {
+    fn from(value: Option<bool>) -> Self {
+        match value {
+            Some(value) => ExtendedBoolean::from(value),
+            None => Any,
+        }
+    }
+}
+
 impl Display for ExtendedBoolean {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self)
@@ -61,7 +70,6 @@ impl ExtendedBoolean {
 }
 
 /// Logical operations on extended booleans.
-
 impl ExtendedBoolean {
     pub fn negate(self) -> Self {
         match self {

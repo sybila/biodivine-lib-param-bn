@@ -9,8 +9,6 @@ use crate::symbolic_async_graph::{
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
-use num_traits::ToPrimitive;
-use std::ops::Shr;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -52,19 +50,17 @@ impl GraphColoredVertices {
 
     /// Amount of storage used for this symbolic set.
     pub fn symbolic_size(&self) -> usize {
-        self.bdd.size()
+        BddSet::symbolic_size(self)
     }
 
     /// Approximate size of this set (error grows for large sets).
     pub fn approx_cardinality(&self) -> f64 {
-        self.exact_cardinality().to_f64().unwrap_or(f64::INFINITY)
+        BddSet::approx_cardinality(self)
     }
 
     /// Compute exact `BigInt` cardinality of this set.
     pub fn exact_cardinality(&self) -> BigInt {
-        let unused_variables = self.bdd.num_vars()
-            - u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap();
-        self.bdd.exact_cardinality().shr(unused_variables)
+        BddSet::exact_cardinality(self)
     }
 
     /// Return `true` if the set can be described by a single conjunction of literals. That is,
@@ -75,7 +71,22 @@ impl GraphColoredVertices {
 
     /// Return `true` if the set represents a single vertex-color pair.
     pub fn is_singleton(&self) -> bool {
-        self.bdd.is_valuation()
+        if self.bdd.is_clause() {
+            let clause = self.bdd.first_clause().unwrap();
+            for var in &self.state_variables {
+                if clause[*var].is_none() {
+                    return false;
+                }
+            }
+            for var in &self.parameter_variables {
+                if clause[*var].is_none() {
+                    return false;
+                }
+            }
+            true
+        } else {
+            false
+        }
     }
 
     /// Compute a subset of this set where the given network variable is always fixed to the
@@ -99,15 +110,15 @@ impl GraphColoredVertices {
     ///
     /// Technically, you can supply any `BddVariable`, but the underlying `Bdd` of this set
     /// should only depend on *state and parameter variables* (i.e. not on extra state variables).
-    pub fn raw_projection(&self, variables: &[BddVariable]) -> RawProjection {
+    pub fn raw_projection(&self, eliminate: &[BddVariable]) -> RawProjection {
         let mut retained = Vec::new();
         for v in &self.state_variables {
-            if !variables.contains(v) {
+            if !eliminate.contains(v) {
                 retained.push(*v);
             }
         }
         for v in &self.parameter_variables {
-            if !variables.contains(v) {
+            if !eliminate.contains(v) {
                 retained.push(*v);
             }
         }
@@ -180,14 +191,23 @@ impl GraphColoredVertices {
         if self.is_empty() {
             self.clone()
         } else {
-            self.copy(self.bdd.sat_witness().unwrap().into())
+            let witness = self.bdd.sat_witness().unwrap();
+            // Retain only the relevant variables.
+            let mut partial_valuation = Vec::new();
+            for s_var in &self.state_variables {
+                partial_valuation.push((*s_var, witness[*s_var]));
+            }
+            for p_var in &self.parameter_variables {
+                partial_valuation.push((*p_var, witness[*p_var]));
+            }
+            self.copy(self.bdd.select(&partial_valuation))
         }
     }
 
     /// Set of all colors which are in this set for at least one vertex.
     pub fn colors(&self) -> GraphColors {
         GraphColors {
-            bdd: self.bdd.project(&self.state_variables),
+            bdd: self.bdd.exists(&self.state_variables),
             parameter_variables: self.parameter_variables.clone(),
         }
     }
@@ -195,7 +215,7 @@ impl GraphColoredVertices {
     /// Set of all vertices which are in this set for at least one colour.
     pub fn vertices(&self) -> GraphVertices {
         GraphVertices {
-            bdd: self.bdd.project(&self.parameter_variables),
+            bdd: self.bdd.exists(&self.parameter_variables),
             state_variables: self.state_variables.clone(),
         }
     }
@@ -212,5 +232,56 @@ impl BddSet for GraphColoredVertices {
 
     fn active_variables(&self) -> u16 {
         u16::try_from(self.state_variables.len() + self.parameter_variables.len()).unwrap()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::BooleanNetwork;
+    use num_bigint::BigInt;
+    use num_traits::One;
+
+    #[test]
+    fn basic_colored_spaces_set_test() {
+        let bn = BooleanNetwork::try_from_file("aeon_models/005.aeon").unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+
+        let unit = stg.mk_unit_colored_vertices();
+        assert!(!unit.is_singleton());
+        assert_eq!(unit, unit.copy(unit.clone().into_bdd()));
+
+        let singleton = unit.pick_singleton();
+        assert_eq!(1.0, singleton.approx_cardinality());
+        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        let singleton_color = singleton.colors();
+        let singleton_vertices = singleton.vertices();
+        assert!(singleton_color.is_singleton());
+        assert!(singleton_vertices.is_singleton());
+        assert!(!unit.intersect_colors(&singleton_color).is_singleton());
+        // There is only one color, hence this holds. Otherwise this should not hold.
+        assert!(unit.intersect_vertices(&singleton_vertices).is_singleton());
+        assert!(unit.minus_colors(&singleton_color).is_empty());
+        assert!(unit.minus_vertices(&singleton_vertices).is_subset(&unit));
+
+        let var = bn.as_graph().find_variable("v_XPF").unwrap();
+        let selected = unit.fix_network_variable(var, true);
+        assert_eq!(
+            unit.approx_cardinality() / 2.0,
+            selected.approx_cardinality()
+        );
+        let restricted = unit.restrict_network_variable(var, true);
+        assert_eq!(unit.approx_cardinality(), restricted.approx_cardinality());
+        let restricted = singleton.restrict_network_variable(var, false);
+        assert_eq!(
+            singleton.approx_cardinality() * 2.0,
+            restricted.approx_cardinality()
+        );
+        assert!(singleton.restrict_network_variable(var, true).is_empty());
+
+        // There are 28 variables and we are eliminating 22 of them, so 6 should be left.
+        let project = unit.raw_projection(&stg.symbolic_context().state_variables()[0..22]);
+        assert_eq!(project.iter().count(), 2_usize.pow(6));
     }
 }

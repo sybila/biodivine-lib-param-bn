@@ -1,6 +1,198 @@
-use crate::symbolic_async_graph::SymbolicContext;
-use crate::{BooleanNetwork, Monotonicity};
+use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
+use crate::{BooleanNetwork, Monotonicity, Regulation, VariableId};
 use biodivine_lib_bdd::{bdd, Bdd};
+impl RegulationConstraint {
+    /// Compute a BDD representing all instantiations of a (partial) function where the given
+    /// `input` is observable (also called essential).
+    ///
+    /// In particular:
+    ///  - `ctx` is a symbolic encoding of a [BooleanNetwork].
+    ///  - `fn_is_true` is a BDD representing a (partially unknown) function.
+    ///  - `input` refers to the function input which should be considered observable.
+    ///
+    /// Note that if `fn_is_true` is fully specified, then the result is always `true` or `false`.
+    /// If `input` does not appear in `fn_is_true` at all, the result is always `false`.
+    ///
+    /// The main point of this function is that you can build an observability constraint for
+    /// an arbitrary symbolic function. Hence it can be used both to validate an existing
+    /// regulatory graph, as well as to infer observability of an otherwise unspecified
+    /// regulation.
+    ///
+    pub fn mk_observability(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
+        /*
+                  "Exists an input vector where output of `f` changes due to the input `r`."
+           (implicit \exists p_1, ..., p_m):
+               \exists s_1, ..., s_n:
+                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 1
+                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
+                   a != b
+        */
+        let input = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input);
+        let input_is_false = input_is_true.not();
+        // \exists x_r : F(x_1, ..., x_r, ..., x_n) & x_r | Context where F is one for x_r, but with x_r erased.
+        let fn_x1_to_1 = bdd!(fn_is_true & input_is_true).var_exists(input);
+        // \exists x_r : F(x_1, ..., x_r, ..., x_m) & !x_r | Context where F is one for !x_r, but with x_r erased.
+        let fn_x0_to_1 = bdd!(fn_is_true & input_is_false).var_exists(input);
+        // Context where F for x_r is not equal F for !x_r (i.e. all witnesses of observability)
+        // and then with all states erased.
+        bdd!(fn_x1_to_1 ^ fn_x0_to_1).exists(ctx.state_variables())
+    }
+
+    /// Compute a BDD representing all instantiations of a (partial) function where the given
+    /// `input` is an activator (also called positively monotonic).
+    ///
+    /// In particular:
+    ///  - `ctx` is a symbolic encoding of a [BooleanNetwork].
+    ///  - `fn_is_true` is a BDD representing a (partially unknown) function.
+    ///  - `input` refers to the function input which should be an activator.
+    ///
+    /// Note that if `fn_is_true` is fully specified, then the result is always `true` or `false`.
+    /// If `input` does not appear in `fn_is_true` at all, the result is always `true`.
+    ///
+    /// The main point of this function is that you can build an activator constraint for
+    /// an arbitrary symbolic function. Hence it can be used both to validate an existing
+    /// regulatory graph, as well as to infer observability of an otherwise unspecified
+    /// regulation.
+    ///
+    pub fn mk_activation(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
+        /*
+               "Exists an input where the functions monotonicity in `r` is reversed."
+           (implicit \exists p_1, ..., p_m):
+               not \exists s_1, ..., s_m:
+                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 0 and s_r = 1
+                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
+                   a & b   // "I can go from 1 to 0 by increasing s_r."
+        */
+        let input = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input);
+        let input_is_false = input_is_true.not();
+        let fn_is_false = fn_is_true.not();
+        let fn_x1_to_0 = bdd!(fn_is_false & input_is_true).var_exists(input);
+        let fn_x0_to_1 = bdd!(fn_is_true & input_is_false).var_exists(input);
+        bdd!(fn_x0_to_1 & fn_x1_to_0)
+            .exists(ctx.state_variables())
+            .not()
+    }
+
+    /// The same as [RegulationConstraint::mk_activation], but with negative monotonicity instead
+    /// of positive monotonicity.
+    pub fn mk_inhibition(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
+        let input = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input);
+        let input_is_false = input_is_true.not();
+        let fn_is_false = fn_is_true.not();
+        let fn_x0_to_0 = bdd!(fn_is_false & input_is_false).var_exists(input);
+        let fn_x1_to_1 = bdd!(fn_is_true & input_is_true).var_exists(input);
+        bdd!(fn_x0_to_0 & fn_x1_to_1)
+            .exists(ctx.state_variables())
+            .not()
+    }
+
+    /// Infer the *most specific* [Regulation] which is still sufficient to correctly
+    /// cover the relationship between `regulator` and `target` in the provided function
+    /// (represented as a `fn_is_true` [Bdd]).
+    ///
+    /// In particular:
+    ///  - If `regulator` has no effect on `target`, return `None`.
+    ///  - If `regulator` has an effect on `target` only for some instantiations of
+    ///    `fn_is_true`, return a regulation with `observable = false`.
+    ///  - If `regulator` impacts `target` in every instantiation of `fn_is_true`,
+    ///    return `observable = true`.
+    ///  - If all instantiations are positively/negatively monotonous, return a monotonic
+    ///    regulation, otherwise return `monotonicity = None`.
+    pub fn infer_sufficient_regulation(
+        ctx: &SymbolicContext,
+        regulator: VariableId,
+        target: VariableId,
+        fn_is_true: &Bdd,
+    ) -> Option<Regulation> {
+        let obs = Self::mk_observability(ctx, fn_is_true, regulator);
+        let observable = if obs.is_true() {
+            true
+        } else if !obs.is_false() {
+            false
+        } else {
+            return None;
+        };
+
+        let act = Self::mk_activation(ctx, fn_is_true, regulator);
+        let inh = Self::mk_inhibition(ctx, fn_is_true, regulator);
+
+        let monotonicity = if act.is_true() {
+            Some(Monotonicity::Activation)
+        } else if inh.is_true() {
+            Some(Monotonicity::Inhibition)
+        } else {
+            None
+        };
+
+        Some(Regulation {
+            regulator,
+            target,
+            observable,
+            monotonicity,
+        })
+    }
+
+    /// Similar to [Self::infer_sufficient_regulation], but it tries to keep the constraints
+    /// from the given `old_regulation` assuming they are satisfiable and more restrictive
+    /// than the inferred constraints.
+    pub fn fix_regulation(
+        ctx: &SymbolicContext,
+        old_regulation: &Regulation,
+        fn_is_true: &Bdd,
+    ) -> Option<Regulation> {
+        let obs = Self::mk_observability(ctx, fn_is_true, old_regulation.regulator);
+        let observable = if obs.is_true() {
+            // The regulation is used by every possible instantiation, it is always observable.
+            true
+        } else if !obs.is_false() {
+            // The regulation is used by *some* instantiations. It is observable if the old
+            // regulation is observable.
+            old_regulation.observable
+        } else {
+            // The regulation is *never* used, hence the regulation is irrelevant.
+            return None;
+        };
+
+        let act = Self::mk_activation(ctx, fn_is_true, old_regulation.regulator);
+        let inh = Self::mk_inhibition(ctx, fn_is_true, old_regulation.regulator);
+
+        let monotonicity = if act.is_true() {
+            // The function is *always* an activation.
+            Some(Monotonicity::Activation)
+        } else if inh.is_true() {
+            // The function is *always* an inhibition.
+            Some(Monotonicity::Inhibition)
+        } else {
+            // The function can have instantiations with different monotonicity, or possibly
+            // even dual monotonicity.
+            if old_regulation.monotonicity == Some(Monotonicity::Activation) && !act.is_false() {
+                // Old regulation is an activation and there are *some* activating instantiations.
+                // We can propagate the old constraint.
+                Some(Monotonicity::Activation)
+            } else if old_regulation.monotonicity == Some(Monotonicity::Inhibition)
+                && !inh.is_false()
+            {
+                // Old regulation is an inhibition and there are *some* inhibiting instantiations.
+                // We can propagate the old constraint.
+                Some(Monotonicity::Inhibition)
+            } else {
+                // Either the old activation is also non-monotonic, or the function contradicts
+                // the old monotonicity requirement.
+                None
+            }
+        };
+
+        Some(Regulation {
+            regulator: old_regulation.regulator,
+            target: old_regulation.target,
+            observable,
+            monotonicity,
+        })
+    }
+}
 
 /// Compute a `Bdd` which is a subset of the `initial` valuations that satisfies all
 /// constraints imposed by the given Boolean `network`.
@@ -29,29 +221,11 @@ pub(crate) fn apply_regulation_constraints(
     let mut error_message = String::new();
     let mut unit_bdd = initial;
     for regulation in &network.graph.regulations {
-        let regulator = context.state_variables[regulation.regulator.0];
-        let regulator_is_true = context.bdd.mk_var(regulator);
-        let regulator_is_false = context.bdd.mk_not_var(regulator);
+        let regulator = regulation.regulator;
+        let fn_is_true = &update_function_is_true[regulation.target.to_index()];
 
-        let fn_is_true = &update_function_is_true[regulation.target.0];
-        let fn_is_false = fn_is_true.not();
-
-        /*
-                           "Exists an input where value of f changes."
-           (implicit \exists p_1, ..., p_m):
-               \exists s_1, ..., s_n:
-                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 1
-                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
-                   a != b
-        */
         let observability = if regulation.observable {
-            // \exists x_r : F(x_1, ..., x_r, ..., x_n) & x_r | Context where F is one for x_r, but with x_r erased.
-            let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_project(regulator);
-            // \exists x_r : F(x_1, ..., x_r, ..., x_m) & !x_r | Context where F is one for !x_r, but with x_r erased.
-            let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_project(regulator);
-            // Context where F for x_r is not equal F for !x_r (i.e. all witnesses of observability)
-            // and then with all states erased.
-            bdd!(fn_x1_to_1 ^ fn_x0_to_1).project(&context.state_variables)
+            RegulationConstraint::mk_observability(context, fn_is_true, regulator)
         } else {
             context.mk_constant(true)
         };
@@ -66,28 +240,15 @@ pub(crate) fn apply_regulation_constraints(
             error_message = format!("{}{}", error_message, problem);
         }
 
-        /*
-               "Exists an input where the functions monotonicity is reversed"
-           (implicit \exists p_1, ..., p_m):
-               \exists s_1, ..., s_m:
-                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 0 and s_r = 1
-                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
-                   a & b   // "I can go from 1 to 0 by increasing s_r."
-        */
-        let non_monotonous = match regulation.monotonicity {
+        let monotonicity = match regulation.monotonicity {
             Some(Monotonicity::Activation) => {
-                let fn_x1_to_0 = bdd!(fn_is_false & regulator_is_true).var_project(regulator);
-                let fn_x0_to_1 = bdd!(fn_is_true & regulator_is_false).var_project(regulator);
-                bdd!(fn_x0_to_1 & fn_x1_to_0).project(&context.state_variables)
+                RegulationConstraint::mk_activation(context, fn_is_true, regulator)
             }
             Some(Monotonicity::Inhibition) => {
-                let fn_x0_to_0 = bdd!(fn_is_false & regulator_is_false).var_project(regulator);
-                let fn_x1_to_1 = bdd!(fn_is_true & regulator_is_true).var_project(regulator);
-                bdd!(fn_x0_to_0 & fn_x1_to_1).project(&context.state_variables)
+                RegulationConstraint::mk_inhibition(context, fn_is_true, regulator)
             }
-            None => context.mk_constant(false),
+            None => context.mk_constant(true),
         };
-        let monotonicity = non_monotonous.not();
 
         if monotonicity.is_false() {
             let monotonicity_str = match regulation.monotonicity {

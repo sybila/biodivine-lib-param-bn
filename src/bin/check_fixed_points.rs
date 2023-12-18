@@ -20,13 +20,13 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
 
     let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true, true);
     println!(
         "Loaded model with {} variables and {} parameters/inputs.",
         model.num_vars(),
         model.num_parameters()
     );
-    let stg = SymbolicAsyncGraph::new(model).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let start = SystemTime::now();
     println!("Search for fixed-point colors...");

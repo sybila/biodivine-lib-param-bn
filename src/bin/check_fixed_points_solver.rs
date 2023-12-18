@@ -16,7 +16,7 @@ fn main() {
     let args = std::env::args().collect::<Vec<_>>();
 
     let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
-    let model = model.inline_inputs();
+    let model = model.inline_inputs(true, true);
     println!(
         "Loaded model with {} variables and {} parameters/inputs.",
         model.num_vars(),
@@ -25,7 +25,7 @@ fn main() {
 
     let z3 = z3::Context::new(&z3::Config::new());
     let ctx = BnSolverContext::new(&z3, model.clone());
-    let stg = SymbolicAsyncGraph::new(model.clone()).unwrap();
+    let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let all_vertices = vec![Space::new(&model)];
     let iterator = FixedPoints::solver_iterator(&ctx, &all_vertices, &[]);

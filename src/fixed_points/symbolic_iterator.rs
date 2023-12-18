@@ -186,7 +186,7 @@ impl<'a> Iterator for SymbolicIterator<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|bdd| self.stg.empty_vertices().copy(bdd))
+            .map(|bdd| self.stg.empty_colored_vertices().copy(bdd))
     }
 }
 
@@ -199,7 +199,6 @@ impl<'a> SymbolicIterator<'a> {
         limit: usize,
     ) -> SymbolicIterator<'a> {
         let mut to_merge: Vec<Bdd> = stg
-            .as_network()
             .variables()
             .map(|var| {
                 let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
@@ -221,7 +220,6 @@ impl<'a> SymbolicIterator<'a> {
         }
 
         let mut clauses: Vec<BddPartialValuation> = stg
-            .as_network()
             .variables()
             .flat_map(|it| {
                 let can_step = stg.var_can_post(it, restriction);
@@ -299,7 +297,7 @@ mod tests {
     #[test]
     pub fn test_symbolic_iterator() {
         let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p1026.aeon").unwrap();
-        let stg = SymbolicAsyncGraph::new(bn).unwrap();
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
 
         let mut set = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
 
