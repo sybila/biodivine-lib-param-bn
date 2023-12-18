@@ -12,10 +12,16 @@ use biodivine_lib_param_bn::{BooleanNetwork, SdGraph};
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
     let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
+    println!("Initial: {} / {}", model.num_vars(), model.as_graph().regulations().count());
+    let model = model.infer_valid_graph().unwrap();
+    println!("Simplified: {} / {}", model.num_vars(), model.as_graph().regulations().count());
 
+    println!("Model size: {}", model.num_vars());
     // First, compute the feedback vertex set.
-    let fvs = model.as_graph().feedback_vertex_set();
-    println!("FVS size: {}", fvs.len());
+    //let fvs = model.as_graph().feedback_vertex_set();
+    let fvs = model.as_graph().exact_fvs();
+    println!("Initial size: {}", model.as_graph().feedback_vertex_set().len());
+    println!("FVS size: {}; IC size: {}", fvs.len(), model.as_graph().independent_cycles().len());
 
     // Then compute the SCC decomposition without the FVS. The result should be empty
     // since the graph should be acyclic.
