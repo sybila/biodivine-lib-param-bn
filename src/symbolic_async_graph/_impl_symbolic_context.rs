@@ -6,6 +6,7 @@ use biodivine_lib_bdd::{
 };
 use std::collections::HashMap;
 use std::convert::TryInto;
+use std::fmt::{Debug, Formatter};
 
 impl SymbolicContext {
     /// Create a new `SymbolicContext` that encodes the given `BooleanNetwork`, but otherwise has
@@ -114,14 +115,10 @@ impl SymbolicContext {
         // Finally, collect all parameter BddVariables into one vector.
         let mut parameter_variables: Vec<BddVariable> = Vec::new();
         for table in &explicit_function_tables {
-            for p in &table.rows {
-                parameter_variables.push(*p);
-            }
+            parameter_variables.extend_from_slice(&table.rows);
         }
         for table in implicit_function_tables.iter().flatten() {
-            for p in &table.rows {
-                parameter_variables.push(*p);
-            }
+            parameter_variables.extend_from_slice(&table.rows);
         }
 
         Ok(SymbolicContext {
@@ -173,6 +170,92 @@ impl SymbolicContext {
         result.extra_state_variables.remove(index);
         result.implicit_function_tables.remove(index);
         result
+    }
+
+    /// Create a copy of this [SymbolicContext] which only contains the relevant state and parameter variables.
+    ///
+    /// In other words, the new context is equivalent to calling [SymbolicContext::new] with the original network
+    /// that was also used to create this context.
+    ///
+    /// In general, if you are using extra variables in your algorithm, it is preferred to export the result in
+    /// such a way that the BDDs are compatible with this "canonical" context whenever possible. To do that, you
+    /// can use this method to create the canonical context, and then use [SymbolicContext::transfer_from]
+    /// to translate the output BDDs.
+    pub fn as_canonical_context(&self) -> SymbolicContext {
+        let mut builder = BddVariableSetBuilder::new();
+        let mut state_variables = Vec::new();
+        let mut explicit_function_tables = Vec::new();
+        let mut implicit_function_tables: Vec<Option<FunctionTable>> =
+            vec![None; self.num_state_variables()];
+        // Now, a key problem is that we need to recreate all objects in the correct order, such that we are
+        // truly compatible with the original representation. This is a bit complicated, because we don't have that
+        // order saved anywhere explicitly. However, we can "reconstruct" it from the current data-structures.
+        let mut to_skip = 0usize; // Variables are skipped when they represent a single uninterpreted function.
+        let mut next_var_id = 0usize; // We use this to tell which variable are we processing now/have processed last.
+        'var_loop: for var in self.bdd.variables() {
+            if to_skip > 0 {
+                to_skip -= 1;
+                continue 'var_loop;
+            }
+            if self.state_variables.contains(&var) {
+                // Recreate state variable.
+                let variable_name = self.bdd.name_of(var);
+                let state_variable = builder.make_variable(variable_name.as_str());
+                state_variables.push(state_variable);
+                next_var_id += 1;
+                continue 'var_loop;
+            }
+            if self.all_extra_state_variables.contains(&var) {
+                // Extra state variables are skipped.
+                continue 'var_loop;
+            }
+
+            // Find the variable in the uninterpreted functions.
+            for function in &self.explicit_function_tables {
+                if function.contains(var) {
+                    // Recreate function
+                    let new_table =
+                        FunctionTable::new(function.name.as_str(), function.arity, &mut builder);
+                    to_skip = new_table.rows.len() - 1;
+                    explicit_function_tables.push(new_table);
+                    continue 'var_loop;
+                }
+            }
+            for function in &self.implicit_function_tables {
+                if let Some(function) = function.as_ref() {
+                    if function.contains(var) {
+                        let new_table = FunctionTable::new(
+                            function.name.as_str(),
+                            function.arity,
+                            &mut builder,
+                        );
+                        to_skip = new_table.rows.len() - 1;
+                        assert!(next_var_id > 0);
+                        implicit_function_tables[next_var_id - 1] = Some(new_table);
+                        continue 'var_loop;
+                    }
+                }
+            }
+            unreachable!("There shouldn't be any other symbolic variables.");
+        }
+
+        let mut parameter_variables: Vec<BddVariable> = Vec::new();
+        for table in &explicit_function_tables {
+            parameter_variables.extend_from_slice(&table.rows);
+        }
+        for table in implicit_function_tables.iter().flatten() {
+            parameter_variables.extend_from_slice(&table.rows);
+        }
+
+        SymbolicContext {
+            bdd: builder.build(),
+            state_variables,
+            extra_state_variables: vec![vec![]; self.num_state_variables()],
+            all_extra_state_variables: Vec::new(),
+            parameter_variables,
+            explicit_function_tables,
+            implicit_function_tables,
+        }
     }
 
     /// The number of state variables (should be equal to the number of network variables).
@@ -496,11 +579,58 @@ fn network_symbolic_size(network: &BooleanNetwork, extra: &HashMap<VariableId, u
     size
 }
 
+impl Debug for SymbolicContext {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "SymbolicContext(states={}, extras={}, params={})",
+            self.num_state_variables(),
+            self.all_extra_state_variables.len(),
+            self.parameter_variables.len()
+        )
+    }
+}
+
+impl PartialEq for SymbolicContext {
+    fn eq(&self, other: &Self) -> bool {
+        if self.bdd.variables() != other.bdd.variables() {
+            return false;
+        }
+
+        for var in self.bdd.variables() {
+            if self.bdd.name_of(var) != other.bdd.name_of(var) {
+                return false;
+            }
+        }
+
+        if self.state_variables != other.state_variables {
+            return false;
+        }
+
+        if self.extra_state_variables != other.extra_state_variables {
+            return false;
+        }
+
+        if self.explicit_function_tables != other.explicit_function_tables {
+            return false;
+        }
+
+        if self.implicit_function_tables != other.implicit_function_tables {
+            return false;
+        }
+
+        true
+    }
+}
+
+impl Eq for SymbolicContext {}
+
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
-    use crate::BooleanNetwork;
+    use crate::trap_spaces::SymbolicSpaceContext;
+    use crate::{BooleanNetwork, VariableId};
     use biodivine_lib_bdd::BddPartialValuation;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryFrom;
@@ -630,5 +760,65 @@ mod tests {
             assert!(!positive_bdd.is_false());
             assert!(!negative_bdd.is_false());
         }
+    }
+
+    #[test]
+    fn test_canonical_context() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            a -> c
+            b -> c
+            b -> a
+            c -> a
+            c -> b
+            $a: b | c
+            $c: g(a, b)
+        ",
+        )
+        .unwrap();
+
+        let extra = bn
+            .variables()
+            .enumerate()
+            .map(|(i, var)| (var, i as u16))
+            .collect::<HashMap<_, _>>();
+        let extra_context = SymbolicContext::with_extra_state_variables(&bn, &extra).unwrap();
+        let canonical_context = SymbolicContext::new(&bn).unwrap();
+
+        assert_ne!(canonical_context, extra_context);
+        let normalized = extra_context.as_canonical_context();
+        assert_eq!(
+            normalized.bdd.variables(),
+            canonical_context.bdd.variables()
+        );
+        assert_eq!(
+            normalized.state_variables,
+            canonical_context.state_variables
+        );
+        assert_eq!(
+            normalized.extra_state_variables,
+            canonical_context.extra_state_variables
+        );
+        assert_eq!(
+            normalized.explicit_function_tables,
+            canonical_context.explicit_function_tables
+        );
+        assert_eq!(
+            normalized.implicit_function_tables,
+            canonical_context.implicit_function_tables
+        );
+        assert_eq!(canonical_context, extra_context.as_canonical_context());
+
+        let space_ctx = SymbolicSpaceContext::new(&bn);
+        let space_stg = SymbolicAsyncGraph::with_space_context(&bn, &space_ctx).unwrap();
+        let unit_set = space_stg
+            .unit_colored_vertices()
+            .fix_network_variable(VariableId(0), true);
+
+        let normal_stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let translated = normal_stg.transfer_from(&unit_set, &space_stg).unwrap();
+
+        assert_eq!(translated.exact_cardinality(), unit_set.exact_cardinality());
     }
 }

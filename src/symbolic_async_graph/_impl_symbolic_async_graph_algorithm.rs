@@ -1,4 +1,5 @@
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::reachability::Reachability;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::{ExtendedBoolean, Space, VariableId};
 
@@ -13,36 +14,14 @@ impl SymbolicAsyncGraph {
     ///
     /// In other words, the result is the smallest forward-closed superset of `initial`.
     pub fn reach_forward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        let mut result = initial.clone();
-        'fwd: loop {
-            for var in self.variables().rev() {
-                let step = self.var_post_out(var, &result);
-                if !step.is_empty() {
-                    result = result.union(&step);
-                    continue 'fwd;
-                }
-            }
-
-            return result;
-        }
+        Reachability::reach_fwd(self, initial)
     }
 
     /// Compute the set of backward-reachable vertices from the given `initial` set.
     ///
     /// In other words, the result is the smallest backward-closed superset of `initial`.
     pub fn reach_backward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        let mut result = initial.clone();
-        'bwd: loop {
-            for var in self.variables().rev() {
-                let step = self.var_pre_out(var, &result);
-                if !step.is_empty() {
-                    result = result.union(&step);
-                    continue 'bwd;
-                }
-            }
-
-            return result;
-        }
+        Reachability::reach_bwd(self, initial)
     }
 
     /// Compute the subset of `initial` vertices that can only reach other vertices within
@@ -139,6 +118,7 @@ impl SymbolicAsyncGraph {
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::reachability::Reachability;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::ExtendedBoolean::Zero;
     use crate::{BooleanNetwork, ExtendedBoolean, Space};
@@ -165,6 +145,8 @@ mod tests {
         let pivot = stg.unit_colored_vertices().pick_vertex();
         let fwd = stg.reach_forward(&pivot);
         let bwd = stg.reach_backward(&pivot);
+        let fwd_basic = Reachability::reach_fwd_basic(&stg, &pivot);
+        let bwd_basic = Reachability::reach_bwd_basic(&stg, &pivot);
         let scc = fwd.intersect(&bwd);
 
         // Should contain all cases where pivot is in an attractor.
@@ -179,6 +161,13 @@ mod tests {
         // For some reason, there is only a very small number of parameter valuations
         // where this is not empty -- less than in the pivot in fact.
         assert!(!repeller_basin.is_empty());
+
+        assert!(pivot.is_subset(&fwd));
+        assert!(pivot.is_subset(&bwd));
+        assert!(pivot.is_subset(&scc));
+
+        assert_eq!(fwd, fwd_basic);
+        assert_eq!(bwd, bwd_basic);
     }
 
     #[test]

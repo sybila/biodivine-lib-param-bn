@@ -58,6 +58,8 @@ mod _impl_symbolic_context;
 /// that are used to iterate through various projections of symbolic sets.
 pub mod projected_iteration;
 
+pub mod reachability;
+
 /// A module with a trait that describes common methods shared by all set representations
 /// based on BDDs.
 ///
@@ -167,8 +169,11 @@ pub struct SymbolicContext {
 /// The main functionality of a `FunctionTable` is that it provides an iterator over
 /// pairs of `Vec<bool>` (function input assignment) and `BddVariable`
 /// (corresponding symbolic variable).
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FunctionTable {
+    /// Original name of the function. This can be derived from the names of the symbolic variables, but it
+    /// is useful to have it around if we ever want to translate between representations.
+    name: String,
     pub arity: u16,
     rows: Vec<BddVariable>,
 }
