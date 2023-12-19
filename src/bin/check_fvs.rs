@@ -19,6 +19,7 @@ fn main() {
     println!("Model size: {}", model.num_vars());
     // First, compute the feedback vertex set.
     //let fvs = model.as_graph().feedback_vertex_set();
+    //let fvs = model.as_graph().exact_fvs_solver();
     let fvs = model.as_graph().exact_fvs();
     println!("Initial size: {}", model.as_graph().feedback_vertex_set().len());
     println!("FVS size: {}; IC size: {}", fvs.len(), model.as_graph().independent_cycles().len());

@@ -1,8 +1,10 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::Sign::{Negative, Positive};
 use crate::{RegulatoryGraph, VariableId};
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::ops::Add;
 use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddValuation, BddVariable, BddVariableSet};
+use z3::{FuncDecl, SatResult, Solver, Sort};
+use z3::ast::Bool;
 
 /// **(internal)** Basic utility methods for manipulating the `SdGraph`.
 mod _impl_sd_graph;
@@ -117,15 +119,131 @@ impl RegulatoryGraph {
         graph.restricted_feedback_vertex_set(&graph.mk_all_vertices())
     }
 
+    pub fn exact_fvs_solver(&self) -> HashSet<VariableId> {
+        let z3 = z3::Context::new(&z3::Config::new());
+        let bool_sort = Sort::bool(&z3);
+
+        let variable_constructors = self.variables()
+            .map(|it| {
+                let name = self.get_variable_name(it);
+                FuncDecl::new(&z3, name.as_str(), &[], &bool_sort)
+            })
+            .collect::<Vec<_>>();
+
+        let variable_constants = variable_constructors
+            .iter()
+            .map(|it| it.apply(&[]).as_bool().unwrap())
+            .collect::<Vec<_>>();
+
+        let cycles = self.independent_cycles();
+        if cycles.is_empty() {
+            return HashSet::new();
+        }
+
+        let var_counts = variable_constants.iter()
+            .map(|it| (it, 1))
+            .collect::<Vec<_>>();
+
+        let graph = SdGraph::from(self);
+
+        let mut target_size = cycles.len() as i32;
+        let solver = Solver::new(&z3);
+        loop {
+            println!("Start searching for size {}.", target_size);
+            let constraint = Bool::pb_eq(&z3, &var_counts, target_size);
+            solver.push();
+            solver.assert(&constraint);
+            match solver.check() {
+                SatResult::Unknown => unreachable!("This must be decidable."),
+                SatResult::Unsat => {
+                    // There is no FVS of the target size. We have to increase the limit.
+                    println!("Nothing found. Increasing target size to {}.", target_size);
+                    solver.pop(1);
+                    target_size += 1;
+                    continue
+                },
+                SatResult::Sat => {
+                    // We have a candidate.
+                    let model = solver.get_model().unwrap();
+                    println!("Found FVS candidate.");
+
+                    // Translate model into a candidate FVS.
+                    let mut fvs_candidate = HashSet::new();
+                    for (i, term) in variable_constants.iter().enumerate() {
+                        let is_valid = model.eval(term, true).unwrap().as_bool().unwrap();
+                        if is_valid {
+                            fvs_candidate.insert(VariableId(i));
+                        }
+                    }
+
+                    // Search for conflict cycles.
+                    let restriction = self.variables()
+                        .filter(|it| !fvs_candidate.contains(it))
+                        .collect::<HashSet<_>>();
+                    let mut conflict_cycles = Vec::new();
+                    for var in self.variables().rev() {
+                        if !restriction.contains(&var) {
+                            continue;
+                        }
+                        if let Some(cycle) = graph.shortest_cycle(&restriction, var, usize::MAX) {
+                            conflict_cycles.push(cycle);
+                        }
+                    }
+                    if conflict_cycles.is_empty() {
+                        println!("FVS is correct and minimal.");
+                        return fvs_candidate;
+                    }
+                    println!("Found {} conflict cycles.", conflict_cycles.len());
+                    conflict_cycles.sort_by(|a, b| a.len().cmp(&b.len()));
+                    // Assert the shortest cycle.
+                    let cycle_members = conflict_cycles[0].iter()
+                        .map(|var| &variable_constants[var.to_index()])
+                        .collect::<Vec<_>>();
+                    let assertion = Bool::or(&z3, &cycle_members);
+
+                    println!("Adding assertion of size {}.", cycle_members.len());
+                    solver.pop(1);  // remove the old count assertion
+                    solver.assert(&assertion);
+                }
+            }
+        }
+    }
+
     pub fn exact_fvs(&self) -> HashSet<VariableId> {
-        let ctx = BddVariableSet::new_anonymous(u16::try_from(self.num_vars()).unwrap());
+        println!("{:?}", self.strongly_connected_components().iter().map(|it| it.len()).collect::<Vec<_>>());
+        let mut candidate_variables = Vec::new();
+        for var in self.variables() {
+            if self.shortest_cycle(var).is_none() {
+                // Acyclic variable.
+                continue;
+            }
+            let regulators = self.regulators(var);
+            let targets = self.targets(var);
+            if regulators.len() == 1 && candidate_variables.contains(&regulators[0]) {
+                // Skip if we have just one regulator and it is already included.
+                continue;
+            }
+            if targets.len() == 1 && candidate_variables.contains(&targets[0]) {
+                continue;
+            }
+            candidate_variables.push(var);
+        }
+
+        println!("There are {} variables, and {} are relevant.", self.num_vars(), candidate_variables.len());
+
+        let ctx = BddVariableSet::new_anonymous(u16::try_from(candidate_variables.len()).unwrap());
+        let all_vars = ctx.variables();
         let bdd_vars = ctx.variables();
+        let bdd_vars = bdd_vars.into_iter().zip(candidate_variables)
+            .map(|(a, b)| (b, a))
+            .collect::<HashMap<_, _>>();
+
         let cycles = self.independent_cycles();
         if cycles.is_empty() {
             return HashSet::new();
         }
         // Upper bound will be updated as we go to better results.
-        let mut upper_bound = self.feedback_vertex_set();
+        let upper_bound = self.feedback_vertex_set();
         println!("Upper bound: {}", upper_bound.len());
 
         let min_size = cycles.len();
@@ -142,25 +260,26 @@ impl RegulatoryGraph {
 
         fn build_cycle_clause(
             ctx: &BddVariableSet,
-            bdd_vars: &[BddVariable],
+            bdd_vars: &HashMap<VariableId, BddVariable>,
             cycle: &[VariableId]
         ) -> Bdd {
             let mut valuation = BddPartialValuation::empty();
             for var in cycle {
-                let bdd_var = bdd_vars[var.to_index()];
-                valuation[bdd_var] = Some(true);
+                if let Some(var) = bdd_vars.get(var) {
+                    valuation[*var] = Some(true);
+                }
             }
             ctx.mk_disjunctive_clause(&valuation)
         }
 
         fn valuation_to_fvs(
-            bdd_vars: &[BddVariable],
+            bdd_vars: &HashMap<VariableId, BddVariable>,
             valuation: &BddValuation,
         ) -> HashSet<VariableId> {
             let mut result = HashSet::new();
-            for (i, var) in bdd_vars.iter().enumerate() {
-                if valuation[*var] {
-                    result.insert(VariableId::from_index(i));
+            for (n_var, b_var) in bdd_vars.iter() {
+                if valuation[*b_var] {
+                    result.insert(*n_var);
                 }
             }
             result
@@ -168,18 +287,19 @@ impl RegulatoryGraph {
 
         let graph = SdGraph::from(self);
         for k in min_size..max_size {
+        //for k in (min_size..max_size).rev() {
             println!("Start with {}", k);
 
-            let mut candidates = ctx.mk_sat_exactly_k(k, &bdd_vars);
+            let mut candidates = ctx.mk_sat_exactly_k(k, &all_vars);
             //let mut candidates = ctx.mk_sat_up_to_k(max_size - 1, &bdd_vars);
             //candidates = candidates.and_not(&ctx.mk_sat_up_to_k(min_size - 1, &bdd_vars));
 
             // Each cycles is a new potential clause that needs to be satisfied:
-            let mut cycles = cycles.clone();
-            cycles.sort_by(|a, b| a.len().cmp(&b.len()));
+            //let mut cycles = cycles.clone();
+            //cycles.sort_by(|a, b| a.len().cmp(&b.len()));
             //cycles.reverse();
-            candidates = candidates.and(&build_cycle_clause(&ctx, &bdd_vars, &cycles[0]));
-            println!("Apply cycle: {}; Candidates: {}", cycles[0].len(), candidates.size());
+            //candidates = candidates.and(&build_cycle_clause(&ctx, &bdd_vars, &cycles[0]));
+            //println!("Apply cycle: {}; Candidates: {}", cycles[0].len(), candidates.size());
             /*for cycle in &cycles {
                 candidates = candidates.and(&build_cycle_clause(&ctx, &bdd_vars, &cycle));
                 println!("Apply cycle: {}; Candidates: {}", cycle.len(), candidates.size());
@@ -203,7 +323,13 @@ impl RegulatoryGraph {
                     return fvs;
                 }
                 println!("Found {} conflict cycles", conflict_cycles.len());
-                conflict_cycles.sort_by(|a, b| a.len().cmp(&b.len()));
+                //conflict_cycles.sort_by(|a, b| a.len().cmp(&b.len()));
+
+                // This should put the cycle with the "largest" variable first.
+                conflict_cycles.sort_by(|a, b| {
+                    a.iter().max().unwrap().cmp(&b.iter().max().unwrap()).reverse()
+                });
+
                 //conflict_cycles.reverse();
                 /*for cycle in conflict_cycles {
                     // Found counterexample. Assert that at least one of the vertices on that cycle must
