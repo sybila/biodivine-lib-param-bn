@@ -1,4 +1,5 @@
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::reachability::Reachability;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::{ExtendedBoolean, Space, VariableId};
 
@@ -13,36 +14,14 @@ impl SymbolicAsyncGraph {
     ///
     /// In other words, the result is the smallest forward-closed superset of `initial`.
     pub fn reach_forward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        let mut result = initial.clone();
-        'fwd: loop {
-            for var in self.variables().rev() {
-                let step = self.var_post_out(var, &result);
-                if !step.is_empty() {
-                    result = result.union(&step);
-                    continue 'fwd;
-                }
-            }
-
-            return result;
-        }
+        Reachability::reach_fwd(self, initial)
     }
 
     /// Compute the set of backward-reachable vertices from the given `initial` set.
     ///
     /// In other words, the result is the smallest backward-closed superset of `initial`.
     pub fn reach_backward(&self, initial: &GraphColoredVertices) -> GraphColoredVertices {
-        let mut result = initial.clone();
-        'bwd: loop {
-            for var in self.variables().rev() {
-                let step = self.var_pre_out(var, &result);
-                if !step.is_empty() {
-                    result = result.union(&step);
-                    continue 'bwd;
-                }
-            }
-
-            return result;
-        }
+        Reachability::reach_bwd(self, initial)
     }
 
     /// Compute the subset of `initial` vertices that can only reach other vertices within
