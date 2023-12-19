@@ -9,6 +9,7 @@ pub struct Reachability {
 }
 
 impl Reachability {
+    /// A FWD reachability procedure that uses "structural saturation".
     pub fn reach_fwd(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
@@ -16,6 +17,7 @@ impl Reachability {
         Self::reach(graph, initial, |g, s, v| g.var_post_out(v, s))
     }
 
+    /// A BWD reachability procedure that uses "structural saturation".
     pub fn reach_bwd(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
@@ -23,6 +25,7 @@ impl Reachability {
         Self::reach(graph, initial, |g, s, v| g.var_pre_out(v, s))
     }
 
+    /// "Basic" saturation FWD reachability procedure.
     pub fn reach_fwd_basic(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
@@ -30,6 +33,7 @@ impl Reachability {
         Self::reach_basic_saturation(graph, initial, |g, s, v| g.var_post_out(v, s))
     }
 
+    /// "Basic" saturation BWD reachability procedure.
     pub fn reach_bwd_basic(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
@@ -37,6 +41,7 @@ impl Reachability {
         Self::reach_basic_saturation(graph, initial, |g, s, v| g.var_pre_out(v, s))
     }
 
+    /// A basic saturation procedure which performs reachability over all transition functions of a graph.
     pub fn reach_basic_saturation<
         F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
     >(
@@ -91,8 +96,11 @@ impl Reachability {
         }
     }
 
-    /// Use [`SymbolicAsyncGraph::restrict`] to limit the reachability search to a particular
-    /// subgraph.
+    /// A "structural" reachability procedure which uses the dependencies between the update functions to reduce
+    /// the number of transitions that need to be tested.
+    ///
+    /// This sometimes increases the size of the BDDs a little bit, but is overall beneficial in the vast majority
+    /// of cases.
     pub fn reach<
         F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
     >(
@@ -163,7 +171,7 @@ impl Reachability {
 
             if cfg!(feature = "print-progress") {
                 println!(
-                    "Basic reachability done: {}[nodes:{}] candidates. Max intermediate size: {}.",
+                    "Structural reachability done: {}[nodes:{}] candidates. Max intermediate size: {}.",
                     result.approx_cardinality(),
                     result.symbolic_size(),
                     max_size
