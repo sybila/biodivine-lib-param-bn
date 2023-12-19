@@ -14,7 +14,8 @@ impl FunctionTable {
                 bdd_builder.make_variable(bdd_var_name.as_str())
             })
             .collect();
-        FunctionTable { arity, rows }
+        let name = name.to_string();
+        FunctionTable { arity, rows, name }
     }
 
     /// List the symbolic variables that appear in this function table.
@@ -24,6 +25,11 @@ impl FunctionTable {
     /// don't care about their input valuations.
     pub fn symbolic_variables(&self) -> &Vec<BddVariable> {
         &self.rows
+    }
+
+    /// True if this [FunctionTable] contains the provided [BddVariable].
+    pub fn contains(&self, var: BddVariable) -> bool {
+        self.rows.contains(&var)
     }
 }
 
