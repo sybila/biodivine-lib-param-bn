@@ -5,6 +5,7 @@ use crate::_aeon_parser::FnUpdateTemp;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use std::collections::{HashMap, HashSet};
+use std::fmt::{Display, Formatter};
 
 /// Constructor and destructor utility methods. These mainly avoid unnecessary boxing
 /// and exhaustive pattern matching when not necessary.
@@ -258,50 +259,63 @@ impl FnUpdate {
         result
     }
 
-    /// Convert this update function to a string, taking names from the provided `BooleanNetwork`.
-    pub fn to_string(&self, context: &BooleanNetwork) -> String {
-        fn to_string_rec(function: &FnUpdate, context: &BooleanNetwork, no_paren: bool) -> String {
-            match function {
-                Const(value) => value.to_string(),
-                Var(id) => context.get_variable_name(*id).to_string(),
-                Not(inner) => format!("!{}", to_string_rec(inner, context, false)),
-                Binary(op, l, r) => {
-                    // And/Or have special treatments so that chains don't produce
-                    // unnecessary parenthesis.
-                    let l_nested_and = *op == And && matches!(**l, Binary(And, _, _));
-                    let r_nested_and = *op == And && matches!(**r, Binary(And, _, _));
-                    let l_nested_or = *op == Or && matches!(**l, Binary(Or, _, _));
-                    let r_nested_or = *op == Or && matches!(**r, Binary(Or, _, _));
-
-                    let l_no_paren = l_nested_and || l_nested_or;
-                    let r_no_paren = r_nested_and || r_nested_or;
-
-                    let l = to_string_rec(l, context, l_no_paren);
-                    let r = to_string_rec(r, context, r_no_paren);
-
-                    if no_paren {
-                        format!("{} {} {}", l, op, r)
-                    } else {
-                        format!("({} {} {})", l, op, r)
-                    }
+    /// Private to_string helper.
+    fn to_string_rec(&self, context: Option<&BooleanNetwork>, no_paren: bool) -> String {
+        match self {
+            Const(value) => value.to_string(),
+            Var(id) => {
+                if let Some(ctx) = context {
+                    ctx.get_variable_name(*id).to_string()
+                } else {
+                    format!("v_{}", id.to_index())
                 }
-                Param(id, args) => {
-                    if args.is_empty() {
-                        context[*id].get_name().to_string()
-                    } else {
-                        // No need for top-level parenthesis in parameters, since commas
-                        // serve the same purpose.
-                        let mut arg_string = format!("({}", to_string_rec(&args[0], context, true));
-                        for arg in args.iter().skip(1) {
-                            arg_string =
-                                format!("{}, {}", arg_string, to_string_rec(arg, context, true));
-                        }
-                        format!("{}{})", context[*id].get_name(), arg_string)
+            }
+            Not(inner) => format!("!{}", Self::to_string_rec(inner, context, false)),
+            Binary(op, l, r) => {
+                // And/Or have special treatments so that chains don't produce
+                // unnecessary parenthesis.
+                let l_nested_and = *op == And && matches!(**l, Binary(And, _, _));
+                let r_nested_and = *op == And && matches!(**r, Binary(And, _, _));
+                let l_nested_or = *op == Or && matches!(**l, Binary(Or, _, _));
+                let r_nested_or = *op == Or && matches!(**r, Binary(Or, _, _));
+
+                let l_no_paren = l_nested_and || l_nested_or;
+                let r_no_paren = r_nested_and || r_nested_or;
+
+                let l = l.to_string_rec(context, l_no_paren);
+                let r = r.to_string_rec(context, r_no_paren);
+
+                if no_paren {
+                    format!("{} {} {}", l, op, r)
+                } else {
+                    format!("({} {} {})", l, op, r)
+                }
+            }
+            Param(id, args) => {
+                let name = if let Some(ctx) = context {
+                    ctx[*id].get_name().to_string()
+                } else {
+                    format!("p_{}", id.to_index())
+                };
+                if args.is_empty() {
+                    name
+                } else {
+                    // No need for top-level parenthesis in parameters, since commas
+                    // serve the same purpose.
+                    let mut arg_string = format!("({}", args[0].to_string_rec(context, true));
+                    for arg in args.iter().skip(1) {
+                        arg_string =
+                            format!("{}, {}", arg_string, arg.to_string_rec(context, true));
                     }
+                    format!("{}{})", name, arg_string)
                 }
             }
         }
-        to_string_rec(self, context, true)
+    }
+
+    /// Convert this update function to a string, taking names from the provided `BooleanNetwork`.
+    pub fn to_string(&self, context: &BooleanNetwork) -> String {
+        self.to_string_rec(Some(context), true)
     }
 
     /// If possible, evaluate this function using the given network variable valuation.
@@ -664,6 +678,12 @@ impl FnUpdate {
                 }
             }
         }
+    }
+}
+
+impl Display for FnUpdate {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.to_string_rec(None, true))
     }
 }
 
