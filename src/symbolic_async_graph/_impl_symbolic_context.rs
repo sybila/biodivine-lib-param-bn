@@ -1,5 +1,8 @@
 use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
-use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId, VariableIdIterator};
+use crate::{
+    BinaryOp, BooleanNetwork, FnUpdate, ParameterId, ParameterIdIterator, VariableId,
+    VariableIdIterator,
+};
 use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
@@ -132,6 +135,11 @@ impl SymbolicContext {
         })
     }
 
+    /// Iterator over all [VariableId] network variables managed by this [SymbolicContext].
+    pub fn network_variables(&self) -> VariableIdIterator {
+        (0..self.num_state_variables()).map(VariableId::from_index)
+    }
+
     /// Obtain a [VariableId] of a state variable, assuming such state variable exists.
     pub fn find_network_variable(&self, name: &str) -> Option<VariableId> {
         self.bdd
@@ -144,9 +152,27 @@ impl SymbolicContext {
         self.bdd.name_of(self.state_variables[variable.to_index()])
     }
 
-    /// Iterator over all [VariableId] network variables managed by this [SymbolicContext].
-    pub fn network_variables(&self) -> VariableIdIterator {
-        (0..self.num_state_variables()).map(VariableId::from_index)
+    /// Iterator over all [ParameterId] of the parameter functions managed by this [SymbolicContext].
+    pub fn network_parameters(&self) -> ParameterIdIterator {
+        (0..self.explicit_function_tables.len()).map(ParameterId::from_index)
+    }
+
+    /// Obtain a [ParameterId] of a parameter function based on a name.
+    pub fn find_network_parameter(&self, name: &str) -> Option<ParameterId> {
+        self.explicit_function_tables
+            .iter()
+            .position(|it| it.name.as_str() == name)
+            .map(ParameterId::from_index)
+    }
+
+    /// Obtain the arity of an underlying parameter function.
+    pub fn get_network_parameter_arity(&self, id: ParameterId) -> u16 {
+        self.explicit_function_tables[id.to_index()].arity
+    }
+
+    /// Obtain the name of an underlying parameter function.
+    pub fn get_network_parameter_name(&self, id: ParameterId) -> String {
+        self.explicit_function_tables[id.to_index()].name.clone()
     }
 
     /// Create a new [SymbolicContext] which is compatible with the current context (it uses the same
