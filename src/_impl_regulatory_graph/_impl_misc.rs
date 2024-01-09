@@ -49,6 +49,29 @@ impl RegulatoryGraph {
         Ok(())
     }
 
+    /// Remove a [Regulation] from this [RegulatoryGraph] assuming it exists.
+    ///
+    /// Note that if there is a [BooleanNetwork] that uses this graph internally, this can make some if its functions
+    /// invalid if they depend on the existence of this regulation.
+    pub fn remove_regulation(
+        &mut self,
+        regulator: VariableId,
+        target: VariableId,
+    ) -> Result<Regulation, String> {
+        let index = self
+            .regulations
+            .iter()
+            .position(|r| r.regulator == regulator && r.target == target);
+        if let Some(index) = index {
+            Ok(self.regulations.remove(index))
+        } else {
+            Err(format!(
+                "Regulation ({:?}, {:?}) does not exist.",
+                regulator, target
+            ))
+        }
+    }
+
     /// Add a new regulation using the [Regulation] object.
     pub fn add_raw_regulation(&mut self, regulation: Regulation) -> Result<(), String> {
         self.assert_no_regulation(regulation.regulator, regulation.target)?;
@@ -291,6 +314,11 @@ pub mod tests {
         assert!(rg.add_regulation("a", "c", false, None).is_err());
         assert!(rg.add_regulation("a", "b", true, None).is_err());
         assert!(rg.add_regulation("b_1", "a_1", true, None).is_err());
+
+        // a -> c
+        assert!(rg.remove_regulation(VariableId(0), VariableId(3)).is_ok());
+        assert!(rg.remove_regulation(VariableId(0), VariableId(3)).is_err());
+        assert!(rg.add_regulation("a", "c", true, None).is_ok());
 
         assert_eq!(rg.num_vars(), 8);
         assert_eq!(rg.find_variable("b_1").unwrap(), VariableId(1));
