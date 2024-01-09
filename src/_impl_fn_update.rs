@@ -122,7 +122,7 @@ impl FnUpdate {
 
     /// Build an expression which is equivalent to the conjunction of the given expressions.
     pub fn mk_conjunction(items: &[FnUpdate]) -> FnUpdate {
-        let Some(first) = items.get(0) else {
+        let Some(first) = items.first() else {
             // Empty conjunction is `true`.
             return Self::mk_true();
         };
@@ -132,7 +132,7 @@ impl FnUpdate {
 
     /// Build an expression which is equivalent to the disjunction of the given expressions.
     pub fn mk_disjunction(items: &[FnUpdate]) -> FnUpdate {
-        let Some(first) = items.get(0) else {
+        let Some(first) = items.first() else {
             // Empty disjunction is `false`.
             return Self::mk_false();
         };
