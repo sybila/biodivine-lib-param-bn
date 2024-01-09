@@ -79,17 +79,19 @@ impl SymbolicAsyncGraph {
         assert_eq!(network.num_vars(), context.num_state_variables());
         let unit_bdd = apply_regulation_constraints(unit_bdd, network, &context)?;
 
-        let update_functions = network
-            .variables()
-            .map(|var| {
-                if let Some(function) = network.get_update_function(var) {
-                    context.mk_fn_update_true(function)
-                } else {
-                    let regulators = network.regulators(var);
-                    context.mk_implicit_function_is_true(var, &regulators)
-                }
-            })
-            .collect::<Vec<_>>();
+        let mut update_functions = Vec::new();
+        for var in network.variables() {
+            let bdd = if let Some(function) = network.get_update_function(var) {
+                // We have to check arguments here, because someone might have removed a regulation after
+                // adding the function that depends on it.
+                network.assert_arguments_are_valid(var, function.collect_arguments())?;
+                context.mk_fn_update_true(function)
+            } else {
+                let regulators = network.regulators(var);
+                context.mk_implicit_function_is_true(var, &regulators)
+            };
+            update_functions.push(bdd);
+        }
 
         unsafe {
             Ok(SymbolicAsyncGraph::new_raw(

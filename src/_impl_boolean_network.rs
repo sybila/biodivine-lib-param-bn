@@ -134,7 +134,7 @@ impl BooleanNetwork {
 
     /// **(internal)** Utility method to check that the arguments of a function are a subset
     /// of the actual regulators.
-    fn assert_arguments_are_valid(
+    pub(crate) fn assert_arguments_are_valid(
         &self,
         variable: VariableId,
         actual: Vec<VariableId>,
