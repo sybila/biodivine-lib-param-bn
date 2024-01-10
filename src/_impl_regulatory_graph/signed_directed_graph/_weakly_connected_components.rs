@@ -2,7 +2,7 @@ use crate::{SdGraph, VariableId};
 use std::collections::HashSet;
 
 impl SdGraph {
-    /// The list of *non-trivial* weakly connected components in this graph.
+    /// The list of all weakly connected components in this graph.
     pub fn weakly_connected_components(&self) -> Vec<HashSet<VariableId>> {
         self.restricted_strongly_connected_components(&self.mk_all_vertices())
     }
@@ -16,40 +16,56 @@ impl SdGraph {
             return Vec::new();
         }
 
-        let pivot = restriction.iter().cloned().next().unwrap();
+        let pivot = *restriction.iter().min().unwrap();
 
         let mut component = HashSet::from([pivot]);
         loop {
-            let mut done = true;
-            for x in component.clone() {
-                for (s, _) in &self.successors[x.to_index()] {
-                    if !component.contains(s) {
-                        component.insert(*s);
-                        done = false;
-                    }
-                }
-                for (p, _) in &self.predecessors[x.to_index()] {
-                    if !component.contains(p) {
-                        component.insert(*p);
-                        done = false;
-                    }
-                }
-            }
-            if done {
+            let fwd = self.restricted_forward_reachable(restriction, component.clone());
+            let bwd = self.restricted_backward_reachable(restriction, component.clone());
+            if fwd.is_subset(&component) && bwd.is_subset(&component) {
                 break;
             }
+            component.extend(fwd);
+            component.extend(bwd);
         }
 
         let mut result = Vec::new();
         let new_restriction: HashSet<VariableId> =
             restriction.difference(&component).cloned().collect();
 
-        if component.len() > 1 {
-            result.push(component);
-        }
-
+        result.push(component);
         result.append(&mut self.restricted_weakly_connected_components(&new_restriction));
 
         result
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{RegulatoryGraph, SdGraph, VariableId};
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_weakly_connected() {
+        let rg = RegulatoryGraph::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+            d -> b
+            c -> e
+        ",
+        )
+        .unwrap();
+        let sd = SdGraph::from(&rg);
+
+        assert_eq!(sd.weakly_connected_components().len(), 1);
+        let restriction =
+            HashSet::from_iter([VariableId::from_index(3), VariableId::from_index(4)]);
+        assert_eq!(
+            sd.restricted_weakly_connected_components(&restriction)
+                .len(),
+            2
+        );
     }
 }
