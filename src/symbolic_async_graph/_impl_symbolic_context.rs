@@ -89,7 +89,7 @@ impl SymbolicContext {
             } else {
                 // Implicit update function.
                 let arity: u16 = network.regulators(variable).len().try_into().unwrap();
-                let function_name = format!("f_{}", variable_name);
+                let function_name = network.get_implicit_function_name(variable);
                 let function_table = FunctionTable::new(&function_name, arity, &mut builder);
                 implicit_function_tables[variable.0] = Some(function_table);
             }
