@@ -22,7 +22,10 @@ impl SdGraph {
         while let Some(mut scc) = components.pop() {
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;
-            for x in &scc {
+            // Not particularly efficient, but keeps this whole thing deterministic.
+            let mut scc_iter: Vec<VariableId> = scc.iter().cloned().collect();
+            scc_iter.sort();
+            for x in &scc_iter {
                 if let Some(cycle) = self.shortest_cycle(&scc, *x, best_cycle_len) {
                     if cycle.len() == 1 {
                         // Cycle of length one will always win, no need to check further.
