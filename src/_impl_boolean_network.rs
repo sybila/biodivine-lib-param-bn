@@ -58,11 +58,14 @@ impl BooleanNetwork {
         Ok(id)
     }
 
-    /// Set parameter name. This should be relatively safe since we use IDs everythere.
+    /// Set parameter name. This should be relatively safe since we use IDs everywhere.
     fn rename_parameter(&mut self, parameter: ParameterId, new_name: &str) -> Result<(), String> {
         self.assert_no_such_parameter(new_name)?;
         let param = self.parameters.get_mut(parameter.to_index()).unwrap();
+        self.parameter_to_index.remove(param.name.as_str());
         param.name = new_name.to_string();
+        self.parameter_to_index
+            .insert(param.name.clone(), parameter);
         Ok(())
     }
 
@@ -729,7 +732,7 @@ impl BooleanNetwork {
         let var_targets = old_rg.targets(var);
 
         // If we have to create an explicit uninterpreted function for the inlined variable,
-        // we have to give it a unique name at first. But one the variable is inlined, we can
+        // we have to give it a unique name at first. But once the variable is inlined, we can
         // use the old name. So here, we save whether a parameter needs to be removed, and if
         // so, to what.
         let mut rename_parameter: Option<(ParameterId, String)> = None;
