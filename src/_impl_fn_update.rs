@@ -541,7 +541,7 @@ impl FnUpdate {
                     Xor => {
                         // (left | right) & !(left & right)
                         let both = left.clone().and(right.clone());
-                        let one = left.and(right);
+                        let one = left.or(right);
                         one.and(both.negation())
                     }
                     Iff => {
