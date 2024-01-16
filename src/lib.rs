@@ -289,7 +289,7 @@ pub struct Space(Vec<ExtendedBoolean>);
 ///
 /// Another usage for annotations are extra properties enforced on the model behaviour, for
 /// example through CTL:
-/// ```test
+/// ```text
 /// #! property : AG (problem => AF apoptosis)
 /// ```
 ///
@@ -304,7 +304,7 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// value with a non-empty path (e.g. `#!is_multivalued:var_1:`). Though this is not particularly
 /// encouraged: it is better to just have `var_1` as the annotation value if you can do that.
 /// An exception to this may be a case where `is_multivalued:var_1:` has an "optional" value and
-/// you want to express that while the "key" is provided, but the "value" is missing. Similarly, for
+/// you want to express that while the "key" is provided, the "value" is missing. Similarly, for
 /// the sake of completeness, it is technically allowed to use empty path names (e.g. `a::b:value`
 /// translates to `["a", "", "b"] = "value"`), but it is discouraged.
 ///
