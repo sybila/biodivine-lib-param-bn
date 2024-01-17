@@ -58,11 +58,14 @@ impl BooleanNetwork {
         Ok(id)
     }
 
-    /// Set parameter name. This should be relatively safe since we use IDs everythere.
+    /// Set parameter name. This should be relatively safe since we use IDs everywhere.
     fn rename_parameter(&mut self, parameter: ParameterId, new_name: &str) -> Result<(), String> {
         self.assert_no_such_parameter(new_name)?;
         let param = self.parameters.get_mut(parameter.to_index()).unwrap();
+        self.parameter_to_index.remove(param.name.as_str());
         param.name = new_name.to_string();
+        self.parameter_to_index
+            .insert(param.name.clone(), parameter);
         Ok(())
     }
 
@@ -698,6 +701,20 @@ impl BooleanNetwork {
         Some(self.inline_variable_internal(var, repair_graph))
     }
 
+    /// Compute a valid name for an "anonymous update function" of the corresponding variable.
+    pub(crate) fn get_implicit_function_name(&self, variable: VariableId) -> String {
+        let mut name = format!("f_{}", self.get_variable_name(variable));
+        loop {
+            if self.find_parameter(name.as_str()).is_none()
+                && self.as_graph().find_variable(name.as_str()).is_none()
+            {
+                return name;
+            }
+            // If there is a collision with existing variable or parameter, prefix the name with an underscore.
+            name = format!("_{}", name);
+        }
+    }
+
     /// An internal infallible version of [BooleanNetwork::inline_variable] which does not check
     /// for self-regulations. The idea is that you can use this function if you are *sure* the
     /// inlining is reasonable even if a self-regulation is present.
@@ -715,7 +732,7 @@ impl BooleanNetwork {
         let var_targets = old_rg.targets(var);
 
         // If we have to create an explicit uninterpreted function for the inlined variable,
-        // we have to give it a unique name at first. But one the variable is inlined, we can
+        // we have to give it a unique name at first. But once the variable is inlined, we can
         // use the old name. So here, we save whether a parameter needs to be removed, and if
         // so, to what.
         let mut rename_parameter: Option<(ParameterId, String)> = None;
@@ -739,17 +756,10 @@ impl BooleanNetwork {
                     .into_iter()
                     .filter(|it| !(*check_var == var && *it == var))
                     .collect::<Vec<_>>();
-                let mut prefix = "fn".to_string(); // This is used to resolve name collisions.
                 let arity = u32::try_from(regulators.len()).unwrap();
-                let p_id = loop {
-                    let name = format!("{}_{}", prefix, old_bn.get_variable_name(*check_var));
-                    match old_bn.add_parameter(&name, arity) {
-                        Ok(p_id) => break p_id,
-                        Err(_) => {
-                            // In case of collision, append a _ to prefix.
-                            prefix = format!("{}_", prefix);
-                        }
-                    }
+                let name = old_bn.get_implicit_function_name(*check_var);
+                let Ok(p_id) = old_bn.add_parameter(name.as_str(), arity) else {
+                    unreachable!("Parameter name is known to be valid.");
                 };
                 if *check_var == var {
                     rename_parameter = Some((p_id, old_bn.get_variable_name(*check_var).clone()));
@@ -1178,7 +1188,7 @@ mod test {
         assert!(inlined.find_parameter("d").is_some());
         assert!(inlined.find_parameter("g").is_some());
         assert!(inlined.find_parameter("fun").is_some());
-        assert!(inlined.find_parameter("fn_w").is_some());
+        assert!(inlined.find_parameter("f_w").is_some());
         assert!(inlined.as_graph().find_variable("c").is_some());
         assert!(inlined.as_graph().find_variable("w").is_some());
         assert!(inlined.as_graph().find_variable("x").is_some());

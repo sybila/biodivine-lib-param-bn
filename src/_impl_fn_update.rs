@@ -122,22 +122,44 @@ impl FnUpdate {
 
     /// Build an expression which is equivalent to the conjunction of the given expressions.
     pub fn mk_conjunction(items: &[FnUpdate]) -> FnUpdate {
+        if items.is_empty() {
+            // Empty conjunction is `true`.
+            return Self::mk_true();
+        }
+        if items.len() == 1 {
+            return items[0].clone();
+        }
+        if items.len() == 2 {
+            return Self::mk_binary(And, items[0].clone(), items[1].clone());
+        }
+
         let Some(first) = items.first() else {
             // Empty conjunction is `true`.
             return Self::mk_true();
         };
-        let rest = &items[1..];
-        rest.iter().fold(first.clone(), |a, b| a.and(b.clone()))
+        let rest = Self::mk_conjunction(&items[1..]);
+        first.clone().and(rest)
     }
 
     /// Build an expression which is equivalent to the disjunction of the given expressions.
     pub fn mk_disjunction(items: &[FnUpdate]) -> FnUpdate {
+        if items.is_empty() {
+            // Empty conjunction is `true`.
+            return Self::mk_true();
+        }
+        if items.len() == 1 {
+            return items[0].clone();
+        }
+        if items.len() == 2 {
+            return Self::mk_binary(Or, items[0].clone(), items[1].clone());
+        }
+
         let Some(first) = items.first() else {
-            // Empty disjunction is `false`.
-            return Self::mk_false();
+            // Empty conjunction is `true`.
+            return Self::mk_true();
         };
-        let rest = &items[1..];
-        rest.iter().fold(first.clone(), |a, b| a.or(b.clone()))
+        let rest = Self::mk_disjunction(&items[1..]);
+        first.clone().or(rest)
     }
 }
 
@@ -519,7 +541,7 @@ impl FnUpdate {
                     Xor => {
                         // (left | right) & !(left & right)
                         let both = left.clone().and(right.clone());
-                        let one = left.and(right);
+                        let one = left.or(right);
                         one.and(both.negation())
                     }
                     Iff => {
@@ -1062,6 +1084,30 @@ mod tests {
                 .unwrap()
                 .to_string(&bn),
             "(a & !b & c) | (!a & b) | c"
+        );
+    }
+
+    #[test]
+    fn test_nary_operators() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+        ",
+        )
+        .unwrap();
+        let args = bn
+            .variables()
+            .map(|it| FnUpdate::mk_var(it))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            FnUpdate::try_from_str("a & b & c", &bn).unwrap(),
+            FnUpdate::mk_conjunction(&args)
+        );
+        assert_eq!(
+            FnUpdate::try_from_str("a | b | c", &bn).unwrap(),
+            FnUpdate::mk_disjunction(&args)
         );
     }
 }

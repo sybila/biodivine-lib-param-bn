@@ -23,12 +23,12 @@ impl ModelAnnotation {
     /// Get a reference to a child `ModelAnnotation` by specifying a path.
     ///
     /// If such annotation does not exist, returns `None`.
-    pub fn get_child<'a>(&'a self, path: &[&str]) -> Option<&'a ModelAnnotation> {
+    pub fn get_child<T: AsRef<str>>(&self, path: &[T]) -> Option<&ModelAnnotation> {
         if path.is_empty() {
             Some(self)
         } else {
             self.inner
-                .get(path[0])
+                .get(path[0].as_ref())
                 .and_then(|inner| inner.get_child(&path[1..]))
         }
     }
@@ -37,12 +37,12 @@ impl ModelAnnotation {
     ///
     /// If such annotation dues not exist, returns `None`. If you want to instead create
     /// the path when it does not exist, use `ModelAnnotation::ensure_child`.
-    pub fn get_mut_child<'a>(&'a mut self, path: &[&str]) -> Option<&'a mut ModelAnnotation> {
+    pub fn get_mut_child<T: AsRef<str>>(&mut self, path: &[T]) -> Option<&mut ModelAnnotation> {
         if path.is_empty() {
             Some(self)
         } else {
             self.inner
-                .get_mut(path[0])
+                .get_mut(path[0].as_ref())
                 .and_then(|inner| inner.get_mut_child(&path[1..]))
         }
     }
@@ -51,13 +51,13 @@ impl ModelAnnotation {
     /// if some part of the path does not exist, empty annotations are created to populate it.
     ///
     /// Panics: Fails if the child path segments contain curly brackets.
-    pub fn ensure_child<'a>(&'a mut self, path: &[&str]) -> &'a mut ModelAnnotation {
+    pub fn ensure_child<T: AsRef<str>>(&mut self, path: &[T]) -> &mut ModelAnnotation {
         if path.is_empty() {
             self
         } else {
             // Sadly, we have to run the `to_string` here, as we are not sure if the key exists.
-            validate_path_segment(path[0]);
-            let entry = self.inner.entry(path[0].to_string()).or_default();
+            validate_path_segment(path[0].as_ref());
+            let entry = self.inner.entry(path[0].as_ref().to_string()).or_default();
             entry.ensure_child(&path[1..])
         }
     }
@@ -65,7 +65,7 @@ impl ModelAnnotation {
     /// Ensure that the given value is present at the given path. If the value is not present,
     /// it is inserted. If the value exists, but is different, it is overwritten. Returns `true`
     /// if the value has been updated.
-    pub fn ensure_value(&mut self, path: &[&str], value: &str) -> bool {
+    pub fn ensure_value<T: AsRef<str>>(&mut self, path: &[T], value: &str) -> bool {
         let annotation = self.ensure_child(path);
         if let Some(current) = annotation.value.as_ref() {
             if current == value {
@@ -85,7 +85,7 @@ impl ModelAnnotation {
     ///
     /// Note that this function does not automatically add a newline to the given `value`.
     /// If you want the value to have newlines, you must add them yourself.
-    pub fn append_value(&mut self, path: &[&str], value: &str) {
+    pub fn append_value<T: AsRef<str>>(&mut self, path: &[T], value: &str) {
         let annotation = self.ensure_child(path);
         if let Some(current) = annotation.value.as_mut() {
             current.push_str(value);
@@ -96,12 +96,12 @@ impl ModelAnnotation {
 
     /// Retrieve an annotation value stored at the given path,
     /// or `None` if such path/value does not exist.
-    pub fn get_value(&self, path: &[&str]) -> Option<&String> {
+    pub fn get_value<T: AsRef<str>>(&self, path: &[T]) -> Option<&String> {
         if path.is_empty() {
             self.value.as_ref()
         } else {
             self.inner
-                .get(path[0])
+                .get(path[0].as_ref())
                 .and_then(|inner| inner.get_value(&path[1..]))
         }
     }
@@ -158,13 +158,13 @@ mod tests {
         assert!(annotation.value().is_none());
 
         // Return value of `ensure_value` is correct.
-        assert!(annotation.ensure_value(&[], "Value 1"));
+        assert!(annotation.ensure_value::<&str>(&[], "Value 1"));
         assert_eq!("Value 1", annotation.value().unwrap().as_str());
-        assert!(!annotation.ensure_value(&[], "Value 1"));
+        assert!(!annotation.ensure_value::<&str>(&[], "Value 1"));
 
         // Value append works:
-        annotation.ensure_value(&[], "Hello\n");
-        annotation.append_value(&[], "World\n");
+        annotation.ensure_value::<&str>(&[], "Hello\n");
+        annotation.append_value::<&str>(&[], "World\n");
         assert_eq!("Hello\nWorld\n", annotation.value().unwrap().as_str());
 
         // We can also add values/children through the mut bindings:

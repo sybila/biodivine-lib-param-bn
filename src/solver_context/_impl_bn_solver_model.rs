@@ -118,8 +118,7 @@ impl<'z3> BnSolverModel<'z3> {
     ) {
         let network = self.context.as_network();
         for variable in network.variables() {
-            if network.get_update_function(variable).is_none() {
-                let table = symbolic.get_implicit_function_table(variable);
+            if let Some(table) = symbolic.get_implicit_function_table(variable) {
                 for (input, bdd_var) in table {
                     let z3_term = self.context.mk_implicit_const_parameter(variable, &input);
                     let value = self.get_bool(&z3_term);

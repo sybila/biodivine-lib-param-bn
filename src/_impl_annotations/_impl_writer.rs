@@ -93,7 +93,7 @@ mod tests {
     pub fn annotation_read_write_test() {
         let mut annotations = ModelAnnotation::new();
         // "root" annotation
-        annotations.ensure_value(&[], "hello");
+        annotations.ensure_value::<&str>(&[], "hello");
         // normal annotation
         annotations.ensure_value(&["name"], "Model name");
         // Empty key and value

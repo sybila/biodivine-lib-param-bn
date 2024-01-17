@@ -788,7 +788,8 @@ impl SymbolicAsyncGraph {
             if let Some(specialised_function) = sub_network.get_update_function(sub_var) {
                 let function_table = self
                     .symbolic_context()
-                    .get_implicit_function_table(main_var);
+                    .get_implicit_function_table(main_var)
+                    .unwrap();
                 let function_args = main_network.regulators(main_var);
                 let specialised_function =
                     specialised_function.rename_all(&sub_to_main_map, &param_sub_to_main_map);

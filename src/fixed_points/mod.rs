@@ -265,7 +265,11 @@ impl FixedPoints {
                     }
                 }
             } else {
-                for p in ctx.get_implicit_function_table(*var).symbolic_variables() {
+                for p in ctx
+                    .get_implicit_function_table(*var)
+                    .unwrap()
+                    .symbolic_variables()
+                {
                     project.remove(p);
                 }
             }

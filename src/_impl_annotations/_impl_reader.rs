@@ -52,10 +52,10 @@ impl ModelAnnotation {
 
             // If the tree already has some value here, add a newline first.
             if child.value().is_some() {
-                child.append_value(&[], "\n");
+                child.append_value::<&str>(&[], "\n");
             }
             // Then push the new value.
-            child.append_value(&[], annotation);
+            child.append_value::<&str>(&[], annotation);
         }
 
         result
