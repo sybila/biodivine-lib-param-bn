@@ -157,6 +157,13 @@ impl SymbolicContext {
         (0..self.explicit_function_tables.len()).map(ParameterId::from_index)
     }
 
+    /// The list of all network variables that have an associated implicit parameter function.
+    pub fn network_implicit_parameters(&self) -> Vec<VariableId> {
+        self.network_variables()
+            .filter(|it| self.implicit_function_tables[it.to_index()].is_some())
+            .collect()
+    }
+
     /// Obtain a [ParameterId] of a parameter function based on a name.
     pub fn find_network_parameter(&self, name: &str) -> Option<ParameterId> {
         self.explicit_function_tables
@@ -168,6 +175,14 @@ impl SymbolicContext {
     /// Obtain the arity of an underlying parameter function.
     pub fn get_network_parameter_arity(&self, id: ParameterId) -> u16 {
         self.explicit_function_tables[id.to_index()].arity
+    }
+
+    /// Obtain the arity of an underlying implicit function.
+    pub fn get_network_implicit_parameter_arity(&self, id: VariableId) -> u16 {
+        self.implicit_function_tables[id.to_index()]
+            .as_ref()
+            .unwrap()
+            .arity
     }
 
     /// Obtain the name of an underlying parameter function.
@@ -361,15 +376,8 @@ impl SymbolicContext {
     }
 
     /// Getter for the entire function table of an implicit update function.
-    pub fn get_implicit_function_table(&self, variable: VariableId) -> &FunctionTable {
-        let table = &self.implicit_function_tables[variable.0];
-        let table = table.as_ref().unwrap_or_else(|| {
-            panic!(
-                "Variable {:?} does not have an implicit uninterpreted function.",
-                variable
-            );
-        });
-        table
+    pub fn get_implicit_function_table(&self, variable: VariableId) -> Option<&FunctionTable> {
+        self.implicit_function_tables[variable.0].as_ref()
     }
 
     /// Getter for the entire function table of an explicit parameter.
@@ -445,12 +453,9 @@ impl SymbolicContext {
         }
     }
 
-    /// **(internal)** Create a `Bdd` that is true when given `FunctionTable` evaluates to true,
+    /// Create a `Bdd` that is true when given `FunctionTable` evaluates to true,
     /// assuming each argument is true when the corresponding `Bdd` in the `args` array is true.
-    ///
-    /// Note that this actually allows functions which do not have just variables as arguments.
-    //  In the future we can use this to build truly universal uninterpreted functions.
-    fn mk_function_table_true(&self, function_table: &FunctionTable, args: &[Bdd]) -> Bdd {
+    pub fn mk_function_table_true(&self, function_table: &FunctionTable, args: &[Bdd]) -> Bdd {
         let mut result = self.bdd.mk_true();
         for (input_row, output) in function_table {
             let row_true = input_row
