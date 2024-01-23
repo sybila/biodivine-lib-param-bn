@@ -287,6 +287,8 @@ impl SymbolicContext {
         for table in implicit_function_tables.iter().flatten() {
             parameter_variables.extend_from_slice(&table.rows);
         }
+        // People will probably expect these to be sorted.
+        parameter_variables.sort();
 
         SymbolicContext {
             bdd: builder.build(),
