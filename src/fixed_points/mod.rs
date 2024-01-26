@@ -31,7 +31,7 @@ use crate::Space;
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
 use crate::symbolic_async_graph::projected_iteration::MixedProjection;
-use crate::{BooleanNetwork, VariableId};
+use crate::{global_log_level, log_essential, never_stop, should_log, BooleanNetwork, VariableId};
 pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
@@ -147,7 +147,16 @@ impl FixedPoints {
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphColoredVertices {
-        if cfg!(feature = "print-progress") {
+        Self::_symbolic(stg, restriction, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _symbolic<E, F: Fn() -> Result<(), E>>(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<GraphColoredVertices, E> {
+        if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
@@ -155,21 +164,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge: Vec<Bdd> = stg
-            .variables()
-            .map(|var| {
-                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
-                let is_stable = stg.unit_colored_vertices().minus(&can_step);
-                if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Created initial set for {:?} using {} BDD nodes.",
-                        var,
-                        is_stable.symbolic_size()
-                    );
-                }
-                is_stable.into_bdd()
-            })
-            .collect();
+        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
 
         /*
            Note to self: There is actually a marginally faster version of this algorithm that
@@ -183,15 +178,19 @@ impl FixedPoints {
             to_merge.push(restriction.as_bdd().clone());
         }
 
+        interrupt()?;
+
         let fixed_points = Self::symbolic_merge(
             stg.symbolic_context().bdd_variable_set(),
             to_merge,
             HashSet::default(),
         );
 
+        interrupt()?;
+
         let fixed_points = stg.unit_colored_vertices().copy(fixed_points);
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] fixed-points.",
                 fixed_points.approx_cardinality(),
@@ -199,7 +198,7 @@ impl FixedPoints {
             );
         }
 
-        fixed_points
+        Ok(fixed_points)
     }
 
     /// This is a general symbolic projected fixed-point algorithm. It works on the same
@@ -231,21 +230,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge: Vec<Bdd> = stg
-            .variables()
-            .map(|var| {
-                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
-                let is_stable = stg.unit_colored_vertices().minus(&can_step);
-                if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Created initial set for {:?} using {} BDD nodes.",
-                        var,
-                        is_stable.symbolic_size()
-                    );
-                }
-                is_stable.into_bdd()
-            })
-            .collect();
+        let mut to_merge = Self::prepare_to_merge(stg, global_log_level(), &never_stop).unwrap();
 
         // Now compute the BDD variables that should be projected away.
         let ctx = stg.symbolic_context();
@@ -312,8 +297,18 @@ impl FixedPoints {
         universe: &BddVariableSet,
         to_merge: Vec<Bdd>,
         // The set of variables that will be eliminated from the result.
-        mut project: HashSet<BddVariable>,
+        project: HashSet<BddVariable>,
     ) -> Bdd {
+        Self::_symbolic_merge(universe, to_merge, project, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _symbolic_merge<E, F: Fn() -> Result<(), E>>(
+        universe: &BddVariableSet,
+        to_merge: Vec<Bdd>,
+        mut project: HashSet<BddVariable>,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Bdd, E> {
         // First, assign each merge item a unique integer identifier.
         let mut to_merge: HashMap<usize, Bdd> = to_merge.into_iter().enumerate().collect();
 
@@ -339,6 +334,7 @@ impl FixedPoints {
 
         let mut result = universe.mk_true();
         let mut merged = HashSet::new();
+        interrupt()?;
 
         /*
            Note to self: It seems that not all projections are always beneficial to the BDD size.
@@ -356,8 +352,9 @@ impl FixedPoints {
                 if dependencies.is_subset(&merged) {
                     result = result.var_exists(p_var);
                     project.remove(&p_var);
+                    interrupt()?;
 
-                    if cfg!(feature = "print-progress") {
+                    if log_essential(log_level, result.size()) {
                         println!(" > Projection. New result has {} BDD nodes. Remaining projections: {}.",
                                  result.size(),
                                  project.len()
@@ -383,6 +380,8 @@ impl FixedPoints {
                     &result,
                     biodivine_lib_bdd::op_function::and,
                 );
+                interrupt()?;
+
                 if let Some(bdd) = bdd {
                     // At this point, the size of the BDD should be smaller or equal to the
                     // best result, so we can just update it.
@@ -401,10 +400,10 @@ impl FixedPoints {
                 merged.insert(best_index);
 
                 if result.is_false() {
-                    return universe.mk_false();
+                    return Ok(universe.mk_false());
                 }
 
-                if cfg!(feature = "print-progress") {
+                if log_essential(log_level, result.size()) {
                     println!(
                         " > Merge. New result has {} BDD nodes. Remaining constraints: {}.",
                         result.size(),
@@ -414,7 +413,9 @@ impl FixedPoints {
             }
         }
 
-        if cfg!(feature = "print-progress") {
+        interrupt()?;
+
+        if should_log(log_level) {
             println!("Merge finished with {} BDD nodes.", result.size(),);
         }
 
@@ -423,7 +424,7 @@ impl FixedPoints {
         // And everything was merged.
         assert_eq!(merged.len(), support_sets.len());
 
-        result
+        Ok(result)
     }
 
     /// The result of the function are all vertices that can appear as fixed-points for **some**
@@ -444,7 +445,16 @@ impl FixedPoints {
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphVertices {
-        if cfg!(feature = "print-progress") {
+        Self::_symbolic_vertices(stg, restriction, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _symbolic_vertices<E, F: Fn() -> Result<(), E>>(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<GraphVertices, E> {
+        if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point vertex search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
@@ -452,21 +462,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge: Vec<Bdd> = stg
-            .variables()
-            .map(|var| {
-                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
-                let is_stable = stg.unit_colored_vertices().minus(&can_step);
-                if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Created initial set for {:?} using {} BDD nodes.",
-                        var,
-                        is_stable.symbolic_size()
-                    );
-                }
-                is_stable.into_bdd()
-            })
-            .collect();
+        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
 
         // Finally add the global requirement on the whole state space, if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
@@ -480,12 +476,16 @@ impl FixedPoints {
             .cloned()
             .collect();
 
+        interrupt()?;
+
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
         let vertices = stg.empty_colored_vertices().vertices().copy(bdd);
 
-        if cfg!(feature = "print-progress") {
+        interrupt()?;
+
+        if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] fixed-point vertices.",
                 vertices.approx_cardinality(),
@@ -493,7 +493,7 @@ impl FixedPoints {
             );
         }
 
-        vertices
+        Ok(vertices)
     }
 
     /// Similar to `Self::symbolic_vertices`, but only returns colors for which there exists
@@ -502,7 +502,16 @@ impl FixedPoints {
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphColors {
-        if cfg!(feature = "print-progress") {
+        Self::_symbolic_colors(stg, restriction, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _symbolic_colors<E, F: Fn() -> Result<(), E>>(
+        stg: &SymbolicAsyncGraph,
+        restriction: &GraphColoredVertices,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<GraphColors, E> {
+        if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point color search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
@@ -510,21 +519,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge: Vec<Bdd> = stg
-            .variables()
-            .map(|var| {
-                let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
-                let is_stable = restriction.minus(&can_step);
-                if cfg!(feature = "print-progress") {
-                    println!(
-                        " > Created initial set for {:?} using {} BDD nodes.",
-                        var,
-                        is_stable.symbolic_size()
-                    );
-                }
-                is_stable.into_bdd()
-            })
-            .collect();
+        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
 
         // Finally add the global requirement on the whole state space, if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
@@ -538,12 +533,16 @@ impl FixedPoints {
             .cloned()
             .collect();
 
+        interrupt()?;
+
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
         let colors = stg.empty_colored_vertices().colors().copy(bdd);
 
-        if cfg!(feature = "print-progress") {
+        interrupt()?;
+
+        if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] fixed-point colors.",
                 colors.approx_cardinality(),
@@ -551,7 +550,7 @@ impl FixedPoints {
             );
         }
 
-        colors
+        Ok(colors)
     }
 
     /// This function creates an iterator that yields symbolic sets of fixed-point states, such
@@ -682,6 +681,29 @@ impl FixedPoints {
         }
 
         solver
+    }
+
+    fn prepare_to_merge<E, F: Fn() -> Result<(), E>>(
+        stg: &SymbolicAsyncGraph,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Vec<Bdd>, E> {
+        let mut to_merge = Vec::new();
+        for var in stg.variables() {
+            let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
+            let is_stable = stg.unit_colored_vertices().minus(&can_step);
+            interrupt()?;
+
+            if log_essential(log_level, is_stable.symbolic_size()) {
+                println!(
+                    " > Created initial set for {:?} using {} BDD nodes.",
+                    var,
+                    is_stable.symbolic_size()
+                );
+            }
+            to_merge.push(is_stable.into_bdd());
+        }
+        Ok(to_merge)
     }
 }
 

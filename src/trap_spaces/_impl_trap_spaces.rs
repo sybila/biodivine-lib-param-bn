@@ -1,7 +1,7 @@
 use crate::biodivine_std::traits::Set;
 use crate::fixed_points::FixedPoints;
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext, TrapSpaces};
-use crate::BooleanNetwork;
+use crate::{global_log_level, log_essential, never_stop, should_log, BooleanNetwork};
 use std::collections::HashSet;
 
 impl TrapSpaces {
@@ -14,7 +14,18 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         restriction: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
-        if cfg!(feature = "print-progress") {
+        Self::_essential_symbolic(network, ctx, restriction, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    pub fn _essential_symbolic<E, F: Fn() -> Result<(), E>>(
+        network: &BooleanNetwork,
+        ctx: &SymbolicSpaceContext,
+        restriction: &NetworkColoredSpaces,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<NetworkColoredSpaces, E> {
+        if should_log(log_level) {
             println!(
                 "Start symbolic essential trap space search with {}[nodes:{}] candidates.",
                 restriction.approx_cardinality(),
@@ -36,23 +47,33 @@ impl TrapSpaces {
                     .mk_implicit_function_is_true(var, &regulators)
             };
             let not_update_bdd = update_bdd.not();
+            interrupt()?;
 
-            let has_up_transition = ctx.mk_can_go_to_true(&update_bdd);
-            let has_down_transition = ctx.mk_can_go_to_true(&not_update_bdd);
+            let has_up_transition = ctx._mk_can_go_to_true(&update_bdd, log_level, interrupt)?;
+            interrupt()?;
+
+            let has_down_transition =
+                ctx._mk_can_go_to_true(&not_update_bdd, log_level, interrupt)?;
+            interrupt()?;
 
             let true_var = ctx.get_positive_variable(var);
             let false_var = ctx.get_negative_variable(var);
+
             let is_trap_1 = has_up_transition.imp(&bdd_ctx.mk_var(true_var));
             let is_trap_2 = has_down_transition.imp(&bdd_ctx.mk_var(false_var));
             let is_trap = is_trap_1.and(&is_trap_2);
+            interrupt()?;
+
             let is_essential_1 = bdd_ctx.mk_var(true_var).and(&bdd_ctx.mk_var(false_var));
             let is_essential_2 = has_up_transition.and(&has_down_transition);
             let is_essential = is_essential_1.imp(&is_essential_2);
+            interrupt()?;
+
             // This will work in next version of lib-bdd:
             // let is_trap = bdd!(bdd_ctx, (has_up_transition => true_var) & (has_down_transition => false_var));
             // let is_essential = bdd!(bdd_ctx, (true_var & false_var) => (has_up_transition & has_down_transition));
 
-            if cfg!(feature = "print-progress") {
+            if log_essential(log_level, is_trap.size() + is_essential.size()) {
                 println!(
                     " > Created initial sets for {:?} using {}+{} BDD nodes.",
                     var,
@@ -62,22 +83,28 @@ impl TrapSpaces {
             }
 
             to_merge.push(is_trap.and(&is_essential));
-            //to_merge.push(is_essential);
         }
 
-        let trap_spaces = FixedPoints::symbolic_merge(bdd_ctx, to_merge, HashSet::default());
-
+        let trap_spaces = FixedPoints::_symbolic_merge(
+            bdd_ctx,
+            to_merge,
+            HashSet::default(),
+            log_level,
+            interrupt,
+        )?;
         let trap_spaces = NetworkColoredSpaces::new(trap_spaces, ctx);
+        interrupt()?;
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
-                "Found {}[nodes:{}] essential trap spaces.",
-                trap_spaces.approx_cardinality(),
+                "Found {}x{}[nodes:{}] essential trap spaces.",
+                trap_spaces.colors().approx_cardinality(),
+                trap_spaces.spaces().approx_cardinality(),
                 trap_spaces.symbolic_size(),
             );
         }
 
-        trap_spaces
+        Ok(trap_spaces)
     }
 
     /// Computes the minimal coloured trap spaces of the provided `network` within the specified
@@ -90,8 +117,18 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         restriction: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
-        let essential = Self::essential_symbolic(network, ctx, restriction);
-        Self::minimize(ctx, &essential)
+        Self::_minimal_symbolic(network, ctx, restriction, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _minimal_symbolic<E, F: Fn() -> Result<(), E>>(
+        network: &BooleanNetwork,
+        ctx: &SymbolicSpaceContext,
+        restriction: &NetworkColoredSpaces,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<NetworkColoredSpaces, E> {
+        let essential = Self::_essential_symbolic(network, ctx, restriction, log_level, interrupt)?;
+        Self::_minimize(ctx, &essential, log_level, interrupt)
     }
 
     /// Compute the minimal spaces within a particular subset.
@@ -99,13 +136,23 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         spaces: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
+        Self::_minimize(ctx, spaces, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _minimize<E, F: Fn() -> Result<(), E>>(
+        ctx: &SymbolicSpaceContext,
+        spaces: &NetworkColoredSpaces,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<NetworkColoredSpaces, E> {
         let mut original = spaces.clone();
         let mut minimal = ctx.mk_empty_colored_spaces();
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
-                "Start minimal space search with {}[nodes:{}] candidates.",
-                original.approx_cardinality(),
+                "Start minimal subspace search with {}x{}[nodes:{}] candidates.",
+                original.colors().approx_cardinality(),
+                original.spaces().approx_cardinality(),
                 original.symbolic_size()
             );
         }
@@ -125,6 +172,8 @@ impl TrapSpaces {
             //  "greedy" method using pick is good enough. Initial tests indicate that the
             //  greedy approach is enough.
             let minimum_candidate = original.pick_space();
+            interrupt()?;
+
             // Compute the set of strict super spaces.
             // TODO:
             //  This can take a long time if there are colors and a lot of traps, e.g.
@@ -132,24 +181,32 @@ impl TrapSpaces {
             //  find a way to get rid of fixed points and any related super-spaces first,
             //  as these are clearly minimal. The other option would be to tune the super
             //  space enumeration to avoid spaces that are clearly irrelevant anyway.
-            let super_spaces = ctx.mk_super_spaces(minimum_candidate.as_bdd());
+            let super_spaces =
+                ctx._mk_super_spaces(minimum_candidate.as_bdd(), log_level, interrupt)?;
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
+            interrupt()?;
 
             original = original.minus(&super_spaces);
             minimal = minimal.minus(&super_spaces).union(&minimum_candidate);
+            interrupt()?;
 
-            if cfg!(feature = "print-progress") {
+            if log_essential(
+                log_level,
+                original.symbolic_size() + minimal.symbolic_size(),
+            ) {
                 println!(
-                    "Minimization in progress: {}[nodes:{}] unprocessed, {}[nodes:{}] candidates.",
-                    original.approx_cardinality(),
+                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] candidates.",
+                    original.colors().approx_cardinality(),
+                    original.spaces().approx_cardinality(),
                     original.symbolic_size(),
-                    minimal.approx_cardinality(),
+                    minimal.colors().approx_cardinality(),
+                    minimal.spaces().approx_cardinality(),
                     minimal.symbolic_size(),
                 );
             }
         }
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] minimal spaces.",
                 minimal.approx_cardinality(),
@@ -157,7 +214,7 @@ impl TrapSpaces {
             );
         }
 
-        minimal
+        Ok(minimal)
     }
 
     /// The same as [Self::minimize], but searches for maximal spaces within `spaces`.
@@ -165,46 +222,65 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         spaces: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
+        Self::_maximize(ctx, spaces, global_log_level(), &never_stop).unwrap()
+    }
+
+    pub fn _maximize<E, F: Fn() -> Result<(), E>>(
+        ctx: &SymbolicSpaceContext,
+        spaces: &NetworkColoredSpaces,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<NetworkColoredSpaces, E> {
         let mut original = spaces.clone();
         let mut maximal = ctx.mk_empty_colored_spaces();
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
-                "Start maximal space search with {}[nodes:{}] candidates.",
-                original.approx_cardinality(),
+                "Start maximal subspace search with {}x{}[nodes:{}] candidates.",
+                original.colors().approx_cardinality(),
+                original.spaces().approx_cardinality(),
                 original.symbolic_size()
             );
         }
 
         while !original.is_empty() {
             let maximum_candidate = original.pick_space();
+            interrupt()?;
+
             // Compute the set of strict sub spaces.
             let super_spaces = ctx.mk_sub_spaces(maximum_candidate.as_bdd());
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
+            interrupt()?;
 
             original = original.minus(&super_spaces);
             maximal = maximal.minus(&super_spaces).union(&maximum_candidate);
+            interrupt()?;
 
-            if cfg!(feature = "print-progress") {
+            if log_essential(
+                log_level,
+                original.symbolic_size() + maximal.symbolic_size(),
+            ) {
                 println!(
-                    "Maximization in progress: {}[nodes:{}] unprocessed, {}[nodes:{}] candidates.",
-                    original.approx_cardinality(),
+                    "Maximization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] candidates.",
+                    original.colors().approx_cardinality(),
+                    original.spaces().approx_cardinality(),
                     original.symbolic_size(),
-                    maximal.approx_cardinality(),
+                    maximal.colors().approx_cardinality(),
+                    maximal.spaces().approx_cardinality(),
                     maximal.symbolic_size(),
                 );
             }
         }
 
-        if cfg!(feature = "print-progress") {
+        if should_log(log_level) {
             println!(
-                "Found {}[nodes:{}] minimal spaces.",
+                "Found {}[nodes:{}] maximal spaces.",
                 maximal.approx_cardinality(),
                 maximal.symbolic_size(),
             );
         }
 
-        maximal
+        Ok(maximal)
     }
 }
 
