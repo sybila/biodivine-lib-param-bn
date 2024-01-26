@@ -1,6 +1,8 @@
 use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
 use crate::trap_spaces::{NetworkColoredSpaces, NetworkSpaces, SymbolicSpaceContext};
-use crate::{BooleanNetwork, ExtendedBoolean, Space, VariableId};
+use crate::{
+    global_log_level, log_essential, never_stop, BooleanNetwork, ExtendedBoolean, Space, VariableId,
+};
 use biodivine_lib_bdd::{bdd, Bdd, BddPartialValuation, BddVariable, BddVariableSet};
 use std::collections::HashMap;
 
@@ -107,6 +109,16 @@ impl SymbolicSpaceContext {
     /// these are to some extent still interesting in some applications.
     ///
     pub fn mk_can_go_to_true(&self, function: &Bdd) -> Bdd {
+        self._mk_can_go_to_true(function, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    pub fn _mk_can_go_to_true<E, F: Fn() -> Result<(), E>>(
+        &self,
+        function: &Bdd,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Bdd, E> {
         let bdd_vars = self.inner_ctx.bdd_variable_set();
         // Only constrain variables that are relevant to `functions`.
         let support_set = {
@@ -129,8 +141,17 @@ impl SymbolicSpaceContext {
             let (t_var, f_var) = self.dual_variables[index];
             let is_in_space = bdd!(bdd_vars, (state_var => t_var) & ((!state_var) => f_var));
             result = result.and(&is_in_space).var_exists(state_var);
+            interrupt()?;
+
+            if log_essential(log_level, result.size()) {
+                println!(
+                    "Computing can-go-to-true: {}[nodes:{}].",
+                    result.cardinality(),
+                    result.size(),
+                );
+            }
         }
-        result
+        Ok(result)
     }
 
     /// Compute a [Bdd] of all spaces that are a super-space of the elements in `spaces`.
@@ -140,28 +161,22 @@ impl SymbolicSpaceContext {
     /// and `O(n)` BDD ops to converge (`n` being the number of network variables).
     ///
     pub fn mk_super_spaces(&self, spaces: &Bdd) -> Bdd {
+        self._mk_super_spaces(spaces, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    pub fn _mk_super_spaces<E, F: Fn() -> Result<(), E>>(
+        &self,
+        spaces: &Bdd,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
         for (t_var, f_var) in self.dual_variables.iter().rev() {
             // Select every space in which we have `t_var=false`, but there is
             // no equivalent space with `t_var=true`. Flips `t_var` on output,
             // meaning we actually get the set of super spaces where `true` is added.
-            /*
-            Not sure of ternary actually helps here. Should test at some point.
-            let restricted = result.var_select(*t_var, false);
-            let adds_true = Bdd::fused_binary_flip_op(
-                (&restricted, None),
-                (&result, Some(*t_var)),
-                Some(*t_var),
-                and_not
-            );
-            let restricted = result.var_select(*f_var, false);
-            let adds_false = Bdd::fused_binary_flip_op(
-                (&restricted, None),
-                (&result, Some(*f_var)),
-                Some(*f_var),
-                and_not
-            );*/
             let t_var_bdd = vars.mk_literal(*t_var, false);
             let adds_true = Bdd::fused_ternary_flip_op(
                 (&result, None),
@@ -170,6 +185,8 @@ impl SymbolicSpaceContext {
                 Some(*t_var),
                 and_and_not,
             );
+            interrupt()?;
+
             // Symmetrically for `t_false`.
             let f_var_bdd = vars.mk_literal(*f_var, false);
             let adds_false = Bdd::fused_ternary_flip_op(
@@ -179,9 +196,12 @@ impl SymbolicSpaceContext {
                 Some(*f_var),
                 and_and_not,
             );
+            interrupt()?;
+
             if !adds_true.is_false() || !adds_false.is_false() {
                 result = bdd!(vars, result | (adds_true | adds_false));
-                if cfg!(feature = "print-progress") && result.size() > 100_000 {
+                interrupt()?;
+                if log_essential(log_level, result.size()) {
                     println!(
                         "Computing super-spaces: {}[nodes:{}].",
                         result.cardinality(),
@@ -190,13 +210,23 @@ impl SymbolicSpaceContext {
                 }
             }
         }
-        result
+        Ok(result)
     }
 
     /// Compute a [Bdd] of all spaces that are a sub-space of the elements in `spaces`.
     ///
     /// The same notes as for [SymbolicSpaceContext::mk_super_spaces] apply.
     pub fn mk_sub_spaces(&self, spaces: &Bdd) -> Bdd {
+        self._mk_sub_spaces(spaces, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    pub fn _mk_sub_spaces<E, F: Fn() -> Result<(), E>>(
+        &self,
+        spaces: &Bdd,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
         for (t_var, f_var) in self.dual_variables.clone().into_iter().rev() {
@@ -212,6 +242,8 @@ impl SymbolicSpaceContext {
                 Some(t_var),
                 and_and_not,
             );
+            interrupt()?;
+
             // Symmetrically for `t_false`.
             let removes_false = Bdd::fused_ternary_flip_op(
                 (&result, None),
@@ -220,9 +252,13 @@ impl SymbolicSpaceContext {
                 Some(f_var),
                 and_and_not,
             );
+            interrupt()?;
+
             if !removes_true.is_false() || !removes_false.is_false() {
                 result = bdd!(vars, result | (removes_true | removes_false));
-                if cfg!(feature = "print-progress") && result.size() > 100_000 {
+                interrupt()?;
+
+                if log_essential(log_level, result.size()) {
                     println!(
                         "Computing sub-spaces: {}[nodes:{}].",
                         result.cardinality(),
@@ -231,7 +267,7 @@ impl SymbolicSpaceContext {
                 }
             }
         }
-        result
+        Ok(result)
     }
 
     /// Construct a symbolic singleton for a [Space].

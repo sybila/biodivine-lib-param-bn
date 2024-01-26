@@ -74,6 +74,32 @@ lazy_static! {
     static ref ID_REGEX: Regex = Regex::new(ID_REGEX_STR).unwrap();
 }
 
+/* TODO: These log level utils can probably move to a separate util crate at some point. */
+/* TODO: Logging could be more useful, e.g. print line number and similar info. */
+const LOG_NOTHING: usize = 0;
+const LOG_ESSENTIAL: usize = 1;
+const LOG_VERBOSE: usize = 2;
+
+fn global_log_level() -> usize {
+    if cfg!(feature = "print-progress") {
+        1
+    } else {
+        0
+    }
+}
+
+fn log_essential(log_level: usize, symbolic_size: usize) -> bool {
+    log_level >= LOG_VERBOSE || (symbolic_size > 100_000 && log_level >= LOG_ESSENTIAL)
+}
+
+fn should_log(log_level: usize) -> bool {
+    log_level > LOG_NOTHING
+}
+
+fn never_stop() -> Result<(), ()> {
+    Ok(())
+}
+
 /// A type-safe index of a `Variable` inside a `RegulatoryGraph` (or a `BooleanNetwork`).
 ///
 /// If needed, it can be converted into `usize` for serialisation and safely read
