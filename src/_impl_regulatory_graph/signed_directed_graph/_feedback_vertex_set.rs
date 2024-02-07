@@ -1,9 +1,63 @@
 use crate::VariableId;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
-use std::cmp::Ordering;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 impl SdGraph {
+    /// A utility function that prunes the `candidates` set to a smaller subset that is still
+    /// guaranteed to be a valid FVS with respect to the specified cycle detection function.
+    ///
+    /// This is not the complete FVS approximation algorithm, but it is used multiple times,
+    /// so we abstract it into this helper method.
+    fn _fvs_helper<F: Fn(&HashSet<VariableId>, VariableId) -> Option<Vec<VariableId>>>(
+        &self,
+        subgraph: &mut HashSet<VariableId>,
+        mut candidates: HashSet<VariableId>,
+        compute_cycle: F,
+    ) -> HashSet<VariableId> {
+        let mut result = HashSet::new();
+
+        // The shortest known cycle in the current `subgraph` for the given `pivot`.
+        let mut shortest_cycle_for_pivot: HashMap<VariableId, Vec<VariableId>> = HashMap::new();
+
+        while !candidates.is_empty() {
+            // Ensure determinism.
+            let mut iterable = Vec::from_iter(candidates.clone());
+            iterable.sort();
+
+            let mut best = (VariableId(0), usize::MAX, 0);
+            for vertex in iterable {
+                let cycle = if let Some(known_cycle) = shortest_cycle_for_pivot.get(&vertex) {
+                    known_cycle
+                } else if let Some(computed_cycle) = compute_cycle(subgraph, vertex) {
+                    shortest_cycle_for_pivot
+                        .entry(vertex)
+                        .or_insert(computed_cycle)
+                } else {
+                    subgraph.remove(&vertex);
+                    candidates.remove(&vertex);
+                    continue;
+                };
+
+                let degree = self.approx_degree(vertex, subgraph);
+                if cycle.len() < best.1 || (cycle.len() == best.1 && degree > best.2) {
+                    best = (vertex, cycle.len(), degree);
+                }
+                if cycle.len() == 1 {
+                    // Self-loops are always optimal.
+                    break;
+                }
+            }
+
+            result.insert(best.0);
+            subgraph.remove(&best.0);
+            candidates.remove(&best.0);
+
+            shortest_cycle_for_pivot.retain(|_k, v| !v.contains(&best.0));
+        }
+
+        result
+    }
+
     /// Compute a feedback vertex set of the subgraph induced by the vertices in the
     /// given `restriction` set.
     ///
@@ -12,8 +66,7 @@ impl SdGraph {
     ///
     /// The algorithm attempts to minimize the size of the resulting FVS, but it
     /// is not guaranteed that the result is minimal, as the minimal FVS problem
-    /// is NP complete. Also note that while the *size* of the result is deterministic,
-    /// the actual vertices may not be as they depend on the iteration order of a `HashSet`.
+    /// is NP complete.
     ///
     /// The algorithm works by greedily picking vertices from the shortest cycles, prioritising
     /// vertices with the highest overall degree.
@@ -21,52 +74,19 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> HashSet<VariableId> {
-        let mut result = HashSet::new();
+        let candidates = restriction.clone();
 
-        // By preprocessing the state space into components, we avoid a lot of cycle detection
-        // that would otherwise just prove that the variable does not have any cycles.
-        let mut components = self.restricted_strongly_connected_components(restriction);
-        while let Some(mut scc) = components.pop() {
-            let mut best_candidate = (VariableId::from_index(0), usize::MAX, 0usize);
-            // Not particularly efficient but keeps the procedure deterministic.
-            // However, by a lucky coincidence, it also seems to on average improve the results :O
-            let mut scc_iter: Vec<VariableId> = scc.iter().cloned().collect();
-            scc_iter.sort();
-            for x in &scc_iter {
-                if let Some(cycle_length) = self.shortest_cycle_length(&scc, *x, best_candidate.1) {
-                    if cycle_length == 1 {
-                        // If the cycle has length one, it is guaranteed to appear in the FVS
-                        // and we can just stop looking for the other cycles.
-                        best_candidate = (*x, cycle_length, 0);
-                        break;
-                    }
-                    let degree = self.approx_degree(*x, &scc);
-                    match cycle_length.cmp(&best_candidate.1) {
-                        Ordering::Less => {
-                            // If this is the best cycle, just update it.
-                            best_candidate = (*x, cycle_length, degree);
-                        }
-                        Ordering::Equal => {
-                            // If this is equal to the best cycle, compare degrees.
-                            if degree > best_candidate.2 {
-                                best_candidate = (*x, cycle_length, degree);
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
+        // We then prune the candidates twice: First time, most of the uninteresting nodes are
+        // removed, second time then optimizes the result such that it is (usually) at least
+        // subset minimal. The minimality is still not guaranteed though.
 
-            assert_ne!(best_candidate.1, usize::MAX);
-            result.insert(best_candidate.0);
-            scc.remove(&best_candidate.0);
+        let candidates = self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
+            self.shortest_cycle(g, x, usize::MAX)
+        });
 
-            // Finally, run SCC decomposition again on the smaller component and "return" results
-            // back into processing.
-            components.append(&mut self.restricted_strongly_connected_components(&scc));
-        }
-
-        result
+        self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
+            self.shortest_cycle(g, x, usize::MAX)
+        })
     }
 
     /// Compute a feedback vertex set of the desired parity, considered within the subgraph induced
@@ -80,53 +100,15 @@ impl SdGraph {
         restriction: &HashSet<VariableId>,
         parity: Sign,
     ) -> HashSet<VariableId> {
-        let mut result = HashSet::new();
+        // We will be searching in a subset of a known FVS. This is because FVS detection is
+        // a bit faster and usually gives us a reasonable starting point.
+        let candidates = self.restricted_feedback_vertex_set(restriction);
 
-        let mut components = self.restricted_strongly_connected_components(restriction);
-        while let Some(mut scc) = components.pop() {
-            let mut best_candidate = (VariableId::from_index(0), usize::MAX, 0usize);
-            // Not particularly efficient but keeps the procedure deterministic.
-            // However, by a lucky coincidence, it also seems to on average improve the results :O
-            let mut scc_iter: Vec<VariableId> = scc.iter().cloned().collect();
-            scc_iter.sort();
-            for x in &scc_iter {
-                if let Some(cycle_length) =
-                    self.shortest_parity_cycle_length(&scc, *x, parity, best_candidate.1)
-                {
-                    if cycle_length == 1 {
-                        // If the cycle has length one, it is guaranteed to appear in the FVS
-                        // and we can just stop looking for any other cycles.
-                        best_candidate = (*x, cycle_length, 0);
-                        break;
-                    }
-                    let degree = self.approx_degree(*x, &scc);
-                    match cycle_length.cmp(&best_candidate.1) {
-                        Ordering::Less => {
-                            // If this is the best cycle, just update it.
-                            best_candidate = (*x, cycle_length, degree);
-                        }
-                        Ordering::Equal => {
-                            // If this is equal to the best cycle, compare degrees.
-                            if degree > best_candidate.2 {
-                                best_candidate = (*x, cycle_length, degree);
-                            }
-                        }
-                        _ => (),
-                    }
-                }
-            }
-
-            if best_candidate.1 == usize::MAX {
-                // No cycles found.
-                continue;
-            }
-
-            result.insert(best_candidate.0);
-            scc.remove(&best_candidate.0);
-            components.append(&mut self.restricted_strongly_connected_components(&scc));
-        }
-
-        result
+        // The same as normal FVS method, but uses different cycle detection. Here, we don't
+        // repeat it again, because in most cases it is not needed.
+        self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
+            self.shortest_parity_cycle(g, x, parity, usize::MAX)
+        })
     }
 
     /// **(internal)** Compute the degree of a vertex within the given set.
@@ -156,7 +138,7 @@ mod tests {
 
     #[test]
     pub fn test_feedback_vertex_set() {
-        // Its a similar test graph to the one used for component computation,
+        // It's a similar test graph to the one used for component computation,
         // but `b_1 -> b_2` is a negative cycle and the `d`-component has both one positive and
         // one negative cycle. Finally, `e` has a positive self-loop
         let rg = RegulatoryGraph::try_from(
