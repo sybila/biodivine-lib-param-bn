@@ -74,27 +74,7 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> HashSet<VariableId> {
-        let mut candidates = restriction.clone();
-
-        // Preprocessing to remove all nodes with less than two outgoing edges that don't have
-        // a self-loop. (These are either outputs: useless; or are equivalent to the node on the
-        // other end of the single edge. The only exception are self-loop outputs, since these
-        // actually need to be in the FVS)
-        for x in restriction {
-            let mut target_count = 0;
-            let mut has_self_loop = false;
-            for (succ, _) in &self.successors[x.to_index()] {
-                if succ == x {
-                    has_self_loop = true;
-                }
-                if restriction.contains(succ) {
-                    target_count += 1;
-                }
-            }
-            if !has_self_loop && target_count <= 1 {
-                candidates.remove(x);
-            }
-        }
+        let candidates = restriction.clone();
 
         // We then prune the candidates twice: First time, most of the uninteresting nodes are
         // removed, second time then optimizes the result such that it is (usually) at least
