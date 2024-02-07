@@ -40,6 +40,7 @@ print-progress = []
 solver-z3 = ["dep:z3"]
 
 [dependencies]
+fxhash = "0.2.1"
 regex = "1.10.2"                # Regexes used for parsing of basic .aeon constructs.
 lazy_static = "1.4.0"           # Used for initialization of commonly used regexes.
 biodivine-lib-bdd = ">=0.5.6, <1.0.0"

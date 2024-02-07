@@ -39,7 +39,7 @@ impl From<&RegulatoryGraph> for SdGraph {
                 }
             }
 
-            // Variables should be well ordered, but just in case...
+            // Variables should be well-ordered, but just in case...
             assert_eq!(var.to_index(), successors.len());
 
             successors.push(next_step);
