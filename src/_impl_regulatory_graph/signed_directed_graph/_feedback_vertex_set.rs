@@ -167,8 +167,6 @@ mod tests {
         let d_3 = rg.find_variable("d_3").unwrap();
         let e = rg.find_variable("e").unwrap();
 
-        println!("{:?}", rg.variable_names());
-
         let graph = SdGraph::from(&rg);
 
         let vertices = graph.mk_all_vertices();

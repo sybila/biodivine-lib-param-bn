@@ -26,9 +26,8 @@ fn main() {
     // Finally, for every variable, we check that there are indeed no negative cycles.
     for x in model.variables() {
         if restriction.contains(&x) {
-            assert!(graph
-                .shortest_parity_cycle(&restriction, x, Negative, usize::MAX)
-                .is_none());
+            let cycle = graph.shortest_parity_cycle(&restriction, x, Negative, usize::MAX);
+            assert!(cycle.is_none(), "Parity cycle {:?} found for {}.", cycle, x);
         }
     }
     println!("{}, {}", n_fvs.len(), elapsed.as_millis());
