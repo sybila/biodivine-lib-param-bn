@@ -48,6 +48,11 @@ impl SdGraph {
                 }
             }
 
+            if best.1 == usize::MAX {
+                // The remaining graph is acyclic!
+                return result;
+            }
+
             result.insert(best.0);
             subgraph.remove(&best.0);
             candidates.remove(&best.0);
@@ -132,9 +137,10 @@ impl SdGraph {
 
 #[cfg(test)]
 mod tests {
-    use crate::RegulatoryGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::SdGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::Sign::{Negative, Positive};
+    use crate::{BooleanNetwork, RegulatoryGraph, VariableId};
+    use std::collections::HashSet;
 
     #[test]
     pub fn test_feedback_vertex_set() {
@@ -193,5 +199,23 @@ mod tests {
         assert!(fvs.contains(&d_1) || fvs.contains(&d_2));
         assert!(p_fvs.contains(&d_1) || p_fvs.contains(&d_2));
         assert!(n_fvs.contains(&d_1) || n_fvs.contains(&d_2) || n_fvs.contains(&d_3));
+    }
+
+    #[test]
+    fn test_feedback_vertex_set_2() {
+        let bn = BooleanNetwork::try_from(
+            r#"
+            a -> b
+            b -|? c
+            c -? a
+            a -| c
+            c -> d
+            e -| b
+        "#,
+        )
+        .unwrap();
+
+        let expected = HashSet::from_iter([VariableId::from_index(2)]);
+        assert_eq!(expected, bn.as_graph().feedback_vertex_set());
     }
 }
