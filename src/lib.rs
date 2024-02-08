@@ -171,10 +171,10 @@ pub struct Parameter {
 /// or a `BooleanNetwork`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Regulation {
-    regulator: VariableId,
-    target: VariableId,
-    observable: bool,
-    monotonicity: Option<Monotonicity>,
+    pub regulator: VariableId,
+    pub target: VariableId,
+    pub observable: bool,
+    pub monotonicity: Option<Monotonicity>,
 }
 
 /// A directed graph representing relationships between a collection of Boolean variables
