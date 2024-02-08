@@ -18,6 +18,8 @@ impl TrapSpaces {
             .unwrap()
     }
 
+    /// A version of [TrapSpaces::essential_symbolic] with cancellation
+    /// and logging.
     pub fn _essential_symbolic<E, F: Fn() -> Result<(), E>>(
         network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
@@ -120,6 +122,8 @@ impl TrapSpaces {
         Self::_minimal_symbolic(network, ctx, restriction, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [TrapSpaces::minimal_symbolic] with cancellation
+    /// and logging.
     pub fn _minimal_symbolic<E, F: Fn() -> Result<(), E>>(
         network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
@@ -139,6 +143,8 @@ impl TrapSpaces {
         Self::_minimize(ctx, spaces, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [TrapSpaces::minimize] with cancellation
+    /// and logging.
     pub fn _minimize<E, F: Fn() -> Result<(), E>>(
         ctx: &SymbolicSpaceContext,
         spaces: &NetworkColoredSpaces,
@@ -225,6 +231,8 @@ impl TrapSpaces {
         Self::_maximize(ctx, spaces, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [TrapSpaces::maximize] with cancellation
+    /// and logging.
     pub fn _maximize<E, F: Fn() -> Result<(), E>>(
         ctx: &SymbolicSpaceContext,
         spaces: &NetworkColoredSpaces,

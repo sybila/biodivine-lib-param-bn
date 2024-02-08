@@ -150,6 +150,8 @@ impl FixedPoints {
         Self::_symbolic(stg, restriction, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [FixedPoints::symbolic] with cancellation
+    /// and logging.
     pub fn _symbolic<E, F: Fn() -> Result<(), E>>(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
@@ -302,6 +304,8 @@ impl FixedPoints {
         Self::_symbolic_merge(universe, to_merge, project, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [FixedPoints::symbolic_merge] with cancellation
+    /// and logging.
     pub fn _symbolic_merge<E, F: Fn() -> Result<(), E>>(
         universe: &BddVariableSet,
         to_merge: Vec<Bdd>,
@@ -448,6 +452,8 @@ impl FixedPoints {
         Self::_symbolic_vertices(stg, restriction, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [FixedPoints::symbolic_vertices] with cancellation
+    /// and logging.
     pub fn _symbolic_vertices<E, F: Fn() -> Result<(), E>>(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
@@ -505,6 +511,8 @@ impl FixedPoints {
         Self::_symbolic_colors(stg, restriction, global_log_level(), &never_stop).unwrap()
     }
 
+    /// A version of [FixedPoints::symbolic_colors] with cancellation
+    /// and logging.
     pub fn _symbolic_colors<E, F: Fn() -> Result<(), E>>(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,

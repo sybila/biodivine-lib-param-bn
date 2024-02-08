@@ -1,4 +1,4 @@
-use crate::{SdGraph, VariableId};
+use crate::{never_stop, should_log, SdGraph, VariableId, LOG_NOTHING};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -12,8 +12,20 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<HashSet<VariableId>> {
+        self._restricted_weakly_connected_components(restriction, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_weakly_connected_components] with cancellation
+    /// and logging.
+    pub fn _restricted_weakly_connected_components<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Vec<HashSet<VariableId>>, E> {
         if restriction.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
         let pivot = *restriction.iter().min().unwrap();
@@ -21,7 +33,9 @@ impl SdGraph {
         let mut component = HashSet::from([pivot]);
         loop {
             let fwd = self.restricted_forward_reachable(restriction, component.clone());
+            interrupt()?;
             let bwd = self.restricted_backward_reachable(restriction, component.clone());
+            interrupt()?;
             if fwd.is_subset(&component) && bwd.is_subset(&component) {
                 break;
             }
@@ -33,10 +47,18 @@ impl SdGraph {
         let new_restriction: HashSet<VariableId> =
             restriction.difference(&component).cloned().collect();
 
-        result.push(component);
-        result.append(&mut self.restricted_weakly_connected_components(&new_restriction));
+        if should_log(log_level) {
+            println!("Found weak component with {} vertices.", component.len());
+        }
 
-        result
+        result.push(component);
+        result.append(&mut self._restricted_weakly_connected_components(
+            &new_restriction,
+            log_level,
+            interrupt,
+        )?);
+
+        Ok(result)
     }
 }
 

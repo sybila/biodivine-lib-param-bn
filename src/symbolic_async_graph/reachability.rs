@@ -1,6 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::VariableId;
+use crate::{log_essential, never_stop, should_log, VariableId, LOG_ESSENTIAL, LOG_NOTHING};
 use std::cmp::max;
 use std::collections::{HashMap, HashSet};
 
@@ -108,7 +108,28 @@ impl Reachability {
         initial: &GraphColoredVertices,
         step: F,
     ) -> GraphColoredVertices {
-        if cfg!(feature = "print-progress") {
+        let log_level = if cfg!(feature = "print-progress") {
+            LOG_ESSENTIAL
+        } else {
+            LOG_NOTHING
+        };
+        Reachability::_reach(graph, initial, step, log_level, &never_stop).unwrap()
+    }
+
+    /// A version of [Reachability::reach] with cancellation
+    /// and logging.
+    pub fn _reach<F, E, I>(
+        graph: &SymbolicAsyncGraph,
+        initial: &GraphColoredVertices,
+        step: F,
+        log_level: usize,
+        interrupt: &I,
+    ) -> Result<GraphColoredVertices, E>
+    where
+        F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
+        I: Fn() -> Result<(), E>,
+    {
+        if should_log(log_level) {
             println!(
                 "Start symbolic reachability with {}[nodes:{}] candidates.",
                 initial.approx_cardinality(),
@@ -133,6 +154,8 @@ impl Reachability {
             })
             .collect::<HashMap<_, _>>();
 
+        interrupt()?;
+
         let mut result = initial.clone();
         let mut max_size = 0;
 
@@ -141,13 +164,15 @@ impl Reachability {
         'reach: loop {
             for var in graph.variables().rev() {
                 let next_step = step(graph, &result, var);
+                interrupt()?;
+
                 if next_step.is_empty() {
                     saturated.insert(var);
                 } else {
                     result = result.union(&next_step);
                     max_size = max(max_size, result.symbolic_size());
 
-                    if cfg!(feature = "print-progress") {
+                    if log_essential(log_level, result.symbolic_size()) {
                         let current = result.approx_cardinality();
                         let max = graph.unit_colored_vertices().approx_cardinality();
                         println!(
@@ -169,7 +194,7 @@ impl Reachability {
                 }
             }
 
-            if cfg!(feature = "print-progress") {
+            if should_log(log_level) {
                 println!(
                     "Structural reachability done: {}[nodes:{}] candidates. Max intermediate size: {}.",
                     result.approx_cardinality(),
@@ -178,7 +203,7 @@ impl Reachability {
                 );
             }
 
-            return result;
+            return Ok(result);
         }
     }
 }
