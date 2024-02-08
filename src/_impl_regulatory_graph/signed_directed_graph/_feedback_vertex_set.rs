@@ -1,5 +1,5 @@
-use crate::VariableId;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
+use crate::{never_stop, should_log, VariableId, LOG_NOTHING};
 use std::collections::{HashMap, HashSet};
 
 impl SdGraph {
@@ -8,18 +8,25 @@ impl SdGraph {
     ///
     /// This is not the complete FVS approximation algorithm, but it is used multiple times,
     /// so we abstract it into this helper method.
-    fn _fvs_helper<F: Fn(&HashSet<VariableId>, VariableId) -> Option<Vec<VariableId>>>(
+    fn _fvs_helper<F, E, I>(
         &self,
         subgraph: &mut HashSet<VariableId>,
         mut candidates: HashSet<VariableId>,
         compute_cycle: F,
-    ) -> HashSet<VariableId> {
+        log_level: usize,
+        interrupt: &I,
+    ) -> Result<HashSet<VariableId>, E>
+    where
+        F: Fn(&HashSet<VariableId>, VariableId) -> Option<Vec<VariableId>>,
+        I: Fn() -> Result<(), E>,
+    {
         let mut result = HashSet::new();
 
         // The shortest known cycle in the current `subgraph` for the given `pivot`.
         let mut shortest_cycle_for_pivot: HashMap<VariableId, Vec<VariableId>> = HashMap::new();
 
         while !candidates.is_empty() {
+            interrupt()?;
             // Ensure determinism.
             let mut iterable = Vec::from_iter(candidates.clone());
             iterable.sort();
@@ -29,6 +36,7 @@ impl SdGraph {
                 let cycle = if let Some(known_cycle) = shortest_cycle_for_pivot.get(&vertex) {
                     known_cycle
                 } else if let Some(computed_cycle) = compute_cycle(subgraph, vertex) {
+                    interrupt()?;
                     shortest_cycle_for_pivot
                         .entry(vertex)
                         .or_insert(computed_cycle)
@@ -50,7 +58,14 @@ impl SdGraph {
 
             if best.1 == usize::MAX {
                 // The remaining graph is acyclic!
-                return result;
+                return Ok(result);
+            }
+
+            if should_log(log_level) {
+                println!(
+                    "Selected {:?} as candidate with cycle length {}.",
+                    best.0, best.1
+                );
             }
 
             result.insert(best.0);
@@ -60,7 +75,7 @@ impl SdGraph {
             shortest_cycle_for_pivot.retain(|_k, v| !v.contains(&best.0));
         }
 
-        result
+        Ok(result)
     }
 
     /// Compute a feedback vertex set of the subgraph induced by the vertices in the
@@ -79,19 +94,59 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> HashSet<VariableId> {
+        self._restricted_feedback_vertex_set(restriction, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_feedback_vertex_set] with cancellation
+    /// and logging.
+    pub fn _restricted_feedback_vertex_set<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<HashSet<VariableId>, E> {
         let candidates = restriction.clone();
 
         // We then prune the candidates twice: First time, most of the uninteresting nodes are
         // removed, second time then optimizes the result such that it is (usually) at least
         // subset minimal. The minimality is still not guaranteed though.
 
-        let candidates = self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
-            self.shortest_cycle(g, x, usize::MAX)
-        });
+        if should_log(log_level) {
+            println!(
+                "Starting FVS computation with {} candidates.",
+                candidates.len()
+            );
+        }
 
-        self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
-            self.shortest_cycle(g, x, usize::MAX)
-        })
+        let candidates = self._fvs_helper(
+            &mut restriction.clone(),
+            candidates,
+            |g, x| self.shortest_cycle(g, x, usize::MAX),
+            log_level,
+            interrupt,
+        )?;
+
+        if should_log(log_level) {
+            println!(
+                "Finished initial FVS pruning with {} candidates.",
+                candidates.len()
+            );
+        }
+
+        let result = self._fvs_helper(
+            &mut restriction.clone(),
+            candidates,
+            |g, x| self.shortest_cycle(g, x, usize::MAX),
+            log_level,
+            interrupt,
+        )?;
+
+        if should_log(log_level) {
+            println!("Finished FVS computation: {} nodes.", result.len());
+        }
+
+        Ok(result)
     }
 
     /// Compute a feedback vertex set of the desired parity, considered within the subgraph induced
@@ -105,15 +160,45 @@ impl SdGraph {
         restriction: &HashSet<VariableId>,
         parity: Sign,
     ) -> HashSet<VariableId> {
+        self._restricted_parity_feedback_vertex_set(restriction, parity, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_parity_feedback_vertex_set] with cancellation
+    /// and logging.
+    pub fn _restricted_parity_feedback_vertex_set<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        parity: Sign,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<HashSet<VariableId>, E> {
         // We will be searching in a subset of a known FVS. This is because FVS detection is
         // a bit faster and usually gives us a reasonable starting point.
-        let candidates = self.restricted_feedback_vertex_set(restriction);
+        let candidates = self._restricted_feedback_vertex_set(restriction, log_level, interrupt)?;
+
+        if should_log(log_level) {
+            println!(
+                "Starting parity FVS computation with {} candidates.",
+                candidates.len()
+            );
+        }
 
         // The same as normal FVS method, but uses different cycle detection. Here, we don't
         // repeat it again, because in most cases it is not needed.
-        self._fvs_helper(&mut restriction.clone(), candidates, |g, x| {
-            self.shortest_parity_cycle(g, x, parity, usize::MAX)
-        })
+        let result = self._fvs_helper(
+            &mut restriction.clone(),
+            candidates,
+            |g, x| self.shortest_parity_cycle(g, x, parity, usize::MAX),
+            log_level,
+            interrupt,
+        )?;
+
+        if should_log(log_level) {
+            println!("Finished parity FVS computation: {} nodes.", result.len());
+        }
+
+        Ok(result)
     }
 
     /// **(internal)** Compute the degree of a vertex within the given set.

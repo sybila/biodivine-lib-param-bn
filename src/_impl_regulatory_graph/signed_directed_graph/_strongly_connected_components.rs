@@ -1,5 +1,5 @@
-use crate::VariableId;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
+use crate::{never_stop, should_log, VariableId, LOG_NOTHING};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -7,10 +7,7 @@ impl SdGraph {
     ///
     /// The result is sorted by component size.
     pub fn strongly_connected_components(&self) -> Vec<HashSet<VariableId>> {
-        let mut results = Vec::new();
-        scc_recursive(self, self.mk_all_vertices(), &mut results);
-        results.sort_by_key(|it| it.len());
-        results
+        self.restricted_strongly_connected_components(&self.mk_all_vertices())
     }
 
     /// Find all non-trivial strongly connected components in the given `restriction` of this `SdGraph`.
@@ -20,10 +17,28 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<HashSet<VariableId>> {
+        self._restricted_strongly_connected_components(restriction, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_strongly_connected_components] with cancellation
+    /// and logging.
+    pub fn _restricted_strongly_connected_components<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Vec<HashSet<VariableId>>, E> {
         let mut results = Vec::new();
-        scc_recursive(self, restriction.clone(), &mut results);
+        scc_recursive(
+            self,
+            restriction.clone(),
+            &mut results,
+            log_level,
+            interrupt,
+        )?;
         results.sort_by_key(|it| it.len());
-        results
+        Ok(results)
     }
 }
 
@@ -32,27 +47,37 @@ impl SdGraph {
 /// The complexity of the procedure is $n^2$. It can be (in theory) improved to $n \cdot log(n)$,
 /// but at the moment I don't really see a benefit to it as it is still sufficiently fast for
 /// most reasonable cases.
-fn scc_recursive(
+fn scc_recursive<E, F: Fn() -> Result<(), E>>(
     graph: &SdGraph,
     mut universe: HashSet<VariableId>,
     results: &mut Vec<HashSet<VariableId>>,
-) {
+    log_level: usize,
+    interrupt: &F,
+) -> Result<(), E> {
     trim_trivial(&graph.successors, &mut universe);
+    interrupt()?;
     trim_trivial(&graph.predecessors, &mut universe);
+    interrupt()?;
 
     if universe.is_empty() {
-        return;
+        return Ok(());
     }
 
     let pivot = universe.iter().next().cloned().unwrap();
 
     let fwd = graph.restricted_forward_reachable(&universe, HashSet::from([pivot]));
+    interrupt()?;
+
     let bwd = graph.restricted_backward_reachable(&universe, HashSet::from([pivot]));
+    interrupt()?;
 
     let fwd_or_bwd: HashSet<VariableId> = fwd.union(&bwd).cloned().collect();
     let fwd_and_bwd: HashSet<VariableId> = fwd.intersection(&bwd).cloned().collect();
 
     if is_non_trivial(graph, &fwd_and_bwd) {
+        if should_log(log_level) {
+            println!("Found SCC with {} nodes.", fwd_or_bwd.len());
+        }
         results.push(fwd_and_bwd);
     }
 
@@ -61,16 +86,18 @@ fn scc_recursive(
     let bwd_rest: HashSet<VariableId> = bwd.difference(&fwd).cloned().collect();
 
     if !universe_rest.is_empty() {
-        scc_recursive(graph, universe_rest, results);
+        scc_recursive(graph, universe_rest, results, log_level, interrupt)?;
     }
 
     if !fwd_rest.is_empty() {
-        scc_recursive(graph, fwd_rest, results);
+        scc_recursive(graph, fwd_rest, results, log_level, interrupt)?;
     }
 
     if !bwd_rest.is_empty() {
-        scc_recursive(graph, bwd_rest, results);
+        scc_recursive(graph, bwd_rest, results, log_level, interrupt)?;
     }
+
+    Ok(())
 }
 
 /// **(internal)** Check if an SCC is trivial.

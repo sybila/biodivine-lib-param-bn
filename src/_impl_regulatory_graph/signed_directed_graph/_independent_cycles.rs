@@ -1,5 +1,5 @@
-use crate::VariableId;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
+use crate::{never_stop, should_log, VariableId, LOG_NOTHING};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -16,10 +16,24 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<Vec<VariableId>> {
+        self._restricted_independent_cycles(restriction, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_independent_cycles] with cancellation
+    /// and logging.
+    pub fn _restricted_independent_cycles<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Vec<Vec<VariableId>>, E> {
         let mut cycles = Vec::new();
 
         let mut components = self.restricted_strongly_connected_components(restriction);
         while let Some(mut scc) = components.pop() {
+            interrupt()?;
+
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;
             // Not particularly efficient, but keeps this whole thing deterministic.
@@ -27,6 +41,7 @@ impl SdGraph {
             scc_iter.sort();
             for x in &scc_iter {
                 if let Some(cycle) = self.shortest_cycle(&scc, *x, best_cycle_len) {
+                    interrupt()?;
                     if cycle.len() == 1 {
                         // Cycle of length one will always win, no need to check further.
                         best_cycle = Some(cycle);
@@ -42,6 +57,9 @@ impl SdGraph {
             }
 
             if let Some(best_cycle) = best_cycle {
+                if should_log(log_level) {
+                    println!("Selected {:?} as the shortest candidate.", best_cycle);
+                }
                 for x in &best_cycle {
                     scc.remove(x);
                 }
@@ -51,7 +69,7 @@ impl SdGraph {
         }
 
         cycles.sort_by_key(|it| it.len());
-        cycles
+        Ok(cycles)
     }
 
     /// Compute a collection of independent cycles of the given `parity` within the desired
@@ -68,10 +86,24 @@ impl SdGraph {
         restriction: &HashSet<VariableId>,
         parity: Sign,
     ) -> Vec<Vec<VariableId>> {
+        self._restricted_independent_parity_cycles(restriction, parity, LOG_NOTHING, &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [SdGraph::restricted_independent_parity_cycles] with cancellation
+    /// and logging.
+    pub fn _restricted_independent_parity_cycles<E, F: Fn() -> Result<(), E>>(
+        &self,
+        restriction: &HashSet<VariableId>,
+        parity: Sign,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<Vec<Vec<VariableId>>, E> {
         let mut cycles = Vec::new();
 
         let mut components = self.restricted_strongly_connected_components(restriction);
         while let Some(mut scc) = components.pop() {
+            interrupt()?;
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;
             // Not particularly efficient, but keeps this whole thing deterministic.
@@ -79,6 +111,7 @@ impl SdGraph {
             scc_iter.sort();
             for x in &scc_iter {
                 if let Some(cycle) = self.shortest_parity_cycle(&scc, *x, parity, best_cycle_len) {
+                    interrupt()?;
                     if cycle.len() == 1 {
                         // Cycle of length one will always win, no need to check further.
                         best_cycle = Some(cycle);
@@ -91,6 +124,9 @@ impl SdGraph {
             }
 
             if let Some(best_cycle) = best_cycle {
+                if should_log(log_level) {
+                    println!("Selected {:?} as the shortest candidate.", best_cycle);
+                }
                 for x in &best_cycle {
                     scc.remove(x);
                 }
@@ -100,7 +136,7 @@ impl SdGraph {
         }
 
         cycles.sort_by_key(|it| it.len());
-        cycles
+        Ok(cycles)
     }
 }
 
