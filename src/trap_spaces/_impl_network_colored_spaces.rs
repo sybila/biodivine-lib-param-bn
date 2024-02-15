@@ -1,7 +1,7 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::{FnUpdateProjection, RawProjection};
-use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph};
+use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsyncGraph};
 use crate::trap_spaces::{NetworkColoredSpaces, NetworkSpaces, SymbolicSpaceContext};
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
@@ -109,6 +109,12 @@ impl NetworkColoredSpaces {
             variables.push(*f_var);
         }
         variables
+    }
+
+    /// Produce a set of colored vertices that are contained within the subspaces
+    /// represented in this set.
+    pub fn to_colored_vertices(&self, ctx: &SymbolicSpaceContext) -> GraphColoredVertices {
+        GraphColoredVertices::new(ctx.spaces_to_vertices(self.as_bdd()), ctx.inner_context())
     }
 }
 

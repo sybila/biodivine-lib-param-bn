@@ -23,9 +23,12 @@ mod _impl_trap_spaces;
 /// using the [SymbolicContext] available in [SymbolicSpaceContext::inner_context]
 /// (see also [SymbolicAsyncGraph::with_space_context]).
 ///
+#[derive(Clone)]
 pub struct SymbolicSpaceContext {
     inner_ctx: SymbolicContext,
     dual_variables: Vec<(BddVariable, BddVariable)>,
+    space_to_vertex_bdd: Bdd,
+    vertex_to_space_bdd: Bdd,
 }
 
 /// A symbolic set consisting of network subspaces (see also [Space]).

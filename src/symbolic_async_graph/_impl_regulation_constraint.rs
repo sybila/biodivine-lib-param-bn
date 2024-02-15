@@ -200,7 +200,7 @@ impl RegulationConstraint {
 /// If there are no satisfying valuations, this function should return a human-readable
 /// message which explains problem (often in several lines). However, in some complex
 /// cases (inter-dependent parameters), this can be very hard and the error messages
-/// are thus purely best effort service.
+/// are thus purely a "best effort service".
 pub(crate) fn apply_regulation_constraints(
     initial: Bdd,
     network: &BooleanNetwork,

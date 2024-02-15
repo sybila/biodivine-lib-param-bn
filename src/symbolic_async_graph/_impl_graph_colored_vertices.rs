@@ -6,6 +6,7 @@ use crate::symbolic_async_graph::projected_iteration::{
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
 };
+use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext};
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
@@ -149,6 +150,11 @@ impl GraphColoredVertices {
         context: &'a SymbolicAsyncGraph,
     ) -> MixedProjection<'a> {
         MixedProjection::new(variables.to_vec(), functions.to_vec(), context, &self.bdd)
+    }
+
+    /// Represent this set of colored vertices as a colored set of singleton subspaces instead.
+    pub fn to_singleton_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkColoredSpaces {
+        NetworkColoredSpaces::new(ctx.vertices_to_spaces(self.as_bdd()), ctx)
     }
 }
 
