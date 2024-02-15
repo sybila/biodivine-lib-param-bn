@@ -1,6 +1,7 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::RawProjection;
+use crate::symbolic_async_graph::GraphVertices;
 use crate::trap_spaces::{NetworkSpaces, SpaceIterator, SymbolicSpaceContext};
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{Bdd, BddVariable};
@@ -112,6 +113,11 @@ impl NetworkSpaces {
             inner_iterator: projection.into_iter(),
             dual_variables: self.dual_variables.clone(),
         }
+    }
+
+    /// Produce a set of vertices that are contained within the subspaces represented in this set.
+    pub fn to_vertices(&self, ctx: &SymbolicSpaceContext) -> GraphVertices {
+        GraphVertices::new(ctx.spaces_to_vertices(self.as_bdd()), ctx.inner_context())
     }
 }
 

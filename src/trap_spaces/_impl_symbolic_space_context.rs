@@ -21,9 +21,28 @@ impl SymbolicSpaceContext {
             .zip(negative_variables)
             .map(|((_v1, var_t), (_v2, var_f))| (var_t, var_f))
             .collect::<Vec<_>>();
+
+        let bdd_vars = inner_ctx.bdd_variable_set();
+
+        let mut s_to_v_bdd = inner_ctx.mk_constant(true);
+        let mut v_to_s_bdd = inner_ctx.mk_constant(true);
+        for var in inner_ctx.network_variables() {
+            let (p_var, n_var) = dual_variables[var.to_index()];
+            let s_var = inner_ctx.get_state_variable(var);
+
+            s_to_v_bdd = bdd!(bdd_vars, s_to_v_bdd & ((p_var & (!n_var)) => s_var));
+            s_to_v_bdd = bdd!(bdd_vars, s_to_v_bdd & (((!p_var) & n_var) => (!s_var)));
+
+            v_to_s_bdd = bdd!(bdd_vars, v_to_s_bdd & (s_var => (p_var & (!n_var))));
+            v_to_s_bdd = bdd!(bdd_vars, v_to_s_bdd & ((!s_var) => ((!p_var) & n_var)));
+            v_to_s_bdd = bdd!(bdd_vars, v_to_s_bdd & (p_var | n_var)); // Enforce correct encoding.
+        }
+
         SymbolicSpaceContext {
             inner_ctx,
             dual_variables,
+            space_to_vertex_bdd: s_to_v_bdd,
+            vertex_to_space_bdd: v_to_s_bdd,
         }
     }
 
@@ -213,7 +232,7 @@ impl SymbolicSpaceContext {
         Ok(result)
     }
 
-    /// Compute a [Bdd] of all spaces that are a sub-space of the elements in `spaces`.
+    /// Compute a [Bdd] of all spaces that are a subspace of the elements in `spaces`.
     ///
     /// The same notes as for [SymbolicSpaceContext::mk_super_spaces] apply.
     pub fn mk_sub_spaces(&self, spaces: &Bdd) -> Bdd {
@@ -291,6 +310,53 @@ impl SymbolicSpaceContext {
         }
         self.bdd_variable_set().mk_conjunctive_clause(&valuation)
     }
+
+    /// A utility method which "materializes" the network spaces in the dual encoding into
+    /// a set of vertices that reside in these places.
+    ///
+    /// See also [SymbolicSpaceContext::vertices_to_spaces], but note that these operations
+    /// are not invertible, that is `vertices_to_spaces(spaces_to_vertices(x))` does not
+    /// produce the set `x`.
+    pub fn spaces_to_vertices(&self, bdd: &Bdd) -> Bdd {
+        let mut space_vars = Vec::new();
+        for (p, n) in &self.dual_variables {
+            space_vars.push(*p);
+            space_vars.push(*n);
+        }
+        Bdd::binary_op_with_exists(
+            &self.space_to_vertex_bdd,
+            bdd,
+            biodivine_lib_bdd::op_function::and,
+            &space_vars,
+        )
+    }
+
+    /// Convert a set of vertices into a set of singleton spaces. That is, for each vertex,
+    /// the corresponding space is created.
+    ///
+    /// In other words, this does not try to decompose the set into maximal spaces or anything
+    /// like that, it converts each vertex 1:1 into a space.
+    pub fn vertices_to_spaces(&self, bdd: &Bdd) -> Bdd {
+        Bdd::binary_op_with_exists(
+            &self.vertex_to_space_bdd,
+            bdd,
+            biodivine_lib_bdd::op_function::and,
+            self.inner_ctx.state_variables(),
+        )
+    }
+
+    /// The same as [SymbolicContext::eliminate_network_variable], but extended to the
+    /// domain of a subspaces.
+    pub fn eliminate_network_variable(&self, variable_id: VariableId) -> SymbolicSpaceContext {
+        let mut result = self.clone();
+        let (p_var, n_var) = self.dual_variables[variable_id.to_index()];
+        let s_var = self.inner_ctx.get_state_variable(variable_id);
+        result.inner_ctx = result.inner_ctx.eliminate_network_variable(variable_id);
+        result.dual_variables.remove(variable_id.to_index());
+        result.vertex_to_space_bdd = result.vertex_to_space_bdd.exists(&[p_var, n_var, s_var]);
+        result.space_to_vertex_bdd = result.space_to_vertex_bdd.exists(&[p_var, n_var, s_var]);
+        result
+    }
 }
 
 fn and_and_not(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool> {
@@ -307,9 +373,10 @@ fn and_and_not(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
     use crate::ExtendedBoolean::{One, Zero};
-    use crate::{BooleanNetwork, Space};
+    use crate::{BooleanNetwork, FnUpdate, Space, VariableId};
     use biodivine_lib_bdd::bdd;
 
     #[test]
@@ -324,7 +391,7 @@ mod tests {
         let super_spaces = ctx.mk_super_spaces(&all_zero);
         let sub_spaces = ctx.mk_sub_spaces(&all_zero);
 
-        // all_zero should have only one sub-space: itself.
+        // all_zero should have only one subspace: itself.
         println!("{} {}", all_zero.cardinality(), sub_spaces.cardinality());
         assert!(sub_spaces.iff(&all_zero).is_true());
 
@@ -380,5 +447,101 @@ mod tests {
         // [*,1], [1,*], [0,1], [1,0], [1,1]; everything except [0,0]).
         assert_eq!(4.0 * 2541865828329.0, and_up.approx_cardinality());
         assert_eq!(8.0 * 2541865828329.0, or_up.approx_cardinality());
+    }
+
+    #[test]
+    fn conversions() {
+        let network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
+        let ctx = SymbolicSpaceContext::new(&network);
+        let stg = SymbolicAsyncGraph::with_space_context(&network, &ctx).unwrap();
+
+        assert_eq!(
+            stg.empty_vertices().to_singleton_spaces(&ctx),
+            ctx.mk_empty_spaces(),
+        );
+
+        assert_eq!(
+            stg.empty_colored_vertices().to_singleton_spaces(&ctx),
+            ctx.mk_empty_colored_spaces(),
+        );
+
+        assert_eq!(
+            stg.unit_vertices().exact_cardinality(),
+            stg.unit_vertices()
+                .to_singleton_spaces(&ctx)
+                .exact_cardinality(),
+        );
+
+        assert_eq!(
+            stg.unit_colored_vertices().exact_cardinality(),
+            stg.unit_colored_vertices()
+                .to_singleton_spaces(&ctx)
+                .exact_cardinality(),
+        );
+
+        assert_eq!(
+            ctx.mk_unit_spaces().to_vertices(&ctx),
+            stg.mk_unit_vertices(),
+        );
+
+        assert_eq!(
+            ctx.mk_unit_colored_spaces(&stg).to_colored_vertices(&ctx),
+            stg.mk_unit_colored_vertices(),
+        );
+
+        let mut space = Space::new(&network);
+        space[VariableId(0)] = One;
+        space[VariableId(2)] = Zero;
+        space[VariableId(6)] = One;
+
+        let space = NetworkSpaces::new(ctx.mk_space(&space), &ctx);
+        assert!(space.is_singleton());
+        let vertices = space.to_vertices(&ctx);
+        assert_eq!(
+            vertices,
+            stg.mk_subspace(&[
+                (VariableId(0), true),
+                (VariableId(2), false),
+                (VariableId(6), true)
+            ])
+            .vertices()
+        );
+    }
+
+    #[test]
+    fn elimination() {
+        let mut network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
+        let foo = network.add_parameter("foo", 3).unwrap();
+        network.set_update_function(VariableId(0), None).unwrap();
+        let v1 = network.as_graph().find_variable("v_ATM").unwrap();
+        let v2 = network.as_graph().find_variable("v_CHKREC").unwrap();
+        let v3 = network.as_graph().find_variable("v_ATR").unwrap();
+        network
+            .set_update_function(
+                VariableId(4),
+                Some(FnUpdate::mk_basic_param(foo, &[v1, v2, v3])),
+            )
+            .unwrap();
+        let ctx = SymbolicSpaceContext::new(&network);
+        let ctx2 = ctx.eliminate_network_variable(VariableId(1));
+
+        assert_eq!(
+            ctx.inner_ctx.num_state_variables(),
+            ctx2.inner_ctx.num_state_variables() + 1
+        );
+        assert_eq!(
+            ctx.inner_ctx.num_parameter_variables(),
+            ctx2.inner_ctx.num_parameter_variables()
+        );
+        assert_eq!(ctx.dual_variables.len(), ctx2.dual_variables.len() + 1);
+
+        assert!(ctx
+            .vertex_to_space_bdd
+            .imp(&ctx2.vertex_to_space_bdd)
+            .is_true());
+        assert!(ctx
+            .space_to_vertex_bdd
+            .imp(&ctx2.space_to_vertex_bdd)
+            .is_true());
     }
 }

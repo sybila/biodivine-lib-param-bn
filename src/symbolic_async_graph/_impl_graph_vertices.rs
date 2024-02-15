@@ -3,6 +3,7 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::{RawProjection, StateProjection};
 use crate::symbolic_async_graph::{GraphVertexIterator, GraphVertices, SymbolicContext};
+use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
 use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
@@ -150,6 +151,11 @@ impl GraphVertices {
             inner_iterator: projection.into_iter(),
             state_variables: self.state_variables.clone(),
         }
+    }
+
+    /// Represent this set of vertices as a set of singleton subspaces instead.
+    pub fn to_singleton_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkSpaces {
+        NetworkSpaces::new(ctx.vertices_to_spaces(self.as_bdd()), ctx)
     }
 }
 

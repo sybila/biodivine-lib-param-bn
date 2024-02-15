@@ -11,6 +11,23 @@ use Monotonicity::Activation;
 
 /// Basic methods for safely building `BooleanNetwork`s.
 impl BooleanNetwork {
+    /// Build a copy of this Boolean network where all essentiality and monotonicity constraints
+    /// are removed. This is basically the "inverse" of [BooleanNetwork::infer_valid_graph].
+    pub fn remove_static_constraints(&self) -> BooleanNetwork {
+        let mut new_bn = self.clone();
+        for reg in self.as_graph().regulations() {
+            new_bn
+                .graph
+                .remove_regulation(reg.regulator, reg.target)
+                .unwrap();
+            let mut reg = reg.clone();
+            reg.observable = false;
+            reg.monotonicity = None;
+            new_bn.graph.add_raw_regulation(reg).unwrap();
+        }
+        new_bn
+    }
+
     /// Construct a new `BooleanNetwork` from a `RegulatoryGraph` without any parameters.
     pub fn new(graph: RegulatoryGraph) -> BooleanNetwork {
         BooleanNetwork {
@@ -1393,5 +1410,32 @@ mod test {
 
         assert_ne!(bn.inline_constants(false, true), expected);
         assert_eq!(bn.inline_constants(true, true), expected);
+    }
+
+    #[test]
+    fn test_constraint_remove() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> a
+            b -| b
+            $a: b
+            $b: !b | a
+        ",
+        )
+        .unwrap();
+
+        let expected = BooleanNetwork::try_from(
+            r"
+            a -?? b
+            b -?? a
+            b -?? b
+            $a: b
+            $b: !b | a
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(expected, bn.remove_static_constraints());
     }
 }

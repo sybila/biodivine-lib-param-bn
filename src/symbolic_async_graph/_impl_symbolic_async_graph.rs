@@ -4,11 +4,13 @@ use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_c
 use crate::symbolic_async_graph::_impl_symbolic_async_graph_operators::a_and_b_and_c;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::{
-    GraphColoredVertices, GraphColors, GraphVertices, SymbolicAsyncGraph, SymbolicContext,
+    GraphColoredVertices, GraphColors, GraphVertices, RegulationConstraint, SymbolicAsyncGraph,
+    SymbolicContext,
 };
 use crate::trap_spaces::SymbolicSpaceContext;
 use crate::{
-    BooleanNetwork, FnUpdate, Regulation, RegulatoryGraph, VariableId, VariableIdIterator,
+    BooleanNetwork, FnUpdate, Monotonicity, Regulation, RegulatoryGraph, VariableId,
+    VariableIdIterator,
 };
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
@@ -108,7 +110,7 @@ impl SymbolicAsyncGraph {
     ///
     ///  - Here, the `unit_bdd` will be used as the set of colors/vertices without any further
     ///    postprocessing.
-    ///  - The `functions` vector should contains a BDD for each variable which is true if and
+    ///  - The `functions` vector contains a BDD for each variable which is true if and
     ///    only if the update function of said variable is true.
     ///
     /// # Safety
@@ -331,9 +333,9 @@ impl SymbolicAsyncGraph {
     /// vertices that have all the given variables set to their respective values.
     ///
     /// *Note:* The reason this method takes a slice and not, e.g., a `HashMap` is that:
-    ///  - (a) If constant, slices are much easier to write in code (i.e. we can write
+    ///  - If constant, slices are much easier to write in code (i.e. we can write
     /// `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
-    ///  - (b) This is already used by the internal BDD API, so the conversion is less involved.
+    ///  - This is already used by the internal BDD API, so the conversion is less involved.
     pub fn mk_subspace(&self, values: &[(VariableId, bool)]) -> GraphColoredVertices {
         let partial_valuation: Vec<(BddVariable, bool)> = values
             .iter()
@@ -403,7 +405,7 @@ impl SymbolicAsyncGraph {
         let var_symbolic = self.symbolic_context.get_state_variable(variable);
         let fn_support = self.fn_update[remove_index].support_set();
         if fn_support.contains(&var_symbolic) {
-            // There is a self regulation.
+            // There is a self-regulation.
             return None;
         }
 
@@ -593,24 +595,24 @@ impl SymbolicAsyncGraph {
 
 impl SymbolicAsyncGraph {
     /// Compute the set of all possible colours (instantiations) of this (*main*) network that are
-    /// represented by the supplied more specific *sub-network*.
+    /// represented by the supplied more specific *subnetwork*.
     ///
     /// Note that this is a rather non-trivial theoretical problem. Consequently,
     /// the implementation is currently limited such that it only supports the following special
     /// case. In the future, these restrictions may be lifted as we add better equivalence
     /// checking algorithms:
     ///  - The two networks have the same variables.
-    ///  - All parameters used in the sub-network must also be declared in the
+    ///  - All parameters used in the subnetwork must also be declared in the
     ///  main network (with the same arity).
     ///  - The regulations are identical in both networks (including monotonicity/observability).
-    ///  - If the main network has an update function, the sub-network must have the same
+    ///  - If the main network has an update function, the subnetwork must have the same
     ///  update function (tested using the abstract syntax tree, not semantics).
-    ///  - If the main network has an erased update function, the sub-network can have
+    ///  - If the main network has an erased update function, the subnetwork can have
     ///  a fully specified function (no parameters) instead.
-    ///  - The sub-network and main network are consistent with the shared regulatory graph.
+    ///  - The subnetwork and main network are consistent with the shared regulatory graph.
     ///
     /// If all of these conditions are met, the function returns a `ColorSet` representing all
-    /// instantiations of the sub-network represented using the main network encoding. Otherwise,
+    /// instantiations of the subnetwork represented using the main network encoding. Otherwise,
     /// an error indicates which conditions were not met.
     ///
     /// ## Panics
@@ -665,7 +667,7 @@ impl SymbolicAsyncGraph {
             .collect::<HashMap<_, _>>();
 
         {
-            // 2.1 Verify that the sub-network has the same parameters as the main network.
+            // 2.1 Verify that the subnetwork has the same parameters as the main network.
             for param in sub_network.parameters() {
                 let name = sub_network.get_parameter(param).get_name();
                 if let Some(main_id) = main_network.find_parameter(name) {
@@ -679,7 +681,7 @@ impl SymbolicAsyncGraph {
             }
         }
 
-        // 2.2 Construct a mapping vector from the sub-network parameters to the main network.
+        // 2.2 Construct a mapping vector from the subnetwork parameters to the main network.
         let param_sub_to_main = sub_network
             .parameters()
             .map(|id| {
@@ -735,7 +737,7 @@ impl SymbolicAsyncGraph {
             }
         }
 
-        // 4. Verify that every function in the sub-network is either identical to the main
+        // 4. Verify that every function in the subnetwork is either identical to the main
         // network, or replaces an unknown function.
         for sub_var in sub_network.variables() {
             let main_var = sub_to_main[sub_var.0];
@@ -767,7 +769,7 @@ impl SymbolicAsyncGraph {
             }
         }
 
-        // 5. Check that the sub-network is valid.
+        // 5. Check that the subnetwork is valid.
         let sub_network_graph = SymbolicAsyncGraph::new(sub_network);
         if sub_network_graph.is_err() {
             return Err("Sub-network is not consistent with the regulatory graph.".to_string());
@@ -817,7 +819,7 @@ impl SymbolicAsyncGraph {
                     }
                 }
             }
-            // Else: The function is not specialised in the sub-network. It is safe to skip.
+            // Else: The function is not specialised in the subnetwork. It is safe to skip.
         }
 
         Ok(self.unit_colors().copy(colors))
@@ -834,7 +836,7 @@ impl SymbolicAsyncGraph {
     /// At the moment, condition (2) depends on network structure and is hard to directly
     /// influence unless you use [SymbolicAsyncGraph::with_custom_context]. In the future, we
     /// plan to relax this restriction by automatically reordering the variables as
-    /// part of translation (TODO).
+    /// part of the translation (TODO).
     pub fn transfer_colors_from(
         &self,
         colors: &GraphColors,
@@ -857,7 +859,7 @@ impl SymbolicAsyncGraph {
     /// At the moment, variables are by default ordered alphabetically, hence condition (2)
     /// should be only broken if one of the graphs uses a custom ordering. In the future, we plan
     /// to relax this restriction by automatically reordering the variables as part
-    /// of translation (TODO).
+    /// of the translation (TODO).
     pub fn transfer_vertices_from(
         &self,
         vertices: &GraphVertices,
@@ -880,7 +882,7 @@ impl SymbolicAsyncGraph {
     /// At the moment, condition (2) depends on network structure and is hard to directly
     /// influence if parameters are used extensively unless you use
     /// [SymbolicAsyncGraph::with_custom_context]. In the future, we plan to relax this
-    /// restriction by automatically reordering the variables as part of translation (TODO).
+    /// restriction by automatically reordering the variables as part of the translation (TODO).
     /// For state variables, the ordering should be by default equivalent, since they are ordered
     /// alphabetically.
     pub fn transfer_from(
@@ -892,6 +894,78 @@ impl SymbolicAsyncGraph {
             .symbolic_context
             .transfer_from(&set.bdd, &graph.symbolic_context);
         bdd.map(|it| GraphColoredVertices::new(it, self.symbolic_context()))
+    }
+
+    /// Try to reconstruct a [BooleanNetwork] that is semantically equivalent to the one
+    /// encoded by this [SymbolicAsyncGraph]. Currently, this operation returns `None` if the
+    /// network uses any non-trivial parameters (i.e. arity more than zero). This is
+    /// because we have no reasonable procedure to reconstruct the original function expression
+    /// from such a BDD.
+    pub fn reconstruct_network(&self) -> Option<BooleanNetwork> {
+        let ctx = self.symbolic_context();
+        for par in ctx.network_parameters() {
+            if ctx.get_network_parameter_arity(par) > 0 {
+                return None;
+            }
+        }
+
+        // Recreate the regulatory graph.
+
+        let names = self
+            .variables()
+            .map(|it| self.get_variable_name(it))
+            .collect::<Vec<_>>();
+        let mut rg = RegulatoryGraph::new(names);
+
+        for target in self.variables() {
+            let fn_bdd = self.get_symbolic_fn_update(target);
+            let support = fn_bdd.support_set();
+            for bdd_var in support {
+                if let Some(regulator) = ctx.find_state_variable(bdd_var) {
+                    let obs = RegulationConstraint::mk_observability(ctx, fn_bdd, regulator);
+                    let act = RegulationConstraint::mk_activation(ctx, fn_bdd, regulator);
+                    let inh = RegulationConstraint::mk_inhibition(ctx, fn_bdd, regulator);
+                    let observable = self.unit_bdd.imp(&obs).is_true();
+                    let monotonicity = if self.unit_bdd.imp(&act).is_true() {
+                        Some(Monotonicity::Activation)
+                    } else if self.unit_bdd.imp(&inh).is_true() {
+                        Some(Monotonicity::Inhibition)
+                    } else {
+                        None
+                    };
+                    rg.add_raw_regulation(Regulation {
+                        regulator,
+                        target,
+                        observable,
+                        monotonicity,
+                    })
+                    .unwrap();
+                }
+            }
+        }
+
+        let mut bn = BooleanNetwork::new(rg);
+
+        // Copy parameters
+        for par in ctx.network_parameters() {
+            bn.add_parameter(
+                ctx.get_network_parameter_name(par).as_str(),
+                u32::from(ctx.get_network_parameter_arity(par)),
+            )
+            .unwrap();
+        }
+
+        for var in self.variables() {
+            if ctx.get_implicit_function_table(var).is_none() {
+                // Only infer functions for variables without an implicit parameter.
+                // Other variables stay as None.
+                let fn_bdd = self.get_symbolic_fn_update(var);
+                let fn_update = FnUpdate::build_from_bdd(ctx, fn_bdd);
+                bn.set_update_function(var, Some(fn_update)).unwrap();
+            }
+        }
+
+        Some(bn)
     }
 }
 
@@ -1043,7 +1117,7 @@ mod tests {
         );
         assert!(result.is_err());
 
-        // Inconsistent sub-network:
+        // Inconsistent subnetwork:
         let result = sg.mk_subnetwork_colors(
             &BooleanNetwork::try_from(
                 r"
@@ -1281,7 +1355,7 @@ mod tests {
     }
 
     /*
-        This is essentially a copy paste from the tutorial, but for some reason code coverage
+        This is essentially a copy and paste from the tutorial, but for some reason code coverage
         does not count documentation tests, so let's make a copy here!
     */
     #[test]
@@ -1495,5 +1569,56 @@ mod tests {
             .as_bdd()
             .iff(fixed_points_restricted.as_bdd())
             .is_true());
+    }
+
+    #[test]
+    fn test_reconstruct() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -| b
+            b -| c
+            a -> c
+            b -> d
+            # a is an input with unknown function
+            $b: !a
+            $c: !b & a
+            $d: b
+        ",
+        )
+        .unwrap();
+
+        let a = bn.as_graph().find_variable("a").unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let stg2 = stg.inline_symbolic(a).unwrap();
+
+        let bn2 = stg2.reconstruct_network().unwrap();
+
+        let expected = BooleanNetwork::try_from(
+            r"
+            b -|? c
+            b -> d
+            $b: !a
+            $c: a & !b
+            $d: b
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(expected, bn2);
+
+        let b = stg2.symbolic_context().find_network_variable("b").unwrap();
+        let stg3 = stg2.inline_symbolic(b).unwrap();
+        let bn3 = stg3.reconstruct_network().unwrap();
+
+        let expected = BooleanNetwork::try_from(
+            r"
+            $c: a
+            $d: !a
+        ",
+        )
+        .unwrap();
+
+        assert_eq!(expected, bn3);
     }
 }

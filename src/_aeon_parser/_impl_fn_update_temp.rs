@@ -85,7 +85,28 @@ impl FnUpdateTemp {
     pub fn into_fn_update(self, bn: &BooleanNetwork) -> Result<Box<FnUpdate>, String> {
         Ok(Box::new(match self {
             Const(value) => FnUpdate::Const(value),
-            Var(name) => FnUpdate::Var(Self::get_variable(bn, &name)?),
+            Var(name) => {
+                let var = Self::get_variable(bn, &name);
+                match var {
+                    Ok(var) => FnUpdate::Var(var),
+                    Err(e) => {
+                        let param = Self::get_parameter(bn, &name);
+                        if let Ok(param) = param {
+                            let param_object = bn.get_parameter(param);
+                            if param_object.arity > 0 {
+                                return Err(format!(
+                                    "Parameter `{}` has arity {}, but used with arity 0 arguments.",
+                                    param_object.name, param_object.arity
+                                ));
+                            } else {
+                                FnUpdate::Param(param, Vec::new())
+                            }
+                        } else {
+                            return Err(e);
+                        }
+                    }
+                }
+            }
             Not(inner) => FnUpdate::Not(inner.into_fn_update(bn)?),
             Binary(op, l, r) => FnUpdate::Binary(op, l.into_fn_update(bn)?, r.into_fn_update(bn)?),
             Param(name, args) => {
@@ -134,7 +155,7 @@ impl FnUpdateTemp {
 #[cfg(test)]
 mod tests {
     use crate::_aeon_parser::FnUpdateTemp;
-    use crate::{Parameter, RegulatoryGraph};
+    use crate::{BooleanNetwork, Parameter, RegulatoryGraph};
     use std::collections::HashSet;
     use std::convert::TryFrom;
 
@@ -173,5 +194,33 @@ mod tests {
         });
 
         assert_eq!(expected, params);
+    }
+
+    #[test]
+    fn translation_with_zero_arity() {
+        let function =
+            FnUpdateTemp::try_from("f & !var1 => ((par(a, b, c) | g) <=> q(a))").unwrap();
+        let rg = RegulatoryGraph::new(vec![
+            "b".to_string(),
+            "c".to_string(),
+            "g".to_string(),
+            "var1".to_string(),
+        ]);
+        let mut bn = BooleanNetwork::new(rg);
+        bn.add_parameter("f", 0).unwrap();
+        bn.add_parameter("a", 0).unwrap();
+        bn.add_parameter("par", 3).unwrap();
+        bn.add_parameter("q", 1).unwrap();
+
+        assert!(function.into_fn_update(&bn).is_ok());
+
+        let function2 = FnUpdateTemp::try_from("f & !var1 => ((par | g) <=> q(a))").unwrap();
+
+        assert!(function2.into_fn_update(&bn).is_err());
+
+        let function3 =
+            FnUpdateTemp::try_from("f2 & !var1 => ((par(a, b, c) | g) <=> q(a))").unwrap();
+
+        assert!(function3.into_fn_update(&bn).is_err());
     }
 }

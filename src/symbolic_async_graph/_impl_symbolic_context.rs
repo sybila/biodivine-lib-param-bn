@@ -198,6 +198,12 @@ impl SymbolicContext {
     /// must be always a contiguous sequence. You should use variable names to "translate" [VariableId] identifiers
     /// between the two symbolic context. Of course, [SymbolicContext::transfer_from] should also still work.
     ///
+    /// If the eliminated variable has an implicit parameter associated with it, this parameter
+    /// is added as a new explicit parameter to ensure it is still accessible. This also makes
+    /// sense in the context of inlining variables (where this method is used), as the inlined
+    /// implicit function still "exists" within the network (i.e. we eliminated the variable, but
+    /// not its function).
+    ///
     /// Note that the extra state variables and parameter variables do not disappear, even if they are only used
     /// by the eliminated variable. However, you cannot access them using the normal methods
     /// (e.g. [SymbolicContext::get_extra_state_variable]), only through the full list
@@ -207,9 +213,16 @@ impl SymbolicContext {
         let mut result = self.clone();
         // Remove the variable from all variable-indexed lists. The symbolic variables still remain in the
         // general lists though. Explicit parameters are unchanged.
+        let var_name = self.get_network_variable_name(variable);
         result.state_variables.remove(index);
         result.extra_state_variables.remove(index);
-        result.implicit_function_tables.remove(index);
+        if let Some(mut table) = result.implicit_function_tables.remove(index) {
+            // TODO:
+            //   This is a bit unfortunate because we cannot rename the underlying
+            //   symbolic variables... but it should not break anything too much.
+            table.name = var_name;
+            result.explicit_function_tables.push(table);
+        }
         result
     }
 
@@ -579,6 +592,20 @@ impl SymbolicContext {
     ///
     pub fn transfer_from(&self, bdd: &Bdd, ctx: &SymbolicContext) -> Option<Bdd> {
         self.bdd.transfer_from(bdd, &ctx.bdd)
+    }
+
+    /// The list of symbolic variables that correspond to "input parameters", i.e. explicit
+    /// parameters that are not functions but constants.
+    pub(crate) fn input_parameter_variables(&self) -> Vec<BddVariable> {
+        let mut input_parameters = Vec::new();
+        for par in self.network_parameters() {
+            let table = self.get_explicit_function_table(par);
+            let vars = table.symbolic_variables();
+            if vars.len() == 1 {
+                input_parameters.push(vars[0]);
+            }
+        }
+        input_parameters
     }
 }
 
