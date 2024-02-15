@@ -291,6 +291,18 @@ impl SymbolicSpaceContext {
         }
         self.bdd_variable_set().mk_conjunctive_clause(&valuation)
     }
+    /// The same as [SymbolicContext::eliminate_network_variable], but extended to the
+    /// domain of a subspaces.
+    pub fn eliminate_network_variable(&self, variable_id: VariableId) -> SymbolicSpaceContext {
+        let mut result = self.clone();
+        let (p_var, n_var) = self.dual_variables[variable_id.to_index()];
+        let s_var = self.inner_ctx.get_state_variable(variable_id);
+        result.inner_ctx = result.inner_ctx.eliminate_network_variable(variable_id);
+        result.dual_variables.remove(variable_id.to_index());
+        result.vertex_to_space_bdd = result.vertex_to_space_bdd.exists(&[p_var, n_var, s_var]);
+        result.space_to_vertex_bdd = result.space_to_vertex_bdd.exists(&[p_var, n_var, s_var]);
+        result
+    }
 }
 
 fn and_and_not(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool> {
@@ -380,5 +392,41 @@ mod tests {
         // [*,1], [1,*], [0,1], [1,0], [1,1]; everything except [0,0]).
         assert_eq!(4.0 * 2541865828329.0, and_up.approx_cardinality());
         assert_eq!(8.0 * 2541865828329.0, or_up.approx_cardinality());
+    }
+    #[test]
+    fn elimination() {
+        let mut network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
+        let foo = network.add_parameter("foo", 3).unwrap();
+        network.set_update_function(VariableId(0), None).unwrap();
+        let v1 = network.as_graph().find_variable("v_ATM").unwrap();
+        let v2 = network.as_graph().find_variable("v_CHKREC").unwrap();
+        let v3 = network.as_graph().find_variable("v_ATR").unwrap();
+        network
+            .set_update_function(
+                VariableId(4),
+                Some(FnUpdate::mk_basic_param(foo, &[v1, v2, v3])),
+            )
+            .unwrap();
+        let ctx = SymbolicSpaceContext::new(&network);
+        let ctx2 = ctx.eliminate_network_variable(VariableId(1));
+
+        assert_eq!(
+            ctx.inner_ctx.num_state_variables(),
+            ctx2.inner_ctx.num_state_variables() + 1
+        );
+        assert_eq!(
+            ctx.inner_ctx.num_parameter_variables(),
+            ctx2.inner_ctx.num_parameter_variables()
+        );
+        assert_eq!(ctx.dual_variables.len(), ctx2.dual_variables.len() + 1);
+
+        assert!(ctx
+            .vertex_to_space_bdd
+            .imp(&ctx2.vertex_to_space_bdd)
+            .is_true());
+        assert!(ctx
+            .space_to_vertex_bdd
+            .imp(&ctx2.space_to_vertex_bdd)
+            .is_true());
     }
 }
