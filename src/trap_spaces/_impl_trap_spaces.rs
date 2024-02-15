@@ -1,7 +1,8 @@
 use crate::biodivine_std::traits::Set;
 use crate::fixed_points::FixedPoints;
+use crate::symbolic_async_graph::SymbolicAsyncGraph;
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext, TrapSpaces};
-use crate::{global_log_level, log_essential, never_stop, should_log, BooleanNetwork};
+use crate::{global_log_level, log_essential, never_stop, should_log};
 use std::collections::HashSet;
 
 impl TrapSpaces {
@@ -10,19 +11,18 @@ impl TrapSpaces {
     /// A trap space is essential if it cannot be reduced through percolation. In general, every
     /// minimal trap space is always essential.
     pub fn essential_symbolic(
-        network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
-        Self::_essential_symbolic(network, ctx, restriction, global_log_level(), &never_stop)
-            .unwrap()
+        Self::_essential_symbolic(ctx, graph, restriction, global_log_level(), &never_stop).unwrap()
     }
 
     /// A version of [TrapSpaces::essential_symbolic] with cancellation
     /// and logging.
     pub fn _essential_symbolic<E, F: Fn() -> Result<(), E>>(
-        network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
         log_level: usize,
         interrupt: &F,
@@ -40,18 +40,12 @@ impl TrapSpaces {
         // We always start with the restriction set, because it should carry the information
         // about valid encoding of spaces.
         let mut to_merge = vec![restriction.as_bdd().clone()];
-        for var in network.variables() {
-            let update_bdd = if let Some(update) = network.get_update_function(var) {
-                ctx.inner_context().mk_fn_update_true(update)
-            } else {
-                let regulators = network.regulators(var);
-                ctx.inner_context()
-                    .mk_implicit_function_is_true(var, &regulators)
-            };
+        for var in graph.variables() {
+            let update_bdd = graph.get_symbolic_fn_update(var);
             let not_update_bdd = update_bdd.not();
             interrupt()?;
 
-            let has_up_transition = ctx._mk_can_go_to_true(&update_bdd, log_level, interrupt)?;
+            let has_up_transition = ctx._mk_can_go_to_true(update_bdd, log_level, interrupt)?;
             interrupt()?;
 
             let has_down_transition =
@@ -115,23 +109,23 @@ impl TrapSpaces {
     /// This method currently uses [Self::essential_symbolic], hence is always slower than
     /// this method.
     pub fn minimal_symbolic(
-        network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
     ) -> NetworkColoredSpaces {
-        Self::_minimal_symbolic(network, ctx, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_minimal_symbolic(ctx, graph, restriction, global_log_level(), &never_stop).unwrap()
     }
 
     /// A version of [TrapSpaces::minimal_symbolic] with cancellation
     /// and logging.
     pub fn _minimal_symbolic<E, F: Fn() -> Result<(), E>>(
-        network: &BooleanNetwork,
         ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let essential = Self::_essential_symbolic(network, ctx, restriction, log_level, interrupt)?;
+        let essential = Self::_essential_symbolic(ctx, graph, restriction, log_level, interrupt)?;
         Self::_minimize(ctx, &essential, log_level, interrupt)
     }
 
@@ -306,8 +300,8 @@ mod tests {
         let stg = SymbolicAsyncGraph::with_space_context(&network, &ctx).unwrap();
         let unit = ctx.mk_unit_colored_spaces(&stg);
 
-        let essential_traps = TrapSpaces::essential_symbolic(&network, &ctx, &unit);
-        let minimal_traps = TrapSpaces::minimal_symbolic(&network, &ctx, &unit);
+        let essential_traps = TrapSpaces::essential_symbolic(&ctx, &stg, &unit);
+        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit);
         let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
 
         assert!(minimal_traps.is_subset(&essential_traps));
