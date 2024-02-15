@@ -14,8 +14,8 @@ impl RegulationConstraint {
     /// If `input` does not appear in `fn_is_true` at all, the result is always `false`.
     ///
     /// The main point of this function is that you can build an observability constraint for
-    /// an arbitrary symbolic function. Hence it can be used both to validate an existing
-    /// regulatory graph, as well as to infer observability of an otherwise unspecified
+    /// an arbitrary symbolic function. Hence, it can be used both to validate an existing
+    /// regulatory graph, and to infer observability of an otherwise unspecified
     /// regulation.
     ///
     pub fn mk_observability(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
@@ -51,8 +51,8 @@ impl RegulationConstraint {
     /// If `input` does not appear in `fn_is_true` at all, the result is always `true`.
     ///
     /// The main point of this function is that you can build an activator constraint for
-    /// an arbitrary symbolic function. Hence it can be used both to validate an existing
-    /// regulatory graph, as well as to infer observability of an otherwise unspecified
+    /// an arbitrary symbolic function. Hence, it can be used both to validate an existing
+    /// regulatory graph, and to infer observability of an otherwise unspecified
     /// regulation.
     ///
     pub fn mk_activation(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
@@ -107,7 +107,10 @@ impl RegulationConstraint {
         target: VariableId,
         fn_is_true: &Bdd,
     ) -> Option<Regulation> {
+        let inputs = ctx.input_parameter_variables();
+
         let obs = Self::mk_observability(ctx, fn_is_true, regulator);
+        let obs = obs.exists(&inputs);
         let observable = if obs.is_true() {
             true
         } else if !obs.is_false() {
@@ -117,7 +120,9 @@ impl RegulationConstraint {
         };
 
         let act = Self::mk_activation(ctx, fn_is_true, regulator);
+        let act = act.for_all(&inputs);
         let inh = Self::mk_inhibition(ctx, fn_is_true, regulator);
+        let inh = inh.for_all(&inputs);
 
         let monotonicity = if act.is_true() {
             Some(Monotonicity::Activation)
@@ -143,7 +148,11 @@ impl RegulationConstraint {
         old_regulation: &Regulation,
         fn_is_true: &Bdd,
     ) -> Option<Regulation> {
+        let inputs = ctx.input_parameter_variables();
+
         let obs = Self::mk_observability(ctx, fn_is_true, old_regulation.regulator);
+        let obs = obs.exists(&inputs);
+
         let observable = if obs.is_true() {
             // The regulation is used by every possible instantiation, it is always observable.
             true
@@ -157,7 +166,9 @@ impl RegulationConstraint {
         };
 
         let act = Self::mk_activation(ctx, fn_is_true, old_regulation.regulator);
+        let act = act.for_all(&inputs);
         let inh = Self::mk_inhibition(ctx, fn_is_true, old_regulation.regulator);
+        let inh = inh.for_all(&inputs);
 
         let monotonicity = if act.is_true() {
             // The function is *always* an activation.
@@ -206,6 +217,12 @@ pub(crate) fn apply_regulation_constraints(
     network: &BooleanNetwork,
     context: &SymbolicContext,
 ) -> Result<Bdd, String> {
+    // Detect "input parameters". For these, we don't actually want to apply any restrictions,
+    // as these are typically just variables that are converted into parameters. Therefore,
+    // they *can* have both values, even though one of them would make a particular constraint
+    // not satisfied.
+    let inputs = context.input_parameter_variables();
+
     // For each variable, compute Bdd that is true exactly when its update function is true.
     let update_function_is_true: Vec<Bdd> = network
         .variables()
@@ -230,6 +247,9 @@ pub(crate) fn apply_regulation_constraints(
             context.mk_constant(true)
         };
 
+        // The regulation is observable if it is observable for at least one input valuation.
+        let observability = observability.exists(&inputs);
+
         /* If observability failed, report error and continue. */
         if observability.is_false() {
             let problem = format!(
@@ -249,6 +269,10 @@ pub(crate) fn apply_regulation_constraints(
             }
             None => context.mk_constant(true),
         };
+
+        // The input parameter either makes the regulation not observable,
+        // or it must be monotonic.
+        let monotonicity = monotonicity.for_all(&inputs);
 
         if monotonicity.is_false() {
             let monotonicity_str = match regulation.monotonicity {
@@ -275,5 +299,97 @@ pub(crate) fn apply_regulation_constraints(
         ))
     } else {
         Ok(unit_bdd)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
+    use crate::symbolic_async_graph::{RegulationConstraint, SymbolicAsyncGraph, SymbolicContext};
+    use crate::Monotonicity::{Activation, Inhibition};
+    use crate::{BooleanNetwork, Regulation, VariableId};
+
+    #[test]
+    fn input_parameter_constraints() {
+        // For "inputs", both values are always allowed.
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            a -| c
+            # p1 has to be false for a to be observable.
+            $b: p1 | a
+            # p1 has to be true for a to be observable.
+            $c: !p1 | !a
+        ",
+        )
+        .unwrap();
+
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let unit = ctx.mk_constant(true);
+        let constraint = apply_regulation_constraints(unit.clone(), &bn, &ctx);
+        assert_eq!(constraint, Ok(unit));
+
+        // This behaviour should also apply to the inference methods:
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let a = VariableId(0);
+        let b = VariableId(1);
+        let c = VariableId(2);
+        let reg = RegulationConstraint::infer_sufficient_regulation(
+            &ctx,
+            a,
+            b,
+            stg.get_symbolic_fn_update(b),
+        )
+        .unwrap();
+        assert!(reg.observable);
+        assert_eq!(reg.monotonicity, Some(Activation));
+        let empty_reg = Regulation {
+            regulator: a,
+            target: b,
+            observable: false,
+            monotonicity: None,
+        };
+        let reg =
+            RegulationConstraint::fix_regulation(&ctx, &empty_reg, stg.get_symbolic_fn_update(b))
+                .unwrap();
+        assert!(reg.observable);
+        assert_eq!(reg.monotonicity, Some(Activation));
+
+        let reg = RegulationConstraint::infer_sufficient_regulation(
+            &ctx,
+            a,
+            c,
+            stg.get_symbolic_fn_update(c),
+        )
+        .unwrap();
+        assert!(reg.observable);
+        assert_eq!(reg.monotonicity, Some(Inhibition));
+        let empty_reg = Regulation {
+            regulator: a,
+            target: c,
+            observable: false,
+            monotonicity: None,
+        };
+        let reg =
+            RegulationConstraint::fix_regulation(&ctx, &empty_reg, stg.get_symbolic_fn_update(c))
+                .unwrap();
+        assert!(reg.observable);
+        assert_eq!(reg.monotonicity, Some(Inhibition));
+
+        // For other functions, the constraints still apply.
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            a -> c
+            $b: f(a)
+            $c: !f(a)
+        ",
+        )
+        .unwrap();
+
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let unit = ctx.mk_constant(true);
+        let constraint = apply_regulation_constraints(unit.clone(), &bn, &ctx);
+        assert!(constraint.is_err());
     }
 }

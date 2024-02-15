@@ -593,6 +593,20 @@ impl SymbolicContext {
     pub fn transfer_from(&self, bdd: &Bdd, ctx: &SymbolicContext) -> Option<Bdd> {
         self.bdd.transfer_from(bdd, &ctx.bdd)
     }
+
+    /// The list of symbolic variables that correspond to "input parameters", i.e. explicit
+    /// parameters that are not functions but constants.
+    pub(crate) fn input_parameter_variables(&self) -> Vec<BddVariable> {
+        let mut input_parameters = Vec::new();
+        for par in self.network_parameters() {
+            let table = self.get_explicit_function_table(par);
+            let vars = table.symbolic_variables();
+            if vars.len() == 1 {
+                input_parameters.push(vars[0]);
+            }
+        }
+        input_parameters
+    }
 }
 
 /// **(internal)** Compute the number of rows necessary to represent a function with given arity.
