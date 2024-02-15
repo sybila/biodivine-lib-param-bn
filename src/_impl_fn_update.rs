@@ -175,10 +175,12 @@ impl FnUpdate {
 
     /// Build an update function from an instantiated `Bdd`.
     ///
-    /// The support set of the `Bdd` must be a subset of the state variables, i.e. the `Bdd`
-    /// can only depend on the network variables. Note that it should be possible to also build
-    /// a variant of this function where this requirement is lifted, but it's a bit more
-    /// complicated and so far we are ok with only building fully instantiated update functions.
+    /// The support set of the `Bdd` must be a subset of the state variables and zero-arity
+    /// parameters.
+    ///
+    /// Note that it should be possible to also build a variant of this function where this
+    /// requirement is lifted, but it's a bit more complicated and so far we are ok with only
+    /// building fully instantiated update functions.
     ///
     /// The function produces a DNF representation based on all satisfying clauses. This is far
     /// from minimal, but appears to be slightly more concise than the default translation in
@@ -198,13 +200,25 @@ impl FnUpdate {
             .map(|(i, v)| (*v, VariableId::from_index(i)))
             .collect();
 
+        let param_map: HashMap<BddVariable, ParameterId> = context
+            .network_parameters()
+            .filter_map(|p| {
+                let table = context.get_explicit_function_table(p).symbolic_variables();
+                if table.len() == 1 {
+                    Some((table[0], p))
+                } else {
+                    None
+                }
+            })
+            .collect();
+
         // All variables must be state variables.
         for var in bdd.support_set() {
-            assert!(translation_map.contains_key(&var));
+            assert!(translation_map.contains_key(&var) || param_map.contains_key(&var));
         }
 
         // Now, we transform the BDD into DNF and that into a FnUpdate.
-        let dnf = bdd.to_dnf();
+        let dnf = bdd.to_optimized_dnf();
         let dnf = dnf
             .into_iter()
             .map(|valuation| {
@@ -212,8 +226,13 @@ impl FnUpdate {
                     .to_values()
                     .into_iter()
                     .map(|(var, value)| {
-                        let bn_var = translation_map[&var];
-                        let literal = FnUpdate::mk_var(bn_var);
+                        let literal = if let Some(bn_var) = translation_map.get(&var) {
+                            FnUpdate::mk_var(*bn_var)
+                        } else if let Some(par) = param_map.get(&var) {
+                            FnUpdate::mk_param(*par, &[])
+                        } else {
+                            unreachable!();
+                        };
                         if value {
                             literal
                         } else {
@@ -712,7 +731,7 @@ impl Display for FnUpdate {
 #[cfg(test)]
 mod tests {
     use crate::symbolic_async_graph::SymbolicContext;
-    use crate::{BinaryOp, BooleanNetwork, FnUpdate, RegulatoryGraph, VariableId};
+    use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, RegulatoryGraph, VariableId};
     use biodivine_lib_bdd::bdd;
     use std::collections::HashMap;
     use std::convert::TryFrom;
@@ -856,6 +875,7 @@ mod tests {
             a -> b
             b -> a
             b -| b
+            $a: b | in
         ",
         )
         .unwrap();
@@ -865,6 +885,7 @@ mod tests {
 
         let var_a = &FnUpdate::mk_var(VariableId(0));
         let var_b = &FnUpdate::mk_var(VariableId(1));
+        let par_in = &FnUpdate::mk_param(ParameterId(0), &[]);
         let not_var_a = &FnUpdate::mk_not(var_a.clone());
         let not_var_b = &FnUpdate::mk_not(var_b.clone());
 
@@ -884,7 +905,13 @@ mod tests {
         let a_and_b = FnUpdate::mk_binary(BinaryOp::And, var_a.clone(), var_b.clone());
         let not_a_and_b = FnUpdate::mk_binary(BinaryOp::And, not_var_a.clone(), not_var_b.clone());
         assert_eq!(
-            FnUpdate::mk_binary(BinaryOp::Or, not_a_and_b, a_and_b),
+            FnUpdate::mk_binary(BinaryOp::Or, a_and_b, not_a_and_b),
+            FnUpdate::build_from_bdd(&ctx, &bdd)
+        );
+
+        let bdd = bdd!(vars, "a" & "in[]");
+        assert_eq!(
+            FnUpdate::mk_binary(BinaryOp::And, var_a.clone(), par_in.clone()),
             FnUpdate::build_from_bdd(&ctx, &bdd)
         );
     }
