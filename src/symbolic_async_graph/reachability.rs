@@ -1,8 +1,7 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::{log_essential, never_stop, should_log, VariableId, LOG_ESSENTIAL, LOG_NOTHING};
+use crate::{global_log_level, log_essential, never_stop, should_log, VariableId};
 use std::cmp::max;
-use std::collections::{HashMap, HashSet};
 
 pub struct Reachability {
     _dummy: (),
@@ -49,7 +48,24 @@ impl Reachability {
         initial: &GraphColoredVertices,
         step: F,
     ) -> GraphColoredVertices {
-        if cfg!(feature = "print-progress") {
+        Self::_reach_basic_saturation(graph, initial, step, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    /// A version of [Reachability::reach_basic_saturation] with cancellation
+    /// and logging.
+    pub fn _reach_basic_saturation<F, I, E>(
+        graph: &SymbolicAsyncGraph,
+        initial: &GraphColoredVertices,
+        step: F,
+        log_level: usize,
+        interrupt: &I,
+    ) -> Result<GraphColoredVertices, E>
+    where
+        F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
+        I: Fn() -> Result<(), E>,
+    {
+        if should_log(log_level) {
             println!(
                 "Start basic symbolic reachability with {}[nodes:{}] candidates.",
                 initial.approx_cardinality(),
@@ -64,11 +80,12 @@ impl Reachability {
         'reach: loop {
             for var in graph.variables().rev() {
                 let step = step(graph, &result, var);
+                interrupt()?;
                 if !step.is_empty() {
                     result = result.union(&step);
                     max_size = max(max_size, result.symbolic_size());
 
-                    if cfg!(feature = "print-progress") {
+                    if log_essential(log_level, result.symbolic_size()) {
                         let current = result.approx_cardinality();
                         let max = graph.unit_colored_vertices().approx_cardinality();
                         println!(
@@ -83,7 +100,7 @@ impl Reachability {
                 }
             }
 
-            if cfg!(feature = "print-progress") {
+            if should_log(log_level) {
                 println!(
                     "Basic reachability done: {}[nodes:{}] candidates. Max intermediate size: {}.",
                     result.approx_cardinality(),
@@ -92,7 +109,7 @@ impl Reachability {
                 );
             }
 
-            return result;
+            return Ok(result);
         }
     }
 
@@ -108,12 +125,7 @@ impl Reachability {
         initial: &GraphColoredVertices,
         step: F,
     ) -> GraphColoredVertices {
-        let log_level = if cfg!(feature = "print-progress") {
-            LOG_ESSENTIAL
-        } else {
-            LOG_NOTHING
-        };
-        Reachability::_reach(graph, initial, step, log_level, &never_stop).unwrap()
+        Reachability::_reach(graph, initial, step, global_log_level(), &never_stop).unwrap()
     }
 
     /// A version of [Reachability::reach] with cancellation
@@ -129,7 +141,13 @@ impl Reachability {
         F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
         I: Fn() -> Result<(), E>,
     {
-        if should_log(log_level) {
+        Self::_reach_basic_saturation(graph, initial, step, log_level, interrupt)
+
+        // TODO:
+        //   The algorithm below is useful, but apparently not always complete. We need to
+        //   fix this in the subsequent releases.
+
+        /*if should_log(log_level) {
             println!(
                 "Start symbolic reachability with {}[nodes:{}] candidates.",
                 initial.approx_cardinality(),
@@ -204,6 +222,6 @@ impl Reachability {
             }
 
             return Ok(result);
-        }
+        }*/
     }
 }
