@@ -740,13 +740,18 @@ impl BooleanNetwork {
         let mut old_bn = self.clone();
         let old_rg = self.as_graph();
 
-        // Remove `var` from regulators if it is there.
+        // Remove `var` from regulators and target if it is there, since we want to ignore
+        // the self-regulation (because the precondition is that it is safe to ignore).
         let var_regulators = old_rg
             .regulators(var)
             .into_iter()
             .filter(|it| *it != var)
             .collect::<Vec<_>>();
-        let var_targets = old_rg.targets(var);
+        let var_targets = old_rg
+            .targets(var)
+            .into_iter()
+            .filter(|it| *it != var)
+            .collect::<Vec<_>>();
 
         // If we have to create an explicit uninterpreted function for the inlined variable,
         // we have to give it a unique name at first. But once the variable is inlined, we can
@@ -755,7 +760,7 @@ impl BooleanNetwork {
         let mut rename_parameter: Option<(ParameterId, String)> = None;
 
         // 1. The very first step is to replace anonymous functions with explicit ones if they
-        //    are somehow related to `var`. Hence in the next steps, we can assume the inlined
+        //    are somehow related to `var`. Hence, in the next steps, we can assume the inlined
         //    function and the target functions are all explicit.
         for check_var in var_targets.iter().chain(&[var]) {
             let has_missing_function = old_bn.get_update_function(*check_var).is_none();
@@ -1437,5 +1442,14 @@ mod test {
         .unwrap();
 
         assert_eq!(expected, bn.remove_static_constraints());
+    }
+
+    #[test]
+    fn test_constant_inlining_real_world_1() {
+        // This network actually uses the infer_constants parameter in a way that can break
+        // the function if the self-regulations are not properly handled.
+        let bn = BooleanNetwork::try_from_file("./aeon_models/constants.aeon").unwrap();
+        let inlined = bn.inline_constants(true, true);
+        assert!(inlined.num_vars() < bn.num_vars());
     }
 }
