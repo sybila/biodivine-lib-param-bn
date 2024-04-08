@@ -39,6 +39,14 @@ impl FnUpdate {
                 let r = FnUpdate::try_from_expression(*r, graph)?;
                 l.xor(r)
             }
+            BooleanExpression::Cond(e_if, e_then, e_else) => {
+                let e_if = FnUpdate::try_from_expression(*e_if, graph)?;
+                let e_then = FnUpdate::try_from_expression(*e_then, graph)?;
+                let e_else = FnUpdate::try_from_expression(*e_else, graph)?;
+                e_if.clone()
+                    .implies(e_then)
+                    .and(e_if.negation().implies(e_else))
+            }
         })
     }
 }
