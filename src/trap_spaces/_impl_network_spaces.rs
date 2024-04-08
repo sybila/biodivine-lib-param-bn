@@ -151,9 +151,7 @@ impl Iterator for SpaceIterator {
     type Item = Space;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let Some(valuation) = self.inner_iterator.next() else {
-            return None;
-        };
+        let valuation = self.inner_iterator.next()?;
         let mut space = Space(vec![ExtendedBoolean::Any; self.dual_variables.len()]);
         for (i, (t_var, f_var)) in self.dual_variables.iter().enumerate() {
             match (valuation[*t_var], valuation[*f_var]) {
