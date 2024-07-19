@@ -144,7 +144,7 @@ impl SdGraph {
         }
 
         if upper_bound == 1 {
-            // Only self-loop can have one edge.
+            // Only a self-loop can have one edge.
             return None;
         }
 
@@ -158,7 +158,10 @@ impl SdGraph {
         // Direct predecessors can reach pivot in zero steps.
         let mut one_step = HashMap::with_hasher(FxBuildHasher::default());
         for (pred, sign) in &self.predecessors[pivot.to_index()] {
-            if restriction.contains(pred) {
+            // Pivot should never be inserted here (see also similar condition below), because
+            // it is already "on the path". Adding it again would mean the result is not
+            // a simple path.
+            if restriction.contains(pred) && *pred != pivot {
                 one_step.insert((*pred, *sign), (pivot, Positive));
             }
         }

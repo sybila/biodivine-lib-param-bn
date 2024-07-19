@@ -224,7 +224,7 @@ impl SdGraph {
 mod tests {
     use crate::_impl_regulatory_graph::signed_directed_graph::SdGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::Sign::{Negative, Positive};
-    use crate::{BooleanNetwork, RegulatoryGraph, VariableId};
+    use crate::{BooleanNetwork, RegulatoryGraph, Sign, VariableId};
     use std::collections::HashSet;
 
     #[test]
@@ -302,5 +302,31 @@ mod tests {
 
         let expected = HashSet::from_iter([VariableId::from_index(2)]);
         assert_eq!(expected, bn.as_graph().feedback_vertex_set());
+    }
+
+    #[test]
+    fn test_feedback_vertex_set_3() {
+        let bn = BooleanNetwork::try_from(
+            r#"
+        a3 -| a3
+        a5 -| a3
+        a6 -| a4
+        a4 -| a5
+        a4 -| a6
+        $a3: !a3 & !a5
+        $a4: !a6
+        $a5: !a4
+        $a6: !a4
+        "#,
+        )
+        .unwrap();
+
+        let p_fvs = bn.as_graph().parity_feedback_vertex_set(Sign::Positive);
+
+        // The graph only has one positive cycle on a4/a6.
+        let a4 = VariableId::from_index(1);
+        let a6 = VariableId::from_index(3);
+        assert!(p_fvs.contains(&a4) || p_fvs.contains(&a6));
+        assert_eq!(p_fvs.len(), 1);
     }
 }
