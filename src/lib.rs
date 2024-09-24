@@ -264,7 +264,7 @@ pub enum FnUpdate {
 ///
 /// Also keep in mind that the *ordering* of variables and parameters must be shared by equivalent
 /// networks. This is because we want to preserve the property that `VariableId` and `ParameterId`
-/// objects are interchangeable as log as networks are equivalent.
+/// objects are interchangeable as long as networks are equivalent.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BooleanNetwork {
     graph: RegulatoryGraph,
