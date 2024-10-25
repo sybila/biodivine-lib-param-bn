@@ -4,7 +4,7 @@
 //!  - Full SBML-qual support for import/export as well as custom string format `.aeon`.
 //!  - Fully symbolic asynchronous state-space generator using BDDs (great overall performance).
 //!  - Semi-symbolic state-space generator, using BDDs used only for the network parameters
-//! (allows state-level parallelism for smaller networks).
+//!    (allows state-level parallelism for smaller networks).
 //!
 //! For a quick introduction to Boolean networks and their symbolic manipulation, you can
 //! check out our [tutorial module](./tutorial/index.html).
@@ -155,10 +155,10 @@ pub struct Parameter {
 /// Every regulation can be *monotonous*, and can be set as *observable*:
 ///
 ///  - Monotonicity is either *positive* or *negative* and signifies that the influence of the
-/// `regulator` on the `target` has to *increase* or *decrease* the `target` value respectively.
+///    `regulator` on the `target` has to *increase* or *decrease* the `target` value respectively.
 ///  - If observability is set to `true`, the `regulator` *must* have influence on the outcome
-///  of the `target` update function in *some* context. If set to false, this is not enforced
-///  (i.e. the `regulator` *can* have an influence on the `target`, but it is not required).
+///    of the `target` update function in *some* context. If set to false, this is not enforced
+///    (i.e. the `regulator` *can* have an influence on the `target`, but it is not required).
 ///
 /// Regulations can be represented as strings in the
 /// form `"regulator_name 'relationship' target_name"`. The 'relationship' starts with `-`, which

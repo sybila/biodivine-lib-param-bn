@@ -1124,10 +1124,7 @@ mod tests {
         ",
         )
         .unwrap();
-        let args = bn
-            .variables()
-            .map(|it| FnUpdate::mk_var(it))
-            .collect::<Vec<_>>();
+        let args = bn.variables().map(FnUpdate::mk_var).collect::<Vec<_>>();
         assert_eq!(
             FnUpdate::try_from_str("a & b & c", &bn).unwrap(),
             FnUpdate::mk_conjunction(&args)

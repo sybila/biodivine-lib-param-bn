@@ -101,7 +101,7 @@ mod tests {
         assert!(!state.get_bit(3));
         assert!(state.get_bit(4));
         let flipped = state.flip_bit(3);
-        assert_eq!(0b11110 as usize, flipped.into());
+        assert_eq!(0b11110_usize, flipped.into());
     }
 
     #[test]

@@ -233,7 +233,7 @@ mod tests {
                 universe = universe.minus(&scc);
                 components.push(scc);
             }
-            return components;
+            components
         }
         let bn = BooleanNetwork::try_from(
             r"

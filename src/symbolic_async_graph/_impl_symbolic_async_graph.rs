@@ -334,7 +334,7 @@ impl SymbolicAsyncGraph {
     ///
     /// *Note:* The reason this method takes a slice and not, e.g., a `HashMap` is that:
     ///  - If constant, slices are much easier to write in code (i.e. we can write
-    /// `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
+    ///    `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
     ///  - This is already used by the internal BDD API, so the conversion is less involved.
     pub fn mk_subspace(&self, values: &[(VariableId, bool)]) -> GraphColoredVertices {
         let partial_valuation: Vec<(BddVariable, bool)> = values
@@ -603,12 +603,12 @@ impl SymbolicAsyncGraph {
     /// checking algorithms:
     ///  - The two networks have the same variables.
     ///  - All parameters used in the subnetwork must also be declared in the
-    ///  main network (with the same arity).
+    ///    main network (with the same arity).
     ///  - The regulations are identical in both networks (including monotonicity/observability).
     ///  - If the main network has an update function, the subnetwork must have the same
-    ///  update function (tested using the abstract syntax tree, not semantics).
+    ///    update function (tested using the abstract syntax tree, not semantics).
     ///  - If the main network has an erased update function, the subnetwork can have
-    ///  a fully specified function (no parameters) instead.
+    ///    a fully specified function (no parameters) instead.
     ///  - The subnetwork and main network are consistent with the shared regulatory graph.
     ///
     /// If all of these conditions are met, the function returns a `ColorSet` representing all
@@ -830,7 +830,7 @@ impl SymbolicAsyncGraph {
     ///
     /// The `graph` is considered compatible if:
     ///  1. All parameters which appear in `colors` also appear in this graph under the same name
-    ///  (parameters not used in `colors` do not matter).
+    ///     (parameters not used in `colors` do not matter).
     ///  2. The internal ordering of symbolic parameter variables is equivalent between graphs.
     ///
     /// At the moment, condition (2) depends on network structure and is hard to directly
@@ -853,7 +853,7 @@ impl SymbolicAsyncGraph {
     ///
     /// The `graph` is considered compatible if:
     ///  1. All variables which appear in `vertices` also appear in this graph under the same name
-    ///  (variables not used in `vertices` do not matter).
+    ///     (variables not used in `vertices` do not matter).
     ///  2. The internal ordering of symbolic variables is equivalent between the two graphs.
     ///
     /// At the moment, variables are by default ordered alphabetically, hence condition (2)
@@ -876,7 +876,7 @@ impl SymbolicAsyncGraph {
     ///
     /// The `graph` is considered compatible if:
     ///  1. All parameters and state variables which appear in `set` also appear in this graph
-    ///  under the same name (variables not used in `set` do not matter).
+    ///     under the same name (variables not used in `set` do not matter).
     ///  2. The internal ordering of relevant symbolic variables is equivalent between graphs.
     ///
     /// At the moment, condition (2) depends on network structure and is hard to directly
