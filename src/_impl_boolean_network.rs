@@ -732,6 +732,63 @@ impl BooleanNetwork {
         }
     }
 
+    /// Replace the implicit parameter of the given `variable` (i.e. its anonymous uninterpreted
+    /// update function) with an explicit (i.e. named) parameter.
+    ///
+    /// 1. This is only allowed if the update function of `variable` actually is
+    ///    an implicit parameter.
+    ///
+    /// 2. You can provide an optional parameter `name`. If the name is not specified, the new
+    ///    explicit parameter will be named `f_VAR`, where `VAR` is the name of the variable. If
+    ///    the default name clashes with an existing parameter or variable name, it is prefixed
+    ///    with enough underscores (`_`) to eliminate any ambiguity.
+    ///
+    /// 3. The arguments of `f_VAR` will be sorted based on standard ordering of `VariableId`.
+    ///
+    /// Note that this operation modifies the current network.
+    pub fn assign_parameter_name(
+        &mut self,
+        variable: VariableId,
+        name: Option<&str>,
+    ) -> Result<ParameterId, String> {
+        // Ensure that the update function for that variable indeed does not exist.
+        if self.get_update_function(variable).is_some() {
+            return Err(format!(
+                "Variable {} has an explicit update function.",
+                self.get_variable_name(variable)
+            ));
+        }
+        // Either use the provided name, or the default one.
+        let name = name
+            .map(|it| it.to_string())
+            .unwrap_or_else(|| self.get_implicit_function_name(variable));
+
+        // Get the regulators, register the parameter, and set the update function.
+        let regulators = self.as_graph().regulators(variable);
+        let arity = regulators.len();
+        // Note that this should never fail because the new name is always safe and unambiguous.
+        let id = self.add_parameter(name.as_str(), u32::try_from(arity).unwrap())?;
+        let function = FnUpdate::mk_basic_param(id, &regulators);
+        self.set_update_function(variable, Some(function))?;
+
+        Ok(id)
+    }
+
+    /// Make a copy of this [BooleanNetwork] where all implicit parameters (i.e. anonymous update
+    /// functions) are replaced with explicit parameters using a default naming scheme (see also
+    /// [BooleanNetwork::assign_parameter_name]).
+    pub fn name_implicit_parameters(&self) -> BooleanNetwork {
+        let mut copy = self.clone();
+        for var in self.variables() {
+            if self.get_update_function(var).is_none() {
+                // This can never fail because we check that the variable is indeed an
+                // implicit parameter.
+                copy.assign_parameter_name(var, None).unwrap();
+            }
+        }
+        copy
+    }
+
     /// An internal infallible version of [BooleanNetwork::inline_variable] which does not check
     /// for self-regulations. The idea is that you can use this function if you are *sure* the
     /// inlining is reasonable even if a self-regulation is present.
@@ -1074,7 +1131,7 @@ impl Index<ParameterId> for BooleanNetwork {
 
 #[cfg(test)]
 mod test {
-    use crate::BooleanNetwork;
+    use crate::{BooleanNetwork, FnUpdate, ParameterId};
     use std::convert::TryFrom;
 
     #[test]
@@ -1451,5 +1508,30 @@ mod test {
         let bn = BooleanNetwork::try_from_file("./aeon_models/constants.aeon").unwrap();
         let inlined = bn.inline_constants(true, true);
         assert!(inlined.num_vars() < bn.num_vars());
+    }
+
+    #[test]
+    fn test_assign_parameter_name() {
+        let mut bn = BooleanNetwork::try_from(
+            r#"
+        a -> b
+        b -> c
+        a -| c
+        c -? a
+        "#,
+        )
+        .unwrap();
+        let vars = bn.variables().collect::<Vec<_>>();
+        bn.assign_parameter_name(vars[0], Some("foo_a")).unwrap();
+        assert_eq!(bn.num_parameters(), 1);
+        let update = bn.get_update_function(vars[0]).as_ref().unwrap();
+        assert_eq!(bn.get_parameter(ParameterId::from_index(0)).name, "foo_a");
+        assert!(matches!(update, &FnUpdate::Param(_, _)));
+
+        let copy = bn.name_implicit_parameters();
+        assert_eq!(copy.num_parameters(), 3);
+        assert!(copy.get_update_function(vars[0]).is_some());
+        assert!(copy.get_update_function(vars[1]).is_some());
+        assert!(copy.get_update_function(vars[2]).is_some());
     }
 }
