@@ -168,7 +168,7 @@ impl BooleanNetwork {
             }
             i_expected += 1;
         }
-        return if i_actual == actual.len() {
+        if i_actual == actual.len() {
             Ok(())
         } else {
             let expected_names: Vec<String> = expected
@@ -184,7 +184,7 @@ impl BooleanNetwork {
                 "Variable '{}' is regulated by {:?}, but {:?} were found as arguments",
                 var_name, expected_names, actual_names
             ))
-        };
+        }
     }
 }
 
@@ -460,7 +460,7 @@ impl BooleanNetwork {
         for var in old_bn.variables() {
             if let Some(update) = old_bn.get_update_function(var) {
                 // At this point, all non-essential variables are already removed from the
-                // function and we can thus safely copy it into the new network.
+                // function, and we can thus safely copy it into the new network.
                 new_bn
                     .set_update_function(var, Some(update.clone()))
                     .unwrap_or_else(|_| {
@@ -477,8 +477,8 @@ impl BooleanNetwork {
     /// Similar to [BooleanNetwork::inline_inputs], but inlines constant values (i.e. `x=true` or
     /// `x=false`).
     ///
-    /// By default, the constant check is purely syntactic, but we do perform basic constant
-    /// propagation (e.g. `x | true = true`) in order to catch the most obvious non-trivial cases.
+    /// By default, the constant check is purely syntactic, but we do perform basic simplifications
+    /// (e.g. `x | true = true`) in order to catch the most obvious non-trivial cases.
     /// However, you can set `infer_constants` to `true`, in which case a symbolic method will
     /// be used to check if the variable uses a constant function. Note that this can also
     /// eliminate parameters in some cases (e.g. inlining `x=true` into `y=x | f(z)`).
@@ -496,83 +496,101 @@ impl BooleanNetwork {
     /// does not have a valid symbolic representation.
     pub fn inline_constants(&self, infer_constants: bool, repair_graph: bool) -> BooleanNetwork {
         let mut result = self.clone();
-        'inlining: loop {
-            // These are two very similar algorithms, but we don't want to create the context
-            // needlessly if we don't have to.
-            if infer_constants {
-                let ctx = SymbolicContext::new(&result).unwrap_or_else(|_| {
-                    panic!("Cannot create symbolic context for a network.");
-                });
-                for var in result.variables() {
-                    if let Some(update) = result.get_update_function(var) {
-                        // Even if the value is not constant, we want to do constant propagation,
-                        // just in case it makes the problem simpler.
-                        let update_simplified = update.simplify_constants();
-                        let is_constant = update_simplified.as_const();
-                        result
-                            .set_update_function(var, Some(update_simplified))
-                            .unwrap_or_else(|_| {
-                                unreachable!(
-                                    "A simplified function can always replace the original."
-                                )
-                            });
-                        if is_constant.is_some() {
-                            result = result.inline_variable_internal(var, repair_graph);
-                            continue 'inlining;
-                        }
-
-                        // If constant propagation failed, we can recompute the
-                        // result symbolically.
-                        let update = result
-                            .get_update_function(var)
-                            .as_ref()
-                            .unwrap_or_else(|| unreachable!("The function is known (see above)."));
-                        let fn_is_true = ctx.mk_fn_update_true(update);
-                        let constant = if fn_is_true.is_true() {
-                            Some(true)
-                        } else if fn_is_true.is_false() {
-                            Some(false)
-                        } else {
-                            None
-                        };
-                        if let Some(value) = constant {
-                            // "Clean up" the function before inlining it.
-                            result
-                                .set_update_function(var, Some(FnUpdate::Const(value)))
-                                .unwrap_or_else(|_| {
-                                    unreachable!("Constant function should be always allowed.");
-                                });
-                            result = result.inline_variable_internal(var, repair_graph);
-                            // The network has changed, so we need to recreate the symbolic context.
-                            continue 'inlining;
-                        }
-                    }
-                }
-            } else {
-                for var in result.variables() {
-                    if let Some(update) = result.get_update_function(var) {
-                        // This is necessary to enable propagation beyond the first iteration,
-                        // because we need to be able to detect things like `x | true` as `true`.
-                        let update_simplified = update.simplify_constants();
-                        let is_constant = update_simplified.as_const();
-                        result
-                            .set_update_function(var, Some(update_simplified))
-                            .unwrap_or_else(|_| {
-                                unreachable!(
-                                    "A simplified function can always repalce the original."
-                                )
-                            });
-                        if is_constant.is_some() {
-                            result = result.inline_variable_internal(var, repair_graph);
-                            continue 'inlining;
-                        }
-                    }
-                }
+        loop {
+            let constants = result.constants(infer_constants);
+            if constants.is_empty() {
+                break;
             }
-            // If nothing was inlined, we can stop.
-            break;
+            // WARNING: The reverse iterator here is very important, because inlining the constant
+            // variable will change IDs of other variables. However, doing it from largest to
+            // smallest will not affect IDs of the *remaining* constant variables.
+            for (var, constant) in constants.into_iter().rev() {
+                // Replace the function before inlining it.
+                result
+                    .set_update_function(var, Some(FnUpdate::Const(constant)))
+                    .expect("Constant functions should always be valid.");
+                // Inline the function.
+                result = result.inline_variable_internal(var, repair_graph);
+            }
         }
-        result
+
+        // At this point, all constants are "gone", but we can still do two things: First,
+        // we want to simplify the update functions to actually remove the constant values
+        // wherever possible. Second, we can repair the regulatory graph assuming the user
+        // asked for it.
+
+        for var in result.variables() {
+            if let Some(update) = result.get_update_function(var) {
+                result
+                    .set_update_function(var, Some(update.simplify_constants()))
+                    .expect("Simplified functions should always be valid.")
+            }
+        }
+
+        if repair_graph {
+            result
+                .infer_valid_graph()
+                .expect("Cannot infer valid graph.")
+        } else {
+            result
+        }
+    }
+
+    /// A function for checking whether a variable is a constant. If a [SymbolicContext] is
+    /// provided, the check if semantic (using BDDs), otherwise it is only syntactic (using basic
+    /// function simplifications).
+    ///
+    /// See also [BooleanNetwork::constants] and [BooleanNetwork::inline_constants].
+    pub fn is_var_constant(&self, var: VariableId, ctx: Option<&SymbolicContext>) -> Option<bool> {
+        let Some(update) = self.get_update_function(var) else {
+            return None;
+        };
+
+        // First do syntactic propagation of constants.
+        let simplified = update.simplify_constants();
+        if let Some(constant) = simplified.as_const() {
+            return Some(constant);
+        };
+
+        if let Some(ctx) = ctx {
+            // Then check using BDDs.
+            let fn_is_true = ctx.mk_fn_update_true(&simplified);
+            if fn_is_true.is_true() {
+                return Some(true);
+            } else if fn_is_true.is_false() {
+                return Some(false);
+            }
+        }
+
+        None
+    }
+
+    /// Compute the list of variables that are *constant*, meaning their update function
+    /// always evaluates to `true` or always evaluates to `false`. The results are returned
+    /// in an increasing order (w.r.t. [VariableId] ordering).
+    ///
+    /// This can be checked either syntactically (if `infer=False`), or semantically using BDDs
+    /// (if `infer=True`). For the syntactic check, a basic simplification procedure is performed
+    /// to propagate known constant values and detect basic tautologies/contradictions. However,
+    /// this method is incomplete and may not always identify complex functions that evaluate to
+    /// constants.
+    ///
+    /// ## Panics
+    ///
+    /// The method can fail if `infer` is specified and the network
+    /// does not have a valid symbolic representation.
+    pub fn constants(&self, infer: bool) -> Vec<(VariableId, bool)> {
+        let ctx = if infer {
+            let ctx =
+                SymbolicContext::new(self).expect("Cannot create network's symbolic context.");
+            Some(ctx)
+        } else {
+            None
+        };
+
+        self.variables()
+            .filter_map(|var| self.is_var_constant(var, ctx.as_ref()).map(|c| (var, c)))
+            .collect()
     }
 
     /// Try to inline the input nodes (variables) of the network as logical parameters
@@ -600,69 +618,88 @@ impl BooleanNetwork {
     /// of relevant regulations are inferred using BDDs.
     ///
     pub fn inline_inputs(&self, infer_inputs: bool, repair_graph: bool) -> BooleanNetwork {
-        let inputs: Vec<VariableId> = {
-            if infer_inputs {
-                let ctx = SymbolicContext::new(self).unwrap_or_else(|_| {
-                    panic!("Cannot create symbolic context for a network.");
-                });
-                self.variables()
-                    .filter(|it| {
-                        // Check if the variable is an input.
-                        let has_no_regulators = self.as_graph().regulators(*it).is_empty();
-                        let has_update_function = self.get_update_function(*it).is_some();
-                        let is_free_input = has_no_regulators && !has_update_function;
+        let inputs: Vec<VariableId> = self.inputs(infer_inputs);
 
-                        let has_identity_update =
-                            if let Some(update) = self.get_update_function(*it) {
-                                let bdd_var = ctx.get_state_variable(*it);
-                                let bdd_identity = ctx.bdd_variable_set().mk_var(bdd_var);
-                                let bdd_fn = ctx.mk_fn_update_true(update);
-
-                                bdd_fn.iff(&bdd_identity).is_true()
-                            } else {
-                                false
-                            };
-                        is_free_input || has_identity_update
-                    })
-                    .collect()
-            } else {
-                self.variables()
-                    .filter(|it| {
-                        // Check if the variable is an input.
-                        let has_no_regulators = self.as_graph().regulators(*it).is_empty();
-                        let has_update_function = self.get_update_function(*it).is_some();
-                        let is_free_input = has_no_regulators && !has_update_function;
-
-                        let has_identity_update =
-                            self.get_update_function(*it) == &Some(FnUpdate::Var(*it));
-                        is_free_input || has_identity_update
-                    })
-                    .collect()
-            }
-        };
-
-        /*
-           This is not super efficient, because we make a new copy of the BN every time,
-           but we also want to avoid copying the inlining logic here, because it is already
-           sufficiently complex.
-        */
-
+        // Same as with constants, the reversed iteration order is very important here, because we
+        // need to ensure that `VariableId` objects of the "smaller" inputs stay valid after the
+        // "larger" inputs are inlined. If we did this the other way around, the "larger" input IDs
+        // would change once the "smaller" inputs are inlined.
         let mut result = self.clone();
-        for input in inputs {
-            let name = self.get_variable_name(input);
-            let new_id = result.as_graph().find_variable(name).unwrap();
+        for input in inputs.into_iter().rev() {
             // Simplify the function for the purposes of inlining.
-            if result.get_update_function(new_id).is_some() {
+            if result.get_update_function(input).is_some() {
                 result
-                    .set_update_function(new_id, Some(FnUpdate::Var(new_id)))
-                    .unwrap_or_else(|_| {
-                        println!("Identity update must be allowed for these variables.");
-                    });
+                    .set_update_function(input, Some(FnUpdate::Var(input)))
+                    .expect("Identity update must be valid for input variables.")
             }
-            result = result.inline_variable_internal(new_id, repair_graph);
+            result = result.inline_variable_internal(input, repair_graph);
         }
 
+        // Compared to constants, inlining inputs should not create new inputs (at least not under
+        // any normal circumstances).
+
         result
+    }
+
+    /// A function for checking whether a variable is an input. If a [SymbolicContext] is
+    /// provided, the check if semantic (using BDDs), otherwise it is only syntactic (using basic
+    /// function simplifications).
+    ///
+    /// See also [BooleanNetwork::inputs] and [BooleanNetwork::inline_inputs] for a more detailed
+    /// discussion of which variables count as inputs.
+    pub fn is_var_input(&self, var: VariableId, ctx: Option<&SymbolicContext>) -> bool {
+        // Check if the variable is a "free" input (i.e. no regulators and no function).
+        let has_no_regulators = self.as_graph().regulators(var).is_empty();
+        let has_update_function = self.get_update_function(var).is_some();
+        let is_free_input = has_no_regulators && !has_update_function;
+
+        // Check if the variable is an identity input (i.e. it has a function that it equivalent
+        // to an identity function).
+        let has_identity_update = if let Some(update) = self.get_update_function(var) {
+            if let Some(ctx) = ctx {
+                // Check that the BDD of the update function is semantically equivalent
+                // to the BDD of an identity function for the analyzed variable.
+
+                let bdd_var = ctx.get_state_variable(var);
+                let bdd_identity = ctx.bdd_variable_set().mk_var(bdd_var);
+                let bdd_fn = ctx.mk_fn_update_true(update);
+
+                bdd_fn.iff(&bdd_identity).is_true()
+            } else {
+                // Check that (after simplification), the update function is a syntactic
+                // identity.
+                update.simplify_constants() == FnUpdate::Var(var)
+            }
+        } else {
+            false
+        };
+
+        is_free_input || has_identity_update
+    }
+
+    /// Compute the list of variables that are *inputs*, meaning their update function
+    /// is an identify function (i.e. `f_i(x) = x_i`), or equivalent to an identity function.
+    /// The inputs are returned in an increasing order (w.r.t. `VariableId` ordering).
+    ///
+    /// More specifically, an "input" is a variable `i` such that:
+    ///   - `i` has no incoming regulations and a missing update function.
+    ///   - `i` has an identity update function. This is either checked syntactically (default),
+    ///     or semantically using BDDs (if `infer` is set to `true`).
+    ///
+    /// Note that this does not include constant nodes (e.g. `f_i(x)=true`). These are handled
+    /// separately by [BooleanNetwork::constants]. See also [BooleanNetwork::inline_inputs].
+    pub fn inputs(&self, infer: bool) -> Vec<VariableId> {
+        let ctx = if infer {
+            let ctx =
+                SymbolicContext::new(self).expect("Cannot create network's symbolic context.");
+            Some(ctx)
+        } else {
+            None
+        };
+
+        self.variables()
+            .filter(|var| self.is_var_input(*var, ctx.as_ref()))
+            .collect()
     }
 
     /// Produce a new [BooleanNetwork] where the given [VariableId] `var` has been eliminated
@@ -1039,7 +1076,7 @@ impl BooleanNetwork {
         //    ideally want to remove it from the network completely.
         new_bn = new_bn.prune_unused_parameters();
 
-        // 8. If we don't want to fix the regulatory graph afterwards, we are done.
+        // 8. If we don't want to fix the regulatory graph afterward, we are done.
         //    However, if we do want to fix it, we will need to create a symbolic context
         //    and start building the network from scratch.
         //    This is essentially `infer_valid_graph`, but only for the relevant regulations.
@@ -1055,7 +1092,7 @@ impl BooleanNetwork {
 
             let mut new_new_rg = RegulatoryGraph::new(new_bn.as_graph().variable_names());
 
-            // We need to clone the regulations because we will might be modifying the BN
+            // We need to clone the regulations because we might be modifying the BN
             // in the loop (not the regulations though).
             for reg in Vec::from_iter(new_bn.as_graph().regulations().cloned()) {
                 if !repair_targets.contains(&reg.target) {
@@ -1105,7 +1142,7 @@ impl BooleanNetwork {
 
             // In very rare instances, we can eliminate a parameter by detecting an unused
             // regulation and simplifying the variable away (e.g. `x & !x & f(z)` simplifies
-            // to `false`). Hence we have to prune parameters again here.
+            // to `false`). Hence, we have to prune parameters again here.
             new_new_bn.prune_unused_parameters()
         }
     }
@@ -1131,6 +1168,7 @@ impl Index<ParameterId> for BooleanNetwork {
 
 #[cfg(test)]
 mod test {
+    use crate::symbolic_async_graph::SymbolicContext;
     use crate::{BooleanNetwork, FnUpdate, ParameterId};
     use std::convert::TryFrom;
 
@@ -1435,6 +1473,10 @@ mod test {
         )
         .unwrap();
 
+        let c = bn.as_graph().find_variable("c").unwrap();
+        assert_eq!(bn.is_var_constant(c, None), Some(true));
+        assert_eq!(bn.constants(false), vec![(c, true)]);
+
         let expected = BooleanNetwork::try_from(
             r"
             b -> b
@@ -1461,6 +1503,19 @@ mod test {
         ",
         )
         .unwrap();
+
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let a = bn.as_graph().find_variable("a").unwrap();
+        let b = bn.as_graph().find_variable("b").unwrap();
+        let c = bn.as_graph().find_variable("c").unwrap();
+
+        assert_eq!(bn.is_var_constant(a, None), None);
+        assert_eq!(bn.is_var_constant(b, None), None);
+        assert_eq!(bn.is_var_constant(a, Some(&ctx)), Some(false));
+        assert_eq!(bn.is_var_constant(b, Some(&ctx)), Some(true));
+        assert_eq!(bn.is_var_constant(c, Some(&ctx)), None);
+        assert_eq!(bn.constants(false), vec![]);
+        assert_eq!(bn.constants(true), vec![(a, false), (b, true)]);
 
         let expected = BooleanNetwork::try_from(
             r"
