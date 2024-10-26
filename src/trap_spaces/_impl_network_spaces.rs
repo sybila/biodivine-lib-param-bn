@@ -119,6 +119,20 @@ impl NetworkSpaces {
     pub fn to_vertices(&self, ctx: &SymbolicSpaceContext) -> GraphVertices {
         GraphVertices::new(ctx.spaces_to_vertices(self.as_bdd()), ctx.inner_context())
     }
+
+    /// Produce a set of spaces that is a superset of this set, and in addition contains
+    /// all spaces that are a super-space of *some* item in this set.
+    pub fn with_all_super_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkSpaces {
+        let super_bdd = ctx.mk_super_spaces(self.as_bdd());
+        self.copy(super_bdd)
+    }
+
+    /// Produce a set of spaces that is a superset of this set, and in addition contains
+    /// all spaces that are a subspace of *some* item in this set.
+    pub fn with_all_sub_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkSpaces {
+        let sub_bdd = ctx.mk_sub_spaces(self.as_bdd());
+        self.copy(sub_bdd)
+    }
 }
 
 impl BddSet for NetworkSpaces {
@@ -167,8 +181,8 @@ impl Iterator for SpaceIterator {
 
 #[cfg(test)]
 mod tests {
-    use crate::trap_spaces::SymbolicSpaceContext;
-    use crate::BooleanNetwork;
+    use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
+    use crate::{BooleanNetwork, ExtendedBoolean, Space};
     use num_bigint::BigInt;
     use num_traits::One;
 
@@ -185,6 +199,28 @@ mod tests {
         assert_eq!(1.0, singleton.approx_cardinality());
         assert_eq!(BigInt::one(), singleton.exact_cardinality());
         assert_eq!(1, singleton.iter().count());
+
+        let mut space = Space::new(&bn);
+        for var in bn.variables() {
+            space[var] = ExtendedBoolean::Zero;
+        }
+
+        let all_zero = NetworkSpaces::new(ctx.mk_space(&space), &ctx);
+        // 2^28, i.e. the number of variables, since each variable can
+        // be either fixed to zero or free.
+        assert_eq!(1.0, all_zero.with_all_sub_spaces(&ctx).approx_cardinality());
+        assert_eq!(
+            268435456.0,
+            all_zero.with_all_super_spaces(&ctx).approx_cardinality()
+        );
+
+        // Adding all super-spaces will always add *^n, which has all spaces as sub-spaces.
+        assert_eq!(
+            ctx.mk_unit_spaces(),
+            all_zero
+                .with_all_super_spaces(&ctx)
+                .with_all_sub_spaces(&ctx)
+        );
 
         // There are 28 network variables and we are eliminating 22 of them, so 6 should be left.
         let dual_vars = ctx.inner_context().all_extra_state_variables();

@@ -116,6 +116,20 @@ impl NetworkColoredSpaces {
     pub fn to_colored_vertices(&self, ctx: &SymbolicSpaceContext) -> GraphColoredVertices {
         GraphColoredVertices::new(ctx.spaces_to_vertices(self.as_bdd()), ctx.inner_context())
     }
+
+    /// Produce a set of spaces that is a superset of this set, and in addition contains
+    /// all spaces that are a super-space of *some* item in this set.
+    pub fn with_all_super_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkColoredSpaces {
+        let super_bdd = ctx.mk_super_spaces(self.as_bdd());
+        self.copy(super_bdd)
+    }
+
+    /// Produce a set of spaces that is a superset of this set, and in addition contains
+    /// all spaces that are a subspace of *some* item in this set.
+    pub fn with_all_sub_spaces(&self, ctx: &SymbolicSpaceContext) -> NetworkColoredSpaces {
+        let sub_bdd = ctx.mk_sub_spaces(self.as_bdd());
+        self.copy(sub_bdd)
+    }
 }
 
 /// Relation operations.
@@ -213,8 +227,8 @@ impl BddSet for NetworkColoredSpaces {
 mod tests {
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::trap_spaces::SymbolicSpaceContext;
-    use crate::BooleanNetwork;
+    use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext};
+    use crate::{BooleanNetwork, ExtendedBoolean, Space};
     use num_bigint::BigInt;
     use num_traits::One;
 
@@ -236,12 +250,40 @@ mod tests {
         assert!(singleton_color.is_singleton());
         assert!(singleton_space.is_singleton());
         assert!(!unit.intersect_colors(&singleton_color).is_singleton());
-        // There is only one color, hence this holds. Otherwise this should not hold.
+        // There is only one color, hence this holds. Otherwise, this should not hold.
         assert!(unit.intersect_spaces(&singleton_space).is_singleton());
         assert!(unit.minus_colors(&singleton_color).is_empty());
         assert!(unit.minus_spaces(&singleton_space).is_subset(&unit));
 
-        // There are 28 network variables and we are eliminating 22 of them, so 6 should be left.
+        let mut space = Space::new(&bn);
+        for var in bn.variables() {
+            space[var] = ExtendedBoolean::Zero;
+        }
+
+        let all_zero = NetworkColoredSpaces::new(ctx.mk_space(&space), &ctx)
+            .intersect_colors(stg.unit_colors());
+
+        // 2^28, i.e. the number of variables, since each variable can
+        // be either fixed to zero or free.
+        let unit_colors = stg.unit_colors();
+        assert_eq!(
+            unit_colors.approx_cardinality(),
+            all_zero.with_all_sub_spaces(&ctx).approx_cardinality()
+        );
+        assert_eq!(
+            268435456.0 * unit_colors.approx_cardinality(),
+            all_zero.with_all_super_spaces(&ctx).approx_cardinality()
+        );
+
+        // Adding all super-spaces will always add *^n, which has all spaces as sub-spaces.
+        assert_eq!(
+            ctx.mk_unit_colored_spaces(&stg),
+            all_zero
+                .with_all_super_spaces(&ctx)
+                .with_all_sub_spaces(&ctx)
+        );
+
+        // There are 28 network variables, and we are eliminating 22 of them, so 6 should be left.
         let dual_vars = ctx.inner_context().all_extra_state_variables();
         let project = unit.raw_projection(&dual_vars[0..44]);
         assert_eq!(project.iter().count(), 3_usize.pow(6));
