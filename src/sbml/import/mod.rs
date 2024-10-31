@@ -89,17 +89,31 @@ impl BooleanNetwork {
         create_regulations(&mut regulatory_graph, &transitions, &specie_to_name)?;
 
         let mut boolean_network = BooleanNetwork::new(regulatory_graph);
+
+        // First, collect and create parameters (in alphabetic order)
+        let mut parameters = HashMap::new();
         for transition in &transitions {
             if transition.default_term.is_some() {
-                // Only continue if this transition has a function
-                // First, create parameters used by this transition.
+                // First, register parameters used by this transition.
                 for term in &transition.function_terms {
                     if let Some(math) = &term.math {
-                        create_explicit_parameters(math, &mut boolean_network)?;
+                        create_explicit_parameters(math, &mut parameters)?;
                     }
                 }
+            }
+        }
 
-                // At this point we know this won't fail because we already created the regulations.
+        let mut parameters = Vec::from_iter(parameters);
+        parameters.sort_by_cached_key(|(it, _)| it.clone());
+        for (name, arity) in parameters {
+            boolean_network.add_parameter(name.as_str(), arity)?;
+        }
+
+        // Then actually go through the functions and create them.
+        for transition in &transitions {
+            if transition.default_term.is_some() {
+                // At this point we know this won't fail because we already
+                // created the regulations and parameters.
                 let out_var = &specie_to_name[&transition.outputs[0].qual_species];
                 let out_var = boolean_network.graph.find_variable(out_var).unwrap();
                 let update_function = sbml_transition_to_update_function(
@@ -339,20 +353,23 @@ fn create_regulations(
 }
 
 /// **(internal)** Create any explicit parameters used in the given MathML tree.
-fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Result<(), String> {
+fn create_explicit_parameters(
+    math: &MathMl,
+    params: &mut HashMap<String, u32>,
+) -> Result<(), String> {
     match math {
         MathMl::Boolean(_) => Ok(()),
         MathMl::Integer(_) => Ok(()),
         MathMl::Identifier(_) => Ok(()),
         MathMl::Apply(_, args) => {
             for a in args {
-                create_explicit_parameters(a, network)?;
+                create_explicit_parameters(a, params)?;
             }
             Ok(())
         }
         MathMl::SymbolApply(name, args) => {
-            if let Some(p) = network.find_parameter(name) {
-                let current = network.get_parameter(p).get_arity();
+            if let Some(p) = params.get(name) {
+                let current = *p;
                 if current != u32::try_from(args.len()).unwrap() {
                     return Err(format!(
                         "Parameter `{}` is used with cardinality {} as well as {}",
@@ -363,11 +380,11 @@ fn create_explicit_parameters(math: &MathMl, network: &mut BooleanNetwork) -> Re
                 }
             } else {
                 // Seems that at the moment there are no restrictions on parameter names (weird).
-                network.add_parameter(name, u32::try_from(args.len()).unwrap())?;
+                params.insert(name.clone(), u32::try_from(args.len()).unwrap());
             }
             // Also run this, in case we allow complex parameter applications in the future.
             for a in args {
-                create_explicit_parameters(a, network)?;
+                create_explicit_parameters(a, params)?;
             }
             Ok(())
         }
