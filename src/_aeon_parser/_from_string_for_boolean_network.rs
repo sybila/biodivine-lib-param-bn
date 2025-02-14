@@ -23,7 +23,7 @@ impl TryFrom<&str> for BooleanNetwork {
         // annotation, or by a corresponding child annotation.
         let expected_variables = if let Some(decl) = annotations.get_child(&["variable"]) {
             let mut data = decl.read_multiline_value();
-            for (child, _) in decl.children() {
+            for child in decl.children().keys() {
                 data.push(child.clone());
             }
             data
