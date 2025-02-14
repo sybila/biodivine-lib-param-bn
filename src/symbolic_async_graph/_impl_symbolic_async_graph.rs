@@ -3,18 +3,19 @@ use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
 use crate::symbolic_async_graph::_impl_symbolic_async_graph_operators::a_and_b_and_c;
 use crate::symbolic_async_graph::bdd_set::BddSet;
+use crate::symbolic_async_graph::projected_iteration::RawProjection;
 use crate::symbolic_async_graph::{
     GraphColoredVertices, GraphColors, GraphVertices, RegulationConstraint, SymbolicAsyncGraph,
     SymbolicContext,
 };
 use crate::trap_spaces::SymbolicSpaceContext;
 use crate::{
-    BooleanNetwork, FnUpdate, Monotonicity, Regulation, RegulatoryGraph, VariableId,
+    BooleanNetwork, FnUpdate, Monotonicity, ParameterId, Regulation, RegulatoryGraph, VariableId,
     VariableIdIterator,
 };
 use crate::{ExtendedBoolean, Space};
-use biodivine_lib_bdd::{bdd, Bdd, BddVariable};
-use std::collections::HashMap;
+use biodivine_lib_bdd::{bdd, Bdd, BddPartialValuation, BddValuation, BddVariable};
+use std::collections::{HashMap, HashSet};
 
 impl SymbolicAsyncGraph {
     /// Create a [SymbolicAsyncGraph] based on the default symbolic encoding of the supplied
@@ -967,6 +968,159 @@ impl SymbolicAsyncGraph {
 
         Some(bn)
     }
+
+    /// Compute a subset of [GraphColors] where every group of colors that results in a logically
+    /// equivalent network is represented by only one color.
+    ///
+    /// In simple networks, this should not change the color set significantly. In particular,
+    /// networks that only use implicit parameters should not be affected at all. This only applies
+    /// when an unknown function appears in a complex expression that can cause it to be
+    /// irrelevant in certain cases. The most obvious instance of this is `true | f(x)`. In this
+    /// case, the value of `f(x)` is irrelevant and all possible interpretations of `f` lead to
+    /// the same function (i.e. `true`).
+    ///
+    /// However, in most situations, the case is not so simple and depending on the actual
+    /// configuration of update functions, various interpretations can lead to the same
+    /// eventual behavior. Fortunately, in most cases, we can at least split the problem into
+    /// independent sub-problems for fully independent parameters/functions. However, when multiple
+    /// parameters appear in one update function, we may need to explicitly test every combination
+    /// of those parameters.
+    ///
+    /// **Overall, this testing is non-trivial and is not guaranteed to result in smaller symbolic
+    /// representation (smaller BDD). As such, it is recommended to use it only when uniqueness
+    /// is required for the correctness of the result (i.e. problems that require unique network
+    /// counting). In other words, in most real-world instances, using this function will not
+    /// lead to better performance.**
+    ///
+    pub fn logically_unique_subset(&self, colors: &GraphColors) -> GraphColors {
+        // First, we don't need to care about implicit parameters. These are always independent
+        // of the rest of the network.
+        // Second, we want to build "clusters" of explicit parameters and network variables that
+        // depend on them. Each cluster can be considered independently.
+
+        // We need the BN for this operation:
+        let bn = self
+            .as_network()
+            .expect("Computing unique colors requires the original Boolean network.");
+
+        // First, put direct dependencies into the cluster map.
+        let mut clusters: HashMap<Vec<VariableId>, HashSet<ParameterId>> = HashMap::new();
+        for var in bn.variables() {
+            if let Some(update) = bn.get_update_function(var) {
+                let params = update.collect_parameters();
+                if !params.is_empty() {
+                    clusters.insert(vec![var], HashSet::from_iter(params));
+                }
+            }
+        }
+
+        // Then try to search for intersections of clusters and merge them.
+        loop {
+            let mut new_clusters: HashMap<Vec<VariableId>, HashSet<ParameterId>> = HashMap::new();
+            for (mut c1, mut p1) in clusters.clone() {
+                // If the cluster has an intersection with something in new_clusters, we
+                // remove these intersecting clusters and replace them with one large cluster union.
+                let mut to_replace = Vec::new();
+                for (c2, p2) in new_clusters.iter() {
+                    let has_shared_parameters = p1.iter().any(|x| p2.contains(x));
+                    if has_shared_parameters {
+                        to_replace.push(c2.clone());
+                        c1.extend(c2.clone());
+                        p1.extend(p2.clone());
+                    }
+                }
+                for x in to_replace {
+                    new_clusters.remove(&x);
+                }
+                new_clusters.insert(c1, p1);
+            }
+            if new_clusters.len() == clusters.len() {
+                break;
+            } else {
+                clusters = new_clusters;
+            }
+        }
+
+        // Note: As long as everything works ok, unused parameters should be empty.
+        // Ideally, all parameters should be used, but just in case they are not, we should also
+        // go through those that are not used:
+        let mut unused_parameters: HashSet<ParameterId> = HashSet::from_iter(bn.parameters());
+        for (_, v) in &clusters {
+            for p in v {
+                if unused_parameters.contains(p) {
+                    unused_parameters.remove(p);
+                }
+            }
+        }
+        // These unused parameters are a separate cluster that no variables depend on:
+        if !unused_parameters.is_empty() {
+            clusters.insert(Vec::new(), unused_parameters);
+        }
+
+        // Now, we will go through every cluster, and we will gather unique BDDs for the update
+        // function interpretation, and then restrict the original BDD to those interpretation that
+        // generate these unique BDDs.
+        let bdd_ctx = self.symbolic_context.bdd_variable_set();
+        let mut colors_bdd = colors.as_bdd().clone();
+        for (vars, params) in clusters {
+            println!("Process cluster {:?} {:?}", vars, params);
+            let mut relevant_bdd_vars = Vec::new();
+            for p in params {
+                let table = self.symbolic_context.get_explicit_function_table(p);
+                relevant_bdd_vars.extend(table.rows.clone());
+            }
+            let mut unique_interpretations: HashMap<Vec<Bdd>, BddPartialValuation> = HashMap::new();
+            for valuation in RawProjection::new(relevant_bdd_vars, &colors_bdd) {
+                // Extend the partial valuation with `false` values. These should not influence
+                // any of the relevant update functions.
+                let mut full_valuation = BddValuation::all_false(bdd_ctx.num_vars());
+                for (k, v) in valuation.to_values() {
+                    full_valuation.set_value(k, v);
+                }
+
+                // Map every variable to a BDD representing its update function under the selected
+                // valuation.
+                let key = vars
+                    .iter()
+                    .map(|v| {
+                        let update = bn
+                            .get_update_function(*v)
+                            .as_ref()
+                            .expect("Function must exist.");
+                        self.symbolic_context
+                            .instantiate_fn_update(&full_valuation, update)
+                    })
+                    .collect::<Vec<_>>();
+
+                if !unique_interpretations.contains_key(&key) {
+                    unique_interpretations.insert(key, valuation);
+                }
+            }
+            println!("Unique: {:?}", unique_interpretations.len());
+            for (k, v) in unique_interpretations.iter() {
+                println!(
+                    "{:?}: {:?}",
+                    k.iter().map(|it| it.size()).collect::<Vec<_>>(),
+                    v
+                );
+            }
+
+            // Make a BDD that is satisfied only by the semantically unique interpretations of
+            // the considered parameters, and does not depend on the remaining parameters.
+            let dnf = Vec::from_iter(unique_interpretations.values().cloned());
+            println!("DNF: {:?}", dnf);
+            let dnf_bdd = bdd_ctx.mk_dnf(&dnf);
+            println!(
+                "Colors: {} {}",
+                colors_bdd.cardinality(),
+                colors_bdd.num_vars()
+            );
+            colors_bdd = colors_bdd.and(&dnf_bdd);
+            println!("Colors: {}", colors_bdd.cardinality());
+        }
+
+        GraphColors::new(colors_bdd, self.symbolic_context())
+    }
 }
 
 #[cfg(test)]
@@ -1620,5 +1774,60 @@ mod tests {
         .unwrap();
 
         assert_eq!(expected, bn3);
+    }
+
+    #[test]
+    fn test_unique_color_pruner_simple() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            b -> a
+            c ->? a
+            $b: true
+            $c: true
+            $a: b | f(b, c)
+            ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let unique_colors = stg.logically_unique_subset(&stg.mk_unit_colors());
+
+        // By default, the function can be virtually anything that depends non-negatively on `c`,
+        // because `b` is already canalyzing.
+        assert_eq!(stg.mk_unit_colors().approx_cardinality(), 8.0);
+
+        // The function can only simplify to `b | c` and `b`.
+        assert_eq!(unique_colors.approx_cardinality(), 2.0)
+    }
+
+    #[test]
+    fn test_unique_color_pruner_connected() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            b -> a
+            c ->? a
+            y -> x
+            z -? x
+            $b: true
+            $c: true
+            $y: true
+            $z: true
+            $a: b | f(b, c)
+            $x: z & f(y, z)
+            ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&bn).unwrap();
+        let unique_colors = stg.logically_unique_subset(&stg.mk_unit_colors());
+
+        // Here, the number of admissible functions is much smaller, because now we need them
+        // to be essential in both arguments.
+        assert_eq!(stg.mk_unit_colors().approx_cardinality(), 2.0);
+
+        // The first function can only simplify to `b | c` and `b`.
+        // However, `x` enforces that first argument must be essential, meaning the function can
+        // only simplify to `b | c`
+        assert_eq!(unique_colors.approx_cardinality(), 1.0)
     }
 }
