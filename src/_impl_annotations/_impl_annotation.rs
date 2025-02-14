@@ -125,6 +125,26 @@ impl ModelAnnotation {
     pub fn children_mut(&mut self) -> &mut HashMap<String, ModelAnnotation> {
         &mut self.inner
     }
+
+    /// A utility method to read values that store data per-line as a vector of lines. If the
+    /// value is `None`, this returns an empty vector.
+    pub fn read_multiline_value(&self) -> Vec<String> {
+        if let Some(value) = self.value.as_ref() {
+            value.lines().map(|line| line.to_string()).collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// A utility method to write a list of values, one per-line. If the list is empty,
+    /// the value is set to `None`.
+    pub fn write_multiline_value(&mut self, lines: &[String]) {
+        if lines.is_empty() {
+            self.value = None;
+        } else {
+            self.value = Some(lines.join("\n"));
+        }
+    }
 }
 
 impl Default for ModelAnnotation {
