@@ -35,7 +35,7 @@ pub struct SymbolicIterator<'a> {
     inner: RawSymbolicIterator<'a>,
 }
 
-impl<'a> Iterator for RawSymbolicIterator<'a> {
+impl Iterator for RawSymbolicIterator<'_> {
     type Item = Bdd;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -162,7 +162,7 @@ impl<'a> Iterator for RawSymbolicIterator<'a> {
     }
 }
 
-impl<'a> RawSymbolicIterator<'a> {
+impl RawSymbolicIterator<'_> {
     /// Try to split this iterator into two independent disjoint iterators, assuming there are
     /// enough forks to permit such operation.
     pub fn try_split(&mut self) -> Option<Self> {
@@ -180,7 +180,7 @@ impl<'a> RawSymbolicIterator<'a> {
     }
 }
 
-impl<'a> Iterator for SymbolicIterator<'a> {
+impl Iterator for SymbolicIterator<'_> {
     type Item = GraphColoredVertices;
 
     fn next(&mut self) -> Option<Self::Item> {

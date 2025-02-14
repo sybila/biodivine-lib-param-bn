@@ -579,7 +579,7 @@ impl SymbolicContext {
 
     /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
     fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
-        return args.iter().map(|v| self.mk_fn_update_true(v)).collect();
+        args.iter().map(|v| self.mk_fn_update_true(v)).collect()
     }
 
     /// This is similar to [BddVariableSet::transfer_from], but applied at the level of

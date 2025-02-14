@@ -1045,7 +1045,7 @@ impl SymbolicAsyncGraph {
         // Ideally, all parameters should be used, but just in case they are not, we should also
         // go through those that are not used:
         let mut unused_parameters: HashSet<ParameterId> = HashSet::from_iter(bn.parameters());
-        for (_, v) in &clusters {
+        for v in clusters.values() {
             for p in v {
                 if unused_parameters.contains(p) {
                     unused_parameters.remove(p);
@@ -1092,9 +1092,7 @@ impl SymbolicAsyncGraph {
                     })
                     .collect::<Vec<_>>();
 
-                if !unique_interpretations.contains_key(&key) {
-                    unique_interpretations.insert(key, valuation);
-                }
+                unique_interpretations.entry(key).or_insert(valuation);
             }
             println!("Unique: {:?}", unique_interpretations.len());
             for (k, v) in unique_interpretations.iter() {

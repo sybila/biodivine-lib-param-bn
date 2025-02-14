@@ -139,7 +139,7 @@ pub fn sbml_transition_to_update_function(
         panic!("Converting an unspecified transition to FnUpdate.");
     }
 
-    return if transition.function_terms.is_empty() {
+    if transition.function_terms.is_empty() {
         if transition.default_term.as_ref().unwrap().result_level == 0 {
             Ok(FnUpdate::Const(false))
         } else if transition.default_term.as_ref().unwrap().result_level == 1 {
@@ -163,7 +163,7 @@ pub fn sbml_transition_to_update_function(
         } else {
             math_to_update(term.math.as_ref().unwrap(), network, transition, id_to_var)
         }
-    };
+    }
 }
 
 /// **(internal)** Utility function for turning comparisons into valid `FnUpdate` functions.

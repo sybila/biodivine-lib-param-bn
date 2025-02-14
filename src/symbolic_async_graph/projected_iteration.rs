@@ -130,7 +130,7 @@ fn restrict_valuation(valuation: BddValuation, retain: &[BddVariable]) -> BddPar
     partial
 }
 
-impl<'a> Iterator for RawSymbolicIterator<'a> {
+impl Iterator for RawSymbolicIterator<'_> {
     type Item = BddPartialValuation;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -188,7 +188,7 @@ impl StateProjection {
     }
 }
 
-impl<'a> Iterator for StateProjectionIterator<'a> {
+impl Iterator for StateProjectionIterator<'_> {
     type Item = Vec<(VariableId, bool)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -247,7 +247,7 @@ impl<'a> FnUpdateProjection<'a> {
     }
 }
 
-impl<'a, 'b> Iterator for FnUpdateProjectionIterator<'a, 'b> {
+impl Iterator for FnUpdateProjectionIterator<'_, '_> {
     type Item = Vec<(VariableId, FnUpdate)>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -313,7 +313,7 @@ impl<'a> MixedProjection<'a> {
     }
 }
 
-impl<'a, 'b> Iterator for MixedProjectionIterator<'a, 'b> {
+impl Iterator for MixedProjectionIterator<'_, '_> {
     type Item = (Vec<(VariableId, bool)>, Vec<(VariableId, FnUpdate)>);
 
     fn next(&mut self) -> Option<Self::Item> {

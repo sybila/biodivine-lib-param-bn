@@ -114,7 +114,7 @@ fn parse_update_function(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
 
 /// **(internal)** Utility method to find first occurrence of a specific token in the token tree.
 fn index_of_first(data: &[Token], token: Token) -> Option<usize> {
-    return data.iter().position(|t| *t == token);
+    data.iter().position(|t| *t == token)
 }
 
 /// **(internal)** Recursive parsing step 1: extract `<=>` operators.

@@ -39,7 +39,6 @@ impl Display for ExtendedBoolean {
 
 /// Implements a "set-like" ordering for extended Booleans. "Any" is greater than constant values
 /// (since it covers both values), while constant values are incomparable between each other.
-
 impl PartialOrd for ExtendedBoolean {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         match (self, other) {
