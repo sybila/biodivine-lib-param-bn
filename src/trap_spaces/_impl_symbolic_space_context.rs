@@ -71,6 +71,18 @@ impl SymbolicSpaceContext {
         self.dual_variables[var.to_index()].1
     }
 
+    /// Get the two BDD variables `(x_T, x_F)` which this [SymbolicSpaceContext] uses to
+    /// encode a subspace.
+    pub fn get_dual_variable_pair(&self, var: VariableId) -> (BddVariable, BddVariable) {
+        self.dual_variables[var.to_index()]
+    }
+
+    /// Returns the list of all dual variable pairs `(x_T, x_F)` that are used in the
+    /// subspace encoding. These are ordered the same way as "normal" state variables.
+    pub fn get_dual_variables(&self) -> Vec<(BddVariable, BddVariable)> {
+        self.dual_variables.clone()
+    }
+
     /// Compute the [Bdd] which contains all correctly encoded spaces tracked by this
     /// [SymbolicSpaceContext].
     ///
@@ -378,6 +390,20 @@ mod tests {
     use crate::ExtendedBoolean::{One, Zero};
     use crate::{BooleanNetwork, FnUpdate, Space, VariableId};
     use biodivine_lib_bdd::bdd;
+
+    #[test]
+    fn test_basic_getter_functionality() {
+        let network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
+        let ctx = SymbolicSpaceContext::new(&network);
+
+        assert_eq!(ctx.get_dual_variables().len(), network.num_vars());
+        let var = VariableId::from_index(1);
+        let expected = (
+            ctx.get_positive_variable(var),
+            ctx.get_negative_variable(var),
+        );
+        assert_eq!(ctx.get_dual_variable_pair(var), expected);
+    }
 
     #[test]
     fn test_super_and_sub_spaces() {
