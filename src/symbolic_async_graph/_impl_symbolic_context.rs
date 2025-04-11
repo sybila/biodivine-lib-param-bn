@@ -587,7 +587,7 @@ impl SymbolicContext {
     ///
     /// Note that in theory, this method *can* translate between different types of symbolic
     /// objects (e.g. variable to parameter), but it requires that the two use equivalent names.
-    /// Hence it is not really possible to create such situation organically, because state,
+    /// Hence, it is not really possible to create such situation organically, because state,
     /// parameter and extra variables are intentionally created with names that are incompatible.
     ///
     pub fn transfer_from(&self, bdd: &Bdd, ctx: &SymbolicContext) -> Option<Bdd> {

@@ -37,7 +37,7 @@ impl<'z3> SolverIterator<'z3> {
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
-    /// Don't use it unless you are really really sure you need a custom solver.
+    /// Don't use it unless you are really sure you need a custom solver.
     pub fn new_with_solver(
         context: &'z3 BnSolverContext<'z3>,
         solver: BnSolver<'z3>,
@@ -63,7 +63,7 @@ impl<'z3> SolverVertexIterator<'z3> {
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
-    /// Don't use it unless you are really really sure you need a custom solver.
+    /// Don't use it unless you are really sure you need a custom solver.
     pub fn new_with_solver(
         context: &'z3 BnSolverContext<'z3>,
         solver: BnSolver<'z3>,
@@ -90,7 +90,7 @@ impl<'z3> SolverColorIterator<'z3> {
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
-    /// Don't use it unless you are really really sure you need a custom solver.
+    /// Don't use it unless you are really sure you need a custom solver.
     pub fn new_with_solver(
         context: &'z3 BnSolverContext<'z3>,
         solver: BnSolver<'z3>,

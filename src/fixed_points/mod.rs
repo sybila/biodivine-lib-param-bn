@@ -4,13 +4,13 @@
 //! There are two main approaches one can use to obtain the fixed-points:
 //!
 //! 1. A solver based method (relying on Z3). This method works well for enumerating
-//!     small batches of fixed-points, but does not scale very well for high numbers
-//!     of fixed-points, as each of them has to be explicitly returned by the solver.
+//!    small batches of fixed-points, but does not scale very well for high numbers
+//!    of fixed-points, as each of them has to be explicitly returned by the solver.
 //!
 //! 2. A symbolic BDD-based method. This approach generally suffers more from the state space
-//!     explosion (it can take a long time for large networks), but if the number of results
-//!     if very high, it can still outperform enumeration based on solvers. Also, it can be
-//!     easily restricted to arbitrary symbolic sets,
+//!    explosion (it can take a long time for large networks), but if the number of results
+//!    if very high, it can still outperform enumeration based on solvers. Also, it can be
+//!    easily restricted to arbitrary symbolic sets,
 
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
@@ -585,13 +585,13 @@ impl FixedPoints {
     /// `Self::symbolic`. However, there are possible advantages to this approach:
     ///
     /// 1. Depending on the chosen `size_limit`, the algorithm might use less memory to
-    ///     compute the result than `Self::symbolic` (assuming you actually free the yielded
-    ///     results or store them outside of the main memory).
+    ///    compute the result than `Self::symbolic` (assuming you actually free the yielded
+    ///    results or store them outside the main memory).
     ///
     /// 2. While the runtime of the whole algorithm is typically longer, it should usually
-    ///     take less time to get the *first* item than fully running `Self::symbolic`. Also,
-    ///     you can often "tune" this time-to-first-answer using the `size_limit`, as smaller
-    ///     results tend to be faster to find (iterating over all of them is longer though).
+    ///    take less time to get the *first* item than fully running `Self::symbolic`. Also,
+    ///    you can often "tune" this time-to-first-answer using the `size_limit`, as smaller
+    ///    results tend to be faster to find (iterating over all of them is longer though).
     ///
     /// Furthermore, it is relatively easy to extend this implementation to incorporate even
     /// more parallelism than in `Self::symbolic`. Also, we could decrease memory
@@ -672,7 +672,7 @@ impl FixedPoints {
     /// Build a solver that is satisfied exactly by all combinations of fixed-point
     /// vertices and parameter valuations.
     ///
-    /// This is mainly for building very custom fixed-point iterators and you don't have to call
+    /// This is mainly for building very custom fixed-point iterators, and you don't have to call
     /// it explicitly unless you really know that you need a custom solver.
     #[cfg(feature = "solver-z3")]
     pub fn make_fixed_points_solver<'z3>(context: &'z3 BnSolverContext<'z3>) -> BnSolver<'z3> {

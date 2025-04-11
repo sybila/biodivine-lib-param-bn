@@ -100,7 +100,7 @@ impl NetworkSpaces {
     /// Returns an iterator over all elements stored in this set.
     ///
     /// In the case of symbolic sets, `iter` and `into_iter` have the same result because
-    /// we have to recreate the the items anyway, so there is no true "iterate by reference"
+    /// we have to recreate the items anyway, so there is no true "iterate by reference"
     /// option.
     pub fn iter(&self) -> SpaceIterator {
         let mut variables = Vec::with_capacity(2 * self.dual_variables.len());
@@ -222,7 +222,7 @@ mod tests {
                 .with_all_sub_spaces(&ctx)
         );
 
-        // There are 28 network variables and we are eliminating 22 of them, so 6 should be left.
+        // There are 28 network variables, and we are eliminating 22 of them, so 6 should be left.
         let dual_vars = ctx.inner_context().all_extra_state_variables();
         let project = unit.raw_projection(&dual_vars[0..44]);
         assert_eq!(project.iter().count(), 3_usize.pow(6));

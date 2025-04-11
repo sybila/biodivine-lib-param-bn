@@ -136,7 +136,7 @@
 //! assert!(!a_independent_of_b);
 //!
 //! // Finally, we can compute all strongly connected components of the regulatory graph:
-//! let components: Vec<HashSet<VariableId>> = rg.components();
+//! let components: Vec<HashSet<VariableId>> = rg.strongly_connected_components();
 //! assert_eq!(1, components.len());
 //! assert_eq!(all_variables, components.into_iter().next().unwrap());
 //! // (in our case, the whole graph is one component)

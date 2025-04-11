@@ -54,7 +54,7 @@ impl<'z3> RawBnModelIterator<'z3> {
     }
 
     /// Use the enumeration term specified by `index` to assert that its value must be
-    /// different than it currently is in the given `model`.
+    /// different from what it currently is in the given `model`.
     fn block_term(&self, model: &z3::Model<'z3>, index: usize) -> Bool<'z3> {
         self.fix_term(model, index).not()
     }

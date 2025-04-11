@@ -81,15 +81,15 @@
 //! focus on cases where the entire update function is unknown.
 //!
 //! To each parametrised `BooleanNetwork` corresponds a collection of fully specified Boolean
-//! networks. We call these fully specified networks *parametrisations*, or *colors*. More
-//! formally, a parametrisation assigns values to the rows of each update function table, thus
+//! networks. We call a fully specified network *parametrization*, or *color*. More
+//! formally, a parametrization assigns values to the rows of each update function table, thus
 //! making the network fully specified, and color is just a more abstract concept from graph
-//! theory which we can apply also outside of the domain of Boolean networks.
+//! theory which we can apply also outside the domain of Boolean networks.
 //!
 //! Note that the structure of the `RegulatoryGraph` significantly limits the space of all possible
-//! parametrisations. Only update functions that would be valid with respect to the specified graph
-//! are considered (i.e. functions must depend only on the declared regulators and must follow
-//! the declared monotonicity and observability rules).
+//! parametrization options. Only update functions that would be valid with respect to the
+//! specified graph are considered (i.e. functions must depend only on the declared regulators and
+//! must follow the declared monotonicity and observability rules).
 //!
 //! In our example, update function of `C` can thus be only `true` or `false`. Update function
 //! of `B` can in fact be `A`, `A & !C`, and `A | !C` (since `C` is not declared as necessarily
@@ -111,7 +111,7 @@
 //! $A: C | f(A, B)
 //! ```
 //!
-//! Here, `f` is an uninterpreted function of artiy `2` (we can also use uninterpreted constants,
+//! Here, `f` is an uninterpreted function of arity `2` (we can also use uninterpreted constants,
 //! which are simply functions of arity `0`). This way, we have just exactly specified the
 //! dependence of `A` on `C`, while leaving the dependence on `A` and `B` unknown. Note that `f`
 //! can only take values which follow the properties of the regulatory graph, just as we had for
@@ -120,7 +120,7 @@
 //!
 //! When the update function of a variable `X` contains such uninterpreted functions, we say `X`
 //! is *explicitly* parametrised and the uninterpreted functions are its explicit parameters.
-//! Note that such explicit parameter can be shared accross variables. By using a parameter with
+//! Note that such explicit parameter can be shared across variables. By using a parameter with
 //! the same name in two different update functions, you declare that this part of the two
 //! functions is identical.
 //!

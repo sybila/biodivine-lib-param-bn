@@ -453,7 +453,7 @@ impl SymbolicAsyncGraph {
     ///
     /// However, note that in a restricted graph, it may not hold that the unit vertex set is
     /// a product of some subset of vertices and some subset of colours (i.e. there may be
-    /// vertices that are present for some colors and not for others, and vice-versa).
+    /// vertices that are present for some colors and not for others, and vice versa).
     pub fn restrict(&self, set: &GraphColoredVertices) -> SymbolicAsyncGraph {
         SymbolicAsyncGraph {
             network: self.network.clone(),

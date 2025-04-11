@@ -32,7 +32,7 @@ impl ModelAnnotation {
     ///
     /// Arguments:
     ///  - absolute `path` to this specific annotation. The recursive function will push/pop
-    ///     items into path as needed (hence a mutable vector instead of a slice).
+    ///    items into path as needed (hence a mutable vector instead of a slice).
     ///  - A formatter from the `Display::fmt` method.
     fn fmt_with_path<'a>(
         &'a self,

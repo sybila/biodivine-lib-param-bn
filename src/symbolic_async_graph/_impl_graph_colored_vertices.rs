@@ -266,7 +266,7 @@ mod tests {
         assert!(singleton_color.is_singleton());
         assert!(singleton_vertices.is_singleton());
         assert!(!unit.intersect_colors(&singleton_color).is_singleton());
-        // There is only one color, hence this holds. Otherwise this should not hold.
+        // There is only one color, hence this holds. Otherwise, this should not hold.
         assert!(unit.intersect_vertices(&singleton_vertices).is_singleton());
         assert!(unit.minus_colors(&singleton_color).is_empty());
         assert!(unit.minus_vertices(&singleton_vertices).is_subset(&unit));
@@ -286,7 +286,7 @@ mod tests {
         );
         assert!(singleton.restrict_network_variable(var, true).is_empty());
 
-        // There are 28 variables and we are eliminating 22 of them, so 6 should be left.
+        // There are 28 variables, and we are eliminating 22 of them, so 6 should be left.
         let project = unit.raw_projection(&stg.symbolic_context().state_variables()[0..22]);
         assert_eq!(project.iter().count(), 2_usize.pow(6));
     }

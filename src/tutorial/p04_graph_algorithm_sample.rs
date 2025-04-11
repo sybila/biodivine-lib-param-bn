@@ -40,7 +40,7 @@
 //! should be sufficient.
 //!
 //! Now we can observe that an SCC of vertex `v` is always the intersection of forward and backward
-//! reachable vertices from `v`. Hence we can write the following simple algorithm:
+//! reachable vertices from `v`. Hence, we can write the following simple algorithm:
 //!
 //! ```rust
 //! # use biodivine_lib_param_bn::symbolic_async_graph::{SymbolicAsyncGraph, GraphColoredVertices};
@@ -82,7 +82,7 @@
 //!         universe = universe.minus(&scc);
 //!         components.push(scc);
 //!     }
-//!     return components;
+//!     components
 //! }
 //! // Boolean network from the previous tutorial:
 //! let bn = BooleanNetwork::try_from(r"
@@ -98,7 +98,7 @@
 //!
 //! // Note that since the symbolic graph contains different transitions for different colors,
 //! // this will create SCCs that overlap for some colors but are completely different for others.
-//! // Hence the same vertex can appear in multiple SCCs for different colors.
+//! // Hence, the same vertex can appear in multiple SCCs for different colors.
 //! let components = scc(&stg);
 //! assert_eq!(7, components.len());
 //! assert_eq!(2.0, components[0].vertices().approx_cardinality());

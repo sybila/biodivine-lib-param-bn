@@ -65,7 +65,7 @@ pub struct RawSymbolicIterator<'a> {
 ///
 /// Also note that the `Box` around `RawProjection` is essential! When we are constructing
 /// the inner iterator, we need to reference the final memory location of the `RawProjection`.
-/// Hence we need a heap pointer that will stay the same after we move the projection into
+/// Hence, we need a heap pointer that will stay the same after we move the projection into
 /// the [OwnedRawSymbolicIterator].
 pub struct OwnedRawSymbolicIterator {
     raw_projection: Box<RawProjection>,
@@ -500,7 +500,7 @@ mod tests {
         // Now, we also require b=false and remove everything that can update b.
         let set = a1_and_update.intersect(&b_is_false).minus(&can_update_b);
 
-        // This still leaves three functions for a, but only one function for b: b=false.
+        // This still leaves three functions for `a`, but only one function for b: b=false.
         // This is because we know that b must be false, a must be true, and so b=true would
         // update, as well as b=a would update.
         assert_eq!(2, set.fn_update_projection(&[a], &stg).iter().count());
@@ -544,7 +544,7 @@ mod tests {
         // See the fn_update test for the reasoning why function counts are correct.
 
         // With $a=false, there are four options, but with $a=c, there are only two, since c=false
-        // (because a=true and we require it must be updated).
+        // (because `a=true` and we require it must be updated).
         assert_eq!(
             6,
             a1_and_update
@@ -556,7 +556,7 @@ mod tests {
         // Now, we also require b=false and remove everything that can update b.
         let set = a1_and_update.intersect(&b_is_false).minus(&can_update_b);
 
-        // Here, we have three possible functions for c, but a is fixed to true and c is free.
+        // Here, we have three possible functions for `c`, but `a` is fixed to true and c is free.
         assert_eq!(6, set.mixed_projection(&[a, c], &[c], &stg).iter().count());
 
         // Meanwhile here, we have $a=false or $a=c, such that they can be all paired with any

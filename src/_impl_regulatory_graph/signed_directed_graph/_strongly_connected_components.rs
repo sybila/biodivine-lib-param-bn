@@ -117,7 +117,7 @@ fn is_non_trivial(graph: &SdGraph, scc: &HashSet<VariableId>) -> bool {
 }
 
 /// **(internal)** Remove all vertices from `set` that can be trivially shown to be outside
-/// of any cycle using the given `edge` set.
+/// any cycle using the given `edge` set.
 ///
 /// Note that this does not eliminate *all* trivial SCCs, just a part of them that can be detected
 /// using this particular method.
@@ -146,7 +146,7 @@ mod tests {
         // See method for high-level graph description.
         let rg = build_test_regulatory_graph();
 
-        let _a = rg.find_variable("a").unwrap(); // 'a' is a trivial component.
+        let _a = rg.find_variable("a").unwrap(); // variable 'a' is a trivial component.
         let b_1 = rg.find_variable("b_1").unwrap();
         let b_2 = rg.find_variable("b_2").unwrap();
         let c = rg.find_variable("c").unwrap();

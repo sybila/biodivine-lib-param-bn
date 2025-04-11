@@ -15,15 +15,15 @@ use biodivine_lib_bdd::Bdd;
 /// We provide the following variable-specific operations:
 ///  - `var_post` / `var_pre`: General successors or predecessors.
 ///  - `var_post_out` / `var_pre_out`: Successors or predecessors, but only *outside* of the
-///     given initial set.
+///    given initial set.
 ///  - `var_post_within` / `var_pre_within`: Successors or predecessors, but only *inside* the
-///     given initial set.
+///    given initial set.
 ///  - `var_can_post` / `var_can_pre`: Subset of the initial set that has some
-///     successors / predecessors.
+///    successors / predecessors.
 ///  - `var_can_post_out` / `var_can_pre_out`: Subset of the initial set that can perform
-///     a transition leading *outside* of the initial set.
+///    a transition leading *outside* of the initial set.
 ///  - `var_can_post_within` / `var_can_pre_within`: Subset of the initial set that can perform
-///     a transition leading *into* the initial set.
+///    a transition leading *into* the initial set.
 ///
 /// Note that the output of some of these functions is technically equivalent (e.g.
 /// `var_post_within` and `var_can_pre_within`) but we nevertheless provided all for completeness.
@@ -335,15 +335,15 @@ pub(crate) fn not_a_and_b_and_c(a: Option<bool>, b: Option<bool>, c: Option<bool
 /// We provide the following functions:
 ///  - `post` / `pre`: General successors and predecessors functions.
 ///  - `can_post` / `can_pre`: Subsets of the initial states that have some successors
-///     or predecessors.
+///    or predecessors.
 ///  - `can_post_within` / `can_pre_within`: Subsets of initial states that have some successors
-///     / predecessors within the initial set.
+///    / predecessors within the initial set.
 ///  - `will_post_within` / `will_pre_within`: Subsets of initial states that have all successors
-///     / predecessors withing the initial set.
+///    / predecessors withing the initial set.
 ///  - `can_post_out` / `can_pre_out`: Subsets of initial states that have some successors
-///     / predecessors outside of the initial set.
+///    / predecessors outside the initial set.
 ///  - `will_post_out` / `will_pre_out`: Subsets of initial states that have all successors
-///     / predecessors outside of the initial set.
+///    / predecessors outside the initial set.
 ///
 impl SymbolicAsyncGraph {
     /// Compute the result of applying `post` with *all* update functions to the `initial` set.
@@ -415,7 +415,7 @@ impl SymbolicAsyncGraph {
     }
 
     /// Compute the subset of `set` that can perform *some* `post` operation which leads
-    /// to a state outside of `set`.
+    /// to a state outside `set`.
     pub fn can_post_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
         self.variables()
             .fold(self.mk_empty_colored_vertices(), |r, v| {
@@ -434,7 +434,7 @@ impl SymbolicAsyncGraph {
     }
 
     /// Compute the subset of `set` that can perform *some* `pre` operation which leads
-    /// to a state outside of `set`.
+    /// to a state outside `set`.
     pub fn can_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
         self.variables()
             .fold(self.mk_empty_colored_vertices(), |r, v| {
@@ -443,7 +443,7 @@ impl SymbolicAsyncGraph {
     }
 
     /// Compute the subset of `set` such that *every admissible* `pre` operation leads
-    /// to a state outside of `set`.
+    /// to a state outside `set`.
     ///
     /// Note that this also includes states which cannot perform any `pre` operation.
     pub fn will_pre_out(&self, set: &GraphColoredVertices) -> GraphColoredVertices {

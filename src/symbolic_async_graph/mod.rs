@@ -99,7 +99,7 @@ pub struct GraphVertices {
 /// Internally, this struct contains a `Bdd` that has all parameter variables fixed to false,
 /// so that we only iterate over vertices and can safely disregard colors.
 ///
-/// **This object is now deprecated and you can call [GraphVertices::into_iter] directly.**
+/// **This object is now deprecated, and you can call [GraphVertices::into_iter] directly.**
 #[derive(Clone)]
 #[deprecated]
 pub struct IterableVertices {
@@ -115,7 +115,7 @@ pub struct GraphVertexIterator {
 
 /// A symbolic encoding of asynchronous transition system of a `BooleanNetwork`.
 ///
-/// Provides standard pre/post operations for exploring the graph symbolically.
+/// Provides standard pre- / post-operations for exploring the graph symbolically.
 #[derive(Clone)]
 pub struct SymbolicAsyncGraph {
     // If available, provides the original network that was used to create the graph.
@@ -154,7 +154,7 @@ pub struct SymbolicContext {
     state_variables: Vec<BddVariable>,
     // A (possibly empty) list of extra symbolic variables for each network variable.
     extra_state_variables: Vec<Vec<BddVariable>>,
-    // The same variables as above, but in one list (some operations only need this representation
+    // The same variables as above, but in one list (some operations only need this representation,
     // and it could take us some time to compute it for large models).
     all_extra_state_variables: Vec<BddVariable>,
     // All symbolic variables representing parameters. The association between

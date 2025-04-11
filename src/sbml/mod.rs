@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 /// Contains code for parsing SBML models using xml-tree library. It is not 100% SBML-qual
-/// compliant, but should be good enough for now. Also most code is ready for possible extension
-/// to multi-valued models in the future.
+/// compliant, but should be good enough for now. Also, most code is ready for possible extension
+/// to multivalued models in the future.
 pub mod import;
 
 /// A very crude SBML export module. It basically just dumps `BooleanNetwork` into valid XML,

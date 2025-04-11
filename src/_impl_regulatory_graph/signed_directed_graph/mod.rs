@@ -17,8 +17,8 @@ mod _strongly_connected_components;
 /// into weakly connected components.
 mod _weakly_connected_components;
 
-/// **(internal)** Algorithms for detecting smallest cycles, including positive/negative
-/// variants for each algorithms.
+/// **(internal)** Algorithms for detecting the smallest cycles, including positive/negative
+/// variants for each algorithm.
 mod _cycle_detection;
 
 /// **(internal)** Algorithm for computing an approximation of the minimum feedback vertex set.

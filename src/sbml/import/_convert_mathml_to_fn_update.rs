@@ -88,7 +88,7 @@ pub fn sbml_transition_to_update_function(
                         }
                     }
                     "implies" | "xor" => {
-                        // These are also strictly binary, bu don't have special handling
+                        // These are also strictly binary, but don't have special handling
                         if args.len() != 2 {
                             Err(format!(
                                 "Operation `{}` requires exactly 2 arguments, {} given.",

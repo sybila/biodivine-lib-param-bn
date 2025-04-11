@@ -22,7 +22,7 @@ impl BooleanNetwork {
                     network.as_graph_mut().set_variable_name(var, &new_name)?;
                 } else {
                     return Err(format!(
-                        "Variable {} cannnot be exported to bnet. Please rename it first.",
+                        "Variable {} cannot be exported to bnet. Please rename it first.",
                         name
                     ));
                 }

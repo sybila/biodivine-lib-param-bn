@@ -224,7 +224,7 @@ impl SdGraph {
 mod tests {
     use crate::_impl_regulatory_graph::signed_directed_graph::SdGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::Sign::{Negative, Positive};
-    use crate::{BooleanNetwork, RegulatoryGraph, Sign, VariableId};
+    use crate::{BooleanNetwork, RegulatoryGraph, VariableId};
     use std::collections::HashSet;
 
     #[test]
@@ -321,7 +321,7 @@ mod tests {
         )
         .unwrap();
 
-        let p_fvs = bn.as_graph().parity_feedback_vertex_set(Sign::Positive);
+        let p_fvs = bn.as_graph().parity_feedback_vertex_set(Positive);
 
         // The graph only has one positive cycle on a4/a6.
         let a4 = VariableId::from_index(1);

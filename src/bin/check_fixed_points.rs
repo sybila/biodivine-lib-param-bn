@@ -2,7 +2,7 @@
    This is a very simple binary intended as an integration test for the fixed point
    detection algorithms. We can run this on the BBM dataset to see if the algorithms produces
    the expected results. It is not included in normal tests because it needs to be compiled
-   with optimizations and generally we don't really want to run it every time we test.
+   with optimizations, and generally we don't really want to run it every time we test.
 
    It also prints basic performance metrics su that we see how the algorithms compare to
    each other. However, since it always runs all algorithms, it is only applicable to models

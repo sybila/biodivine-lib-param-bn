@@ -98,7 +98,7 @@
 //! two characters are not allowed in path segments at all, and the library will panic as soon as
 //! it encounters them. If such situation occurs in the input file, it
 //! will likely be parsed as an incomplete path (i.e. it the library won't panic, but the resulting
-//! annotation is not well defined).
+//! annotation is not well-defined).
 //!
 //! Similarly, annotation *values* cannot contain colons (path segment separators),
 //! but otherwise can contain any characters. If you want to include a colon, you can

@@ -532,7 +532,7 @@ impl FnUpdate {
     /// Perform a syntactic transformation of this update function which eliminates all binary
     /// operators except for `&` and `|`. Negation is also preserved.
     ///
-    /// Note that the result is neither a conjunction or disjunctive normal form, it just
+    /// Note that the result is neither a conjunction nor disjunctive normal form, it just
     /// eliminates all operators other than conjunction and disjunction.
     ///
     /// Furthermore, when the function contains parameters with expression arguments, the
@@ -579,7 +579,7 @@ impl FnUpdate {
     ///
     /// Note that constants will be automatically negated (true => false, false => true). Also,
     /// keep in mind that this will rewrite binary operators (and => or, iff => xor, etc.), so
-    /// don't expect the function to look the same afterwards.
+    /// don't expect the function to look the same afterward.
     ///
     /// Similar to [Self::to_and_or_normal_form], when the function contains parameters with
     /// complex arguments, each argument is also normalized.

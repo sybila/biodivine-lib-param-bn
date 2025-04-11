@@ -12,7 +12,7 @@
 //! To represent this type of graph, we use Binary Decision Diagrams (BDDs) implemented in our
 //! [`lib-bdd`](https://github.com/sybila/biodivine-lib-bdd). Using these, we can often work with
 //! large sets ($2^{1000}$ elements and beyond) concisely. However, in the worst case, this
-//! representation is still linear in the size of the set and we thus cannot guarantee that it
+//! representation is still linear in the size of the set, and we thus cannot guarantee that it
 //! works well for every model.
 //!
 //! Using BDDs, we implement three important symbolic set types: `GraphVertices`, `GraphColors`,
@@ -114,7 +114,7 @@
 //! one update function, while `post` and `pre` consider all update functions simultaneously
 //! (which is more computationally demanding).
 //!
-//! Furthermore, if you only need to test which vertices *can* perfrom a transition, you can use
+//! Furthermore, if you only need to test which vertices *can* perform a transition, you can use
 //! these methods with a `can_*` prefix, in which case the desired subset of $A$ will be returned.
 //!
 //! ```rust
@@ -139,7 +139,7 @@
 //! let b_is_false = stg.fix_network_variable(id_b, false);
 //!
 //! // Jumping from A=0 to A=1: Vertices that have predecessor with
-//! // respect to this jump are the ones into which we are jumping, and vice-versa:
+//! // respect to this jump are the ones into which we are jumping, and vice versa:
 //! assert_eq!(stg.var_can_pre(id_b, &b_is_true), stg.var_post(id_b, &b_is_false));
 //! assert_eq!(stg.var_can_post(id_b, &b_is_false), stg.var_pre(id_b, &b_is_true));
 //!
@@ -172,7 +172,7 @@
 //! (conversion back to a set is possible using a `copy(Bdd)` method which uses the `self` object
 //! to provide the appropriate context for the set). Also, you can have a look at `SymbolicContext`
 //! and `FunctionTable`, which are part of the `SymbolicAsyncGraph`, if you need some more
-//! advanced operations for mapping colors to the parametrisations of the `BooleanNetwork`.
-//! However, these require expert knowldge of the topic and are not covered
+//! advanced operations for mapping colors to the parametrisation of the `BooleanNetwork`.
+//! However, these require expert knowledge of the topic and are not covered
 //! by this tutorial.
 //!

@@ -58,7 +58,7 @@ impl IdState {
         (self.0 >> bit) & 1 == 1
     }
 
-    /// Flip the bit a the given position.
+    /// Flip the bit at the given position.
     pub fn flip_bit(self, bit: usize) -> IdState {
         IdState(self.0 ^ (1 << bit))
     }

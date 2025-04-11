@@ -223,12 +223,12 @@ impl RegulatoryGraph {
             } else {
                 let targets_a = self.transitive_targets(pivot_a);
                 if targets_a.contains(&pivot_b) {
-                    // There is a path from a to b, a < b, a is "smaller".
+                    // There is a path from `a` to `b`, `a < b`, variable `a` is "smaller".
                     return Ordering::Less;
                 }
                 let targets_b = self.transitive_targets(pivot_b);
                 if targets_b.contains(&pivot_a) {
-                    // There is a path from b to a, b < a, a is "greater".
+                    // There is a path from `b` to `a`, `b < a`, variable `a` is "greater".
                     return Ordering::Greater;
                 }
                 // The components are not comparable - compare them based on size.
@@ -273,10 +273,7 @@ pub mod tests {
         /*
            The graph has three non-trivial SCCs: {b_1, b_2}, {d_1, d_2, d_3} and {e}.
            Then, between the SCCs, the reachability is as follows:
-               * a -> c
-               * b -> c
-               * c -> d
-               * c -> e
+           `a -> c, b -> c, c -> d, c -> e`
         */
         let names = vec!["a", "b_1", "b_2", "c", "d_1", "d_2", "d_3", "e"];
         let mut rg = RegulatoryGraph::new(names.into_iter().map(|s| s.to_string()).collect());

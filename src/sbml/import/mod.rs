@@ -326,7 +326,7 @@ fn create_regulations(
             let out_rg_id = rg.find_variable(out_variable).unwrap();
 
             // Unfortunately, some functions can declare a single variable as multiple inputs,
-            // which means we have to check if the regulation already exists, and if so if it
+            // which means we have to check if the regulation already exists, and if so, it
             // is not contradicting.
             if let Some(existing) = rg.find_regulation(in_rg_id, out_rg_id) {
                 if existing.is_observable() != is_observable {

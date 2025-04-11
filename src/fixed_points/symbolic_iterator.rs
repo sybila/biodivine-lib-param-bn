@@ -147,7 +147,7 @@ impl Iterator for RawSymbolicIterator<'_> {
                     }
                 }
 
-                // Finally, to_merge is empty and we can return the result (as long as it
+                // Finally, to_merge is empty, and we can return the result (as long as it
                 // is actually not empty).
                 if result.is_false() {
                     continue 'main;

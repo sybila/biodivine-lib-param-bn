@@ -262,7 +262,7 @@ mod tests {
         let ctx = BnSolverContext::new(&z3, bn.clone());
         let solver = ctx.mk_empty_solver();
 
-        // Regulation c -> a is declared but not used.
+        // Regulation `c -> a` is declared but not used.
 
         solver.push();
         solver.assert_regulation_observability(c, a);
@@ -281,7 +281,7 @@ mod tests {
         assert_eq!(solver.check(), SatResult::Unsat);
         solver.pop();
 
-        // There is an f such that a -> a is observable.
+        // There is an f such that `a -> a` is observable.
 
         solver.push();
         solver.assert_regulation_observability(a, a);

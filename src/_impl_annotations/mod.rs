@@ -10,14 +10,14 @@ pub mod _impl_writer;
 lazy_static! {
     /// Matches the beginning of a string if it represents a valid alphanumeric
     /// path segment (including the `:` separator).
-    static ref SIMPLE_PATH_SEGMENT: regex::Regex = Regex::new("^\\s*([a-zA-Z0-9_]*)\\s*:").unwrap();
+    static ref SIMPLE_PATH_SEGMENT: Regex = Regex::new("^\\s*([a-zA-Z0-9_]*)\\s*:").unwrap();
 
     /// Matches the beginning of a string if it represents an escaped
     /// path segment (including the `:` separator).
-    static ref ESC_PATH_SEGMENT: regex::Regex = Regex::new("^\\s*`([^`]*)`\\s*:").unwrap();
+    static ref ESC_PATH_SEGMENT: Regex = Regex::new("^\\s*`([^`]*)`\\s*:").unwrap();
 
     /// Matches a string that consists only of alphanumeric characters and underscores.
-    static ref ALPHANUMERIC: regex::Regex = Regex::new("^[a-zA-Z0-9_]*$").unwrap();
+    static ref ALPHANUMERIC: Regex = Regex::new("^[a-zA-Z0-9_]*$").unwrap();
 
 }
 
