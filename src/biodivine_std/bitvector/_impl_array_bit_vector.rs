@@ -78,7 +78,7 @@ impl Debug for ArrayBitVector {
                 if !first {
                     write!(f, " ")?;
                 }
-                write!(f, "{}", i)?;
+                write!(f, "{i}")?;
                 first = false;
             }
         }

@@ -39,7 +39,7 @@ impl BooleanNetwork {
         warnings: &mut Vec<String>,
     ) -> Result<(BooleanNetwork, Layout), String> {
         let document =
-            roxmltree::Document::parse(model_file).map_err(|e| format!("XML Error: {:?}", e))?;
+            roxmltree::Document::parse(model_file).map_err(|e| format!("XML Error: {e:?}"))?;
         let root = document.root();
         if root.children().count() == 0 {
             return Err("Document is empty.".into());
@@ -143,7 +143,7 @@ impl BooleanNetwork {
             if let Some(var) = var_name {
                 transformed_layout.insert(var.clone(), *v);
             } else {
-                warnings.push(format!("Unknown layout glyph `{}`.", k));
+                warnings.push(format!("Unknown layout glyph `{k}`."));
             }
         }
 
@@ -209,8 +209,7 @@ fn create_normalized_names(
         let normalized = name_regex.replace_all(&name, "_").to_string();
         if normalized != name {
             warnings.push(format!(
-                "Renamed `{}` to `{}`. Original name contains invalid symbols.",
-                name, normalized
+                "Renamed `{name}` to `{normalized}`. Original name contains invalid symbols."
             ));
         }
         if id_to_name
@@ -238,12 +237,11 @@ fn create_normalized_names(
         let mut i = 0;
         while name_to_id.contains_key(&updated_name) {
             // This really should not happen, but in case this still clashes with something.
-            updated_name = format!("{}_{}", concat, i);
+            updated_name = format!("{concat}_{i}");
             i += 1;
         }
         warnings.push(format!(
-            "Renamed `{}` to `{}` to avoid duplicates.",
-            current_name, updated_name
+            "Renamed `{current_name}` to `{updated_name}` to avoid duplicates."
         ));
         id_to_name.insert(specie.id.clone(), updated_name.clone());
     }
@@ -331,8 +329,7 @@ fn create_regulations(
             if let Some(existing) = rg.find_regulation(in_rg_id, out_rg_id) {
                 if existing.is_observable() != is_observable {
                     return Err(format!(
-                        "Variable `{}` declared as both observable and non-observable in `{}`.",
-                        in_variable, out_variable
+                        "Variable `{in_variable}` declared as both observable and non-observable in `{out_variable}`."
                     ));
                 }
                 if existing.get_monotonicity() != monotonicity {

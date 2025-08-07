@@ -77,6 +77,6 @@ fn str_to_f64(str: &str) -> Result<f64, String> {
     if let Ok(value) = str.parse::<f64>() {
         Ok(value)
     } else {
-        Err(format!("Invalid numeric value: {}.", str))
+        Err(format!("Invalid numeric value: {str}."))
     }
 }

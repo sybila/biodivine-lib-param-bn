@@ -23,7 +23,7 @@ impl IndexMut<VariableId> for Space {
 impl Display for Space {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         for x in &self.0 {
-            write!(f, "{}", x)?;
+            write!(f, "{x}")?;
         }
         Ok(())
     }

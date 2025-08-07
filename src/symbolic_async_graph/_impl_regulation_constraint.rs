@@ -1,4 +1,4 @@
-use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext, SizeLimitExceeded};
+use crate::symbolic_async_graph::{RegulationConstraint, SizeLimitExceeded, SymbolicContext};
 use crate::{BooleanNetwork, Monotonicity, Regulation, VariableId};
 use biodivine_lib_bdd::op_function::{and, xor};
 use biodivine_lib_bdd::Bdd;
@@ -288,12 +288,10 @@ impl RegulationConstraint {
             return Ok(None);
         };
 
-        let act =
-            Self::mk_activation_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
+        let act = Self::mk_activation_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
         // TODO: This can be a source of memory issues.
         let act = act.for_all(&inputs);
-        let inh =
-            Self::mk_inhibition_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
+        let inh = Self::mk_inhibition_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
         // TODO: This can be a source of memory issues.
         let inh = inh.for_all(&inputs);
 
@@ -385,7 +383,9 @@ pub(crate) fn apply_regulation_constraints_with_limit(
         let fn_is_true = &update_function_is_true[regulation.target.to_index()];
 
         let observability = if regulation.observable {
-            RegulationConstraint::mk_observability_with_limit(context, fn_is_true, regulator, limit)?
+            RegulationConstraint::mk_observability_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?
         } else {
             context.mk_constant(true)
         };
@@ -400,16 +400,16 @@ pub(crate) fn apply_regulation_constraints_with_limit(
                 network.get_variable_name(regulation.regulator),
                 network.get_variable_name(regulation.target),
             );
-            error_message = format!("{}{}", error_message, problem);
+            error_message = format!("{error_message}{problem}");
         }
 
         let monotonicity = match regulation.monotonicity {
-            Some(Monotonicity::Activation) => {
-                RegulationConstraint::mk_activation_with_limit(context, fn_is_true, regulator, limit)?
-            }
-            Some(Monotonicity::Inhibition) => {
-                RegulationConstraint::mk_inhibition_with_limit(context, fn_is_true, regulator, limit)?
-            }
+            Some(Monotonicity::Activation) => RegulationConstraint::mk_activation_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?,
+            Some(Monotonicity::Inhibition) => RegulationConstraint::mk_inhibition_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?,
             None => context.mk_constant(true),
         };
 
@@ -429,7 +429,7 @@ pub(crate) fn apply_regulation_constraints_with_limit(
                 monotonicity_str,
                 network.get_variable_name(regulation.target),
             );
-            error_message = format!("{}{}", error_message, problem);
+            error_message = format!("{error_message}{problem}");
         }
 
         let both = Bdd::binary_op_with_limit(limit, &monotonicity, &observability, and)
@@ -440,8 +440,7 @@ pub(crate) fn apply_regulation_constraints_with_limit(
 
     if unit_bdd.is_false() {
         Ok(Err(format!(
-            "No update functions satisfy given constraints: \n{}",
-            error_message
+            "No update functions satisfy given constraints: \n{error_message}"
         )))
     } else {
         Ok(Ok(unit_bdd))
@@ -490,8 +489,7 @@ mod tests {
         let a = bn.as_graph().find_variable("a").unwrap();
         let b = bn.as_graph().find_variable("b").unwrap();
         let b_is_true = graph.get_symbolic_fn_update(b);
-        let result =
-            RegulationConstraint::mk_observability_with_limit(&ctx, b_is_true, a, 100);
+        let result = RegulationConstraint::mk_observability_with_limit(&ctx, b_is_true, a, 100);
         assert!(result.is_ok());
         let result = result.unwrap();
         assert!(!result.is_false());

@@ -1,4 +1,4 @@
-use crate::symbolic_async_graph::{FunctionTable, SymbolicContext, SizeLimitExceeded};
+use crate::symbolic_async_graph::{FunctionTable, SizeLimitExceeded, SymbolicContext};
 use crate::{
     BinaryOp, BooleanNetwork, FnUpdate, ParameterId, ParameterIdIterator, VariableId,
     VariableIdIterator,
@@ -106,8 +106,7 @@ impl SymbolicContext {
             if explicit_function_tables[i_p].is_none() {
                 let parameter_name = network[ParameterId(i_p)].get_name();
                 return Err(format!(
-                    "Integrity error: Uninterpreted function {} declared but not used.",
-                    parameter_name
+                    "Integrity error: Uninterpreted function {parameter_name} declared but not used."
                 ));
             }
         }
@@ -459,8 +458,7 @@ impl SymbolicContext {
         let table = &self.implicit_function_tables[variable.0];
         let table = table.as_ref().unwrap_or_else(|| {
             panic!(
-                "Variable {:?} does not have an implicit uninterpreted function.",
-                variable
+                "Variable {variable:?} does not have an implicit uninterpreted function."
             );
         });
         let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
@@ -594,8 +592,7 @@ impl SymbolicContext {
         let table = &self.implicit_function_tables[variable.0];
         let table = table.as_ref().unwrap_or_else(|| {
             panic!(
-                "Variable {:?} does not have an implicit uninterpreted function.",
-                variable
+                "Variable {variable:?} does not have an implicit uninterpreted function."
             );
         });
         let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
@@ -775,7 +772,7 @@ impl Eq for SymbolicContext {}
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
-    use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext, SizeLimitExceeded};
+    use crate::symbolic_async_graph::{SizeLimitExceeded, SymbolicAsyncGraph, SymbolicContext};
     use crate::trap_spaces::SymbolicSpaceContext;
     use crate::{BooleanNetwork, FnUpdate, VariableId};
     use biodivine_lib_bdd::BddPartialValuation;

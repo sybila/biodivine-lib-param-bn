@@ -630,15 +630,14 @@ impl SymbolicAsyncGraph {
             for var in main_network.variables() {
                 let name = main_network.get_variable_name(var);
                 if sub_network.as_graph().find_variable(name).is_none() {
-                    return Err(format!("Variable `{}` not found in the sub-network.", name));
+                    return Err(format!("Variable `{name}` not found in the sub-network."));
                 }
             }
             for var in sub_network.variables() {
                 let name = sub_network.get_variable_name(var);
                 if main_network.as_graph().find_variable(name).is_none() {
                     return Err(format!(
-                        "Variable `{}` not found in the main network.",
-                        name
+                        "Variable `{name}` not found in the main network."
                     ));
                 }
             }
@@ -674,10 +673,10 @@ impl SymbolicAsyncGraph {
                 if let Some(main_id) = main_network.find_parameter(name) {
                     let main_arity = main_network.get_parameter(main_id).get_arity();
                     if sub_network.get_parameter(param).get_arity() != main_arity {
-                        return Err(format!("Arity mismatch for parameter `{}`.", name));
+                        return Err(format!("Arity mismatch for parameter `{name}`."));
                     }
                 } else {
-                    return Err(format!("Parameter `{}` missing in the main network.", name));
+                    return Err(format!("Parameter `{name}` missing in the main network."));
                 }
             }
         }
@@ -708,14 +707,12 @@ impl SymbolicAsyncGraph {
                         || sub_reg.monotonicity != main_reg.monotonicity
                     {
                         return Err(format!(
-                            "Regulation `{:?}` is different in the sub-network (`{:?}`).",
-                            main_reg, sub_reg
+                            "Regulation `{main_reg:?}` is different in the sub-network (`{sub_reg:?}`)."
                         ));
                     }
                 } else {
                     return Err(format!(
-                        "Regulation `{:?}` not found in the sub-network.",
-                        main_reg
+                        "Regulation `{main_reg:?}` not found in the sub-network."
                     ));
                 }
             }
@@ -730,8 +727,7 @@ impl SymbolicAsyncGraph {
                 );
                 if main_reg.is_none() {
                     return Err(format!(
-                        "Regulation `{:?} not found in the main network.`",
-                        main_reg
+                        "Regulation `{main_reg:?} not found in the main network.`"
                     ));
                 }
                 // We already tested that if the regulation exists, it is the same.
@@ -748,14 +744,13 @@ impl SymbolicAsyncGraph {
                     let sub_fun_in_main =
                         sub_fun.rename_all(&sub_to_main_map, &param_sub_to_main_map);
                     if &sub_fun_in_main != main_fun {
-                        return Err(format!("Functions of `{}` are different.", name));
+                        return Err(format!("Functions of `{name}` are different."));
                     }
                 } else {
                     // Main has a missing function and sub specialises it.
                     if !sub_fun.collect_parameters().is_empty() {
                         return Err(format!(
-                            "A specialised function of `{}` in the sub-network has parameters.",
-                            name
+                            "A specialised function of `{name}` in the sub-network has parameters."
                         ));
                     }
                 }
@@ -763,8 +758,7 @@ impl SymbolicAsyncGraph {
                 let main_fun = main_network.get_update_function(main_var);
                 if main_fun.is_some() {
                     return Err(format!(
-                        "Sub-network erases existing function of `{}`.",
-                        name
+                        "Sub-network erases existing function of `{name}`."
                     ));
                 }
             }
@@ -816,7 +810,7 @@ impl SymbolicAsyncGraph {
                             .mk_literal(bdd_var, output);
                         colors = colors.and(&literal);
                     } else {
-                        return Err(format!("Unexpected error when evaluating `{}`.", name));
+                        return Err(format!("Unexpected error when evaluating `{name}`."));
                     }
                 }
             }
@@ -1063,7 +1057,7 @@ impl SymbolicAsyncGraph {
         let bdd_ctx = self.symbolic_context.bdd_variable_set();
         let mut colors_bdd = colors.as_bdd().clone();
         for (vars, params) in clusters {
-            println!("Process cluster {:?} {:?}", vars, params);
+            println!("Process cluster {vars:?} {params:?}");
             let mut relevant_bdd_vars = Vec::new();
             for p in params {
                 let table = self.symbolic_context.get_explicit_function_table(p);
@@ -1106,7 +1100,7 @@ impl SymbolicAsyncGraph {
             // Make a BDD that is satisfied only by the semantically unique interpretations of
             // the considered parameters, and does not depend on the remaining parameters.
             let dnf = Vec::from_iter(unique_interpretations.values().cloned());
-            println!("DNF: {:?}", dnf);
+            println!("DNF: {dnf:?}");
             let dnf_bdd = bdd_ctx.mk_dnf(&dnf);
             println!(
                 "Colors: {} {}",

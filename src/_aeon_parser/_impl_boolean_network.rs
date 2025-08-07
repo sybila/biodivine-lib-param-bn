@@ -33,8 +33,7 @@ impl BooleanNetwork {
     /// with appropriate error message.
     fn get_variable_for_name(&self, name: &str) -> Result<VariableId, String> {
         self.graph.find_variable(name).ok_or(format!(
-            "Can't add update function for `{}`. `{}` is not a variable.",
-            name, name
+            "Can't add update function for `{name}`. `{name}` is not a variable."
         ))
     }
 }

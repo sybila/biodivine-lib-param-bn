@@ -46,7 +46,7 @@ impl BooleanNetwork {
         write!(out, "<qual:listOfTransitions xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
         for id in self.variables() {
             let var_name = self[id].get_name();
-            write!(out, "<qual:transition qual:id=\"tr_{}\">", var_name)?;
+            write!(out, "<qual:transition qual:id=\"tr_{var_name}\">")?;
 
             // output inputs (regulators)
             write!(out, "<qual:listOfInputs>")?;
@@ -65,20 +65,20 @@ impl BooleanNetwork {
                 } else {
                     "false"
                 };
-                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\" essential=\"{}\"/>", r_var_name, sign, var_name, r_var_name, essential)?;
+                write!(out, "<qual:input qual:qualitativeSpecies=\"{r_var_name}\" qual:transitionEffect=\"none\" qual:sign=\"{sign}\" qual:id=\"tr_{var_name}_in_{r_var_name}\" essential=\"{essential}\"/>")?;
             }
             write!(out, "</qual:listOfInputs>")?;
 
             // output outputs (self)
             write!(out, "<qual:listOfOutputs>")?;
-            write!(out, "<qual:output qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{}_out\"/>", var_name, var_name)?;
+            write!(out, "<qual:output qual:qualitativeSpecies=\"{var_name}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{var_name}_out\"/>")?;
             write!(out, "</qual:listOfOutputs>")?;
             if let Some(update_function) = self.get_update_function(id) {
                 write!(out, "<qual:listOfFunctionTerms>")?;
                 if let FnUpdate::Const(value) = update_function {
                     // Constants are encoded into the default term:
                     let value = if *value { "1" } else { "0" };
-                    write!(out, "<qual:defaultTerm qual:resultLevel=\"{}\"/>", value)?;
+                    write!(out, "<qual:defaultTerm qual:resultLevel=\"{value}\"/>")?;
                 } else {
                     // set default value to 0
                     write!(out, "<qual:defaultTerm qual:resultLevel=\"0\"/>")?;
@@ -120,7 +120,7 @@ impl BooleanNetwork {
                     BinaryOp::Xor => "xor",
                     BinaryOp::Iff => "eq",
                 };
-                write!(out, "<apply><{}/>", op)?;
+                write!(out, "<apply><{op}/>")?;
                 self.write_update_function(out, l)?;
                 self.write_update_function(out, r)?;
                 write!(out, "</apply>")?;
@@ -144,14 +144,12 @@ fn write_layout(out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Re
     for (name, (x, y)) in layout {
         write!(
             out,
-            "<layout:generalGlyph layout:id=\"_ly_{}\" layout:reference=\"{}\">",
-            name, name
+            "<layout:generalGlyph layout:id=\"_ly_{name}\" layout:reference=\"{name}\">"
         )?;
         write!(out, "<layout:boundingBox>")?;
         write!(
             out,
-            "<layout:position layout:x=\"{}\" layout:y=\"{}\"/>",
-            x, y
+            "<layout:position layout:x=\"{x}\" layout:y=\"{y}\"/>"
         )?;
         write!(
             out,

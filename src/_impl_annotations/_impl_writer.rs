@@ -64,9 +64,9 @@ impl ModelAnnotation {
                         chars.last().map(|it| it.is_whitespace()).unwrap_or(false);
                     let has_whitespace = first_whitespace || last_whitespace;
                     if line.contains(':') || has_escape_sequence || has_whitespace {
-                        writeln!(f, "#`{}`#", line)?;
+                        writeln!(f, "#`{line}`#")?;
                     } else {
-                        writeln!(f, "{}", line)?;
+                        writeln!(f, "{line}")?;
                     }
                 }
             }

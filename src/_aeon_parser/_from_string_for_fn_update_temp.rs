@@ -92,7 +92,7 @@ fn tokenize_function_group(
                 }
                 output.push(Token::Name(name.into_iter().collect()));
             }
-            _ => return Err(format!("Unexpected '{}'.", c)),
+            _ => return Err(format!("Unexpected '{c}'.")),
         }
     }
     if top_level {
@@ -199,7 +199,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
                 }
             }
         }
-        Err(format!("Unexpected: {:?}. Expecting formula.", data))
+        Err(format!("Unexpected: {data:?}. Expecting formula."))
     }
 }
 

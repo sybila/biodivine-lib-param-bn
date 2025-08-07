@@ -58,7 +58,7 @@ impl SdGraph {
 
             if let Some(best_cycle) = best_cycle {
                 if should_log(log_level) {
-                    println!("Selected {:?} as the shortest candidate.", best_cycle);
+                    println!("Selected {best_cycle:?} as the shortest candidate.");
                 }
                 for x in &best_cycle {
                     scc.remove(x);
@@ -125,7 +125,7 @@ impl SdGraph {
 
             if let Some(best_cycle) = best_cycle {
                 if should_log(log_level) {
-                    println!("Selected {:?} as the shortest candidate.", best_cycle);
+                    println!("Selected {best_cycle:?} as the shortest candidate.");
                 }
                 for x in &best_cycle {
                     scc.remove(x);

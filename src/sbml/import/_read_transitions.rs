@@ -97,7 +97,7 @@ pub fn read_transition(transition: Node) -> Result<SbmlTransition, String> {
         .map(|t| t.math.is_some())
         .unwrap_or(false)
     {
-        return Err(format!("Default term in transition {:?} has math.", id));
+        return Err(format!("Default term in transition {id:?} has math."));
     }
 
     for input in inputs {
@@ -132,8 +132,7 @@ fn read_transition_input(
     let essential = input.attribute("essential");
     if species.is_none() {
         return Err(format!(
-            "Transition {:?} is missing an input species.",
-            transition_id
+            "Transition {transition_id:?} is missing an input species."
         ));
     }
 
@@ -155,8 +154,7 @@ fn read_transition_output(
     let id = output.attribute((SBML_QUAL, "id"));
     if species.is_none() {
         return Err(format!(
-            "Transition output in {:?} is missing an output species.",
-            transition_id
+            "Transition output in {transition_id:?} is missing an output species."
         ));
     }
 
@@ -174,16 +172,14 @@ fn read_transition_term(
     let result_level = term.attribute((SBML_QUAL, "resultLevel"));
     if result_level.is_none() {
         return Err(format!(
-            "Term result level not specified in transition {:?}.",
-            transition_id
+            "Term result level not specified in transition {transition_id:?}."
         ));
     }
     let result_level = result_level.unwrap();
     let level = result_level.parse::<u32>();
     if level.is_err() {
         return Err(format!(
-            "Term result level is not a number in transition {:?}. {} given.",
-            transition_id, result_level
+            "Term result level is not a number in transition {transition_id:?}. {result_level} given."
         ));
     }
 

@@ -10,7 +10,7 @@ impl FunctionTable {
     pub fn new(name: &str, arity: u16, bdd_builder: &mut BddVariableSetBuilder) -> FunctionTable {
         let rows: Vec<BddVariable> = ValuationsOfClauseIterator::new_unconstrained(arity)
             .map(|arg_valuation| {
-                let bdd_var_name = format!("{}{}", name, arg_valuation);
+                let bdd_var_name = format!("{name}{arg_valuation}");
                 bdd_builder.make_variable(bdd_var_name.as_str())
             })
             .collect();
@@ -60,7 +60,7 @@ impl Iterator for FunctionTableIterator<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((index, valuation)) = self.inner_iterator.next() {
-            Some((valuation.vector(), self.table.rows[index]))
+            Some((valuation.into_vector(), self.table.rows[index]))
         } else {
             None
         }

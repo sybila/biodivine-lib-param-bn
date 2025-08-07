@@ -126,14 +126,14 @@ impl FnUpdateTemp {
     fn get_variable(bn: &BooleanNetwork, name: &str) -> Result<VariableId, String> {
         bn.graph
             .find_variable(name)
-            .ok_or_else(|| format!("Invalid update function. Unknown variable `{}`.", name))
+            .ok_or_else(|| format!("Invalid update function. Unknown variable `{name}`."))
     }
 
     /// **(internal)** Utility method to safely obtain a parameter id from a
     /// network with an appropriate error.
     fn get_parameter(bn: &BooleanNetwork, name: &str) -> Result<ParameterId, String> {
         bn.find_parameter(name)
-            .ok_or_else(|| format!("Invalid update function. Unknown parameter `{}`.", name))
+            .ok_or_else(|| format!("Invalid update function. Unknown parameter `{name}`."))
     }
 
     /// **(internal)** Generate an error message if the given `parameter` does not have
