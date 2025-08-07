@@ -119,7 +119,7 @@ pub trait BitVector: Clone + Eq + Display + From<Vec<bool>> {
                 if !first {
                     write!(f, " ")?;
                 }
-                write!(f, "{}", i)?;
+                write!(f, "{i}")?;
                 first = false;
             }
         }

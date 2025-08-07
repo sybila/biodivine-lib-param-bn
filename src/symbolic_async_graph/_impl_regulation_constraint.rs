@@ -1,9 +1,63 @@
-use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
+use crate::symbolic_async_graph::{RegulationConstraint, SizeLimitExceeded, SymbolicContext};
 use crate::{BooleanNetwork, Monotonicity, Regulation, VariableId};
-use biodivine_lib_bdd::{bdd, Bdd};
+use biodivine_lib_bdd::op_function::{and, xor};
+use biodivine_lib_bdd::Bdd;
+
 impl RegulationConstraint {
+    /// A version of [RegulationConstraint::mk_observability] that accepts a node limit for
+    /// the underlying BDD operations.
+    ///
+    /// If the limit is exceeded, this function returns an error.
+    pub fn mk_observability_with_limit(
+        ctx: &SymbolicContext,
+        fn_is_true: &Bdd,
+        input: VariableId,
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
+        /*
+                  "Exists an input vector where output of `f` changes due to the input `r`."
+           (implicit \exists p_1, ..., p_m):
+               \exists s_1, ..., s_n:
+                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 1
+                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
+                   a != b
+        */
+        let input_variable = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input_variable);
+        // Negation does not increase node count.
+        let input_is_false = input_is_true.not();
+
+        // Constrain the function to when input is true.
+        let fn_is_true_then_input_true =
+            Bdd::binary_op_with_limit(limit, fn_is_true, &input_is_true, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // Remove the input variable from the BDD.
+        // TODO: This can be a source of memory issues.
+        let fn_x1_to_1 = fn_is_true_then_input_true.var_exists(input_variable);
+
+        // Constrain the function to when input is false.
+        let fn_is_true_then_input_false =
+            Bdd::binary_op_with_limit(limit, fn_is_true, &input_is_false, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // Remove the input variable from the BDD.
+        // TODO: This can be a source of memory issues.
+        let fn_x0_to_1 = fn_is_true_then_input_false.var_exists(input_variable);
+
+        // Check for what parameter valuations the two versions of the function can differ.
+        let result = Bdd::binary_op_with_limit(limit, &fn_x1_to_1, &fn_x0_to_1, xor)
+            .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+
+        // Finally, remove all state variables, leaving only parameters.
+        // TODO: This can be a source of memory issues.
+        Ok(result.exists(ctx.state_variables()))
+    }
+
     /// Compute a BDD representing all instantiations of a (partial) function where the given
     /// `input` is observable (also called essential).
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [RegulationConstraint::mk_observability_with_limit].
     ///
     /// In particular:
     ///  - `ctx` is a symbolic encoding of a [BooleanNetwork].
@@ -19,28 +73,57 @@ impl RegulationConstraint {
     /// regulation.
     ///
     pub fn mk_observability(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
+        Self::mk_observability_with_limit(ctx, fn_is_true, input, usize::MAX).unwrap()
+    }
+
+    /// A version of [RegulationConstraint::mk_activation] that accepts a node limit for
+    /// the underlying BDD operations.
+    ///
+    /// If the limit is exceeded, this function returns an error.
+    pub fn mk_activation_with_limit(
+        ctx: &SymbolicContext,
+        fn_is_true: &Bdd,
+        input: VariableId,
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
         /*
-                  "Exists an input vector where output of `f` changes due to the input `r`."
+               "Exists an input where the functions monotonicity in `r` is reversed."
            (implicit \exists p_1, ..., p_m):
-               \exists s_1, ..., s_n:
-                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 1
+               not \exists s_1, ..., s_m:
+                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 0 and s_r = 1
                    b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
-                   a != b
+                   a & b   // "I can go from 1 to 0 by increasing s_r."
         */
-        let input = ctx.get_state_variable(input);
-        let input_is_true = ctx.bdd_variable_set().mk_var(input);
+        let input_variable = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input_variable);
         let input_is_false = input_is_true.not();
-        // \exists x_r : F(x_1, ..., x_r, ..., x_n) & x_r | Context where F is one for x_r, but with x_r erased.
-        let fn_x1_to_1 = bdd!(fn_is_true & input_is_true).var_exists(input);
-        // \exists x_r : F(x_1, ..., x_r, ..., x_m) & !x_r | Context where F is one for !x_r, but with x_r erased.
-        let fn_x0_to_1 = bdd!(fn_is_true & input_is_false).var_exists(input);
-        // Context where F for x_r is not equal F for !x_r (i.e. all witnesses of observability)
-        // and then with all states erased.
-        bdd!(fn_x1_to_1 ^ fn_x0_to_1).exists(ctx.state_variables())
+        let fn_is_false = fn_is_true.not();
+
+        let fn_is_false_then_input_true =
+            Bdd::binary_op_with_limit(limit, &fn_is_false, &input_is_true, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // TODO: This can be a source of memory issues.
+        let fn_x1_to_0 = fn_is_false_then_input_true.var_exists(input_variable);
+
+        let fn_is_true_then_input_false =
+            Bdd::binary_op_with_limit(limit, fn_is_true, &input_is_false, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // TODO: This can be a source of memory issues.
+        let fn_x0_to_1 = fn_is_true_then_input_false.var_exists(input_variable);
+
+        let result = Bdd::binary_op_with_limit(limit, &fn_x0_to_1, &fn_x1_to_0, and)
+            .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+
+        // TODO: This can be a source of memory issues.
+        Ok(result.exists(ctx.state_variables()).not())
     }
 
     /// Compute a BDD representing all instantiations of a (partial) function where the given
     /// `input` is an activator (also called positively monotonic).
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [RegulationConstraint::mk_activation_with_limit].
     ///
     /// In particular:
     ///  - `ctx` is a symbolic encoding of a [BooleanNetwork].
@@ -56,42 +139,107 @@ impl RegulationConstraint {
     /// regulation.
     ///
     pub fn mk_activation(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
-        /*
-               "Exists an input where the functions monotonicity in `r` is reversed."
-           (implicit \exists p_1, ..., p_m):
-               not \exists s_1, ..., s_m:
-                   a <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 0 and s_r = 1
-                   b <- \exists s_r: F(s_1, ..., s_r, ..., s_n, p_1, ..., p_m) = 1 and s_r = 0
-                   a & b   // "I can go from 1 to 0 by increasing s_r."
-        */
-        let input = ctx.get_state_variable(input);
-        let input_is_true = ctx.bdd_variable_set().mk_var(input);
+        Self::mk_activation_with_limit(ctx, fn_is_true, input, usize::MAX).unwrap()
+    }
+
+    /// A version of [RegulationConstraint::mk_inhibition] that accepts a node limit for
+    /// the underlying BDD operations.
+    ///
+    /// If the limit is exceeded, this function returns an error.
+    pub fn mk_inhibition_with_limit(
+        ctx: &SymbolicContext,
+        fn_is_true: &Bdd,
+        input: VariableId,
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
+        let input_variable = ctx.get_state_variable(input);
+        let input_is_true = ctx.bdd_variable_set().mk_var(input_variable);
         let input_is_false = input_is_true.not();
         let fn_is_false = fn_is_true.not();
-        let fn_x1_to_0 = bdd!(fn_is_false & input_is_true).var_exists(input);
-        let fn_x0_to_1 = bdd!(fn_is_true & input_is_false).var_exists(input);
-        bdd!(fn_x0_to_1 & fn_x1_to_0)
-            .exists(ctx.state_variables())
-            .not()
+
+        let fn_is_false_then_input_false =
+            Bdd::binary_op_with_limit(limit, &fn_is_false, &input_is_false, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // TODO: This can be a source of memory issues.
+        let fn_x0_to_0 = fn_is_false_then_input_false.var_exists(input_variable);
+
+        let fn_is_true_then_input_true =
+            Bdd::binary_op_with_limit(limit, fn_is_true, &input_is_true, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        // TODO: This can be a source of memory issues.
+        let fn_x1_to_1 = fn_is_true_then_input_true.var_exists(input_variable);
+
+        let result = Bdd::binary_op_with_limit(limit, &fn_x0_to_0, &fn_x1_to_1, and)
+            .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+
+        // TODO: This can be a source of memory issues.
+        Ok(result.exists(ctx.state_variables()).not())
     }
 
     /// The same as [RegulationConstraint::mk_activation], but with negative monotonicity instead
     /// of positive monotonicity.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [RegulationConstraint::mk_inhibition_with_limit].
     pub fn mk_inhibition(ctx: &SymbolicContext, fn_is_true: &Bdd, input: VariableId) -> Bdd {
-        let input = ctx.get_state_variable(input);
-        let input_is_true = ctx.bdd_variable_set().mk_var(input);
-        let input_is_false = input_is_true.not();
-        let fn_is_false = fn_is_true.not();
-        let fn_x0_to_0 = bdd!(fn_is_false & input_is_false).var_exists(input);
-        let fn_x1_to_1 = bdd!(fn_is_true & input_is_true).var_exists(input);
-        bdd!(fn_x0_to_0 & fn_x1_to_1)
-            .exists(ctx.state_variables())
-            .not()
+        Self::mk_inhibition_with_limit(ctx, fn_is_true, input, usize::MAX).unwrap()
+    }
+
+    /// A version of [RegulationConstraint::infer_sufficient_regulation] that accepts a node
+    /// limit for the underlying BDD operations.
+    ///
+    /// If the limit is exceeded, this function returns an error.
+    pub fn infer_sufficient_regulation_with_limit(
+        ctx: &SymbolicContext,
+        regulator: VariableId,
+        target: VariableId,
+        fn_is_true: &Bdd,
+        limit: usize,
+    ) -> Result<Option<Regulation>, SizeLimitExceeded> {
+        let inputs = ctx.input_parameter_variables();
+
+        let obs = Self::mk_observability_with_limit(ctx, fn_is_true, regulator, limit)?;
+        // TODO: This can be a source of memory issues.
+        let obs = obs.exists(&inputs);
+        let observable = if obs.is_true() {
+            true
+        } else if !obs.is_false() {
+            false
+        } else {
+            return Ok(None);
+        };
+
+        let act = Self::mk_activation_with_limit(ctx, fn_is_true, regulator, limit)?;
+        // TODO: This can be a source of memory issues.
+        let act = act.for_all(&inputs);
+        let inh = Self::mk_inhibition_with_limit(ctx, fn_is_true, regulator, limit)?;
+        // TODO: This can be a source of memory issues.
+        let inh = inh.for_all(&inputs);
+
+        let monotonicity = if act.is_true() {
+            Some(Monotonicity::Activation)
+        } else if inh.is_true() {
+            Some(Monotonicity::Inhibition)
+        } else {
+            None
+        };
+
+        Ok(Some(Regulation {
+            regulator,
+            target,
+            observable,
+            monotonicity,
+        }))
     }
 
     /// Infer the *most specific* [Regulation] which is still sufficient to correctly
     /// cover the relationship between `regulator` and `target` in the provided function
     /// (represented as a `fn_is_true` [Bdd]).
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [RegulationConstraint::infer_sufficient_regulation_with_limit].
     ///
     /// In particular:
     ///  - If `regulator` has no effect on `target`, return `None`.
@@ -107,50 +255,25 @@ impl RegulationConstraint {
         target: VariableId,
         fn_is_true: &Bdd,
     ) -> Option<Regulation> {
-        let inputs = ctx.input_parameter_variables();
-
-        let obs = Self::mk_observability(ctx, fn_is_true, regulator);
-        let obs = obs.exists(&inputs);
-        let observable = if obs.is_true() {
-            true
-        } else if !obs.is_false() {
-            false
-        } else {
-            return None;
-        };
-
-        let act = Self::mk_activation(ctx, fn_is_true, regulator);
-        let act = act.for_all(&inputs);
-        let inh = Self::mk_inhibition(ctx, fn_is_true, regulator);
-        let inh = inh.for_all(&inputs);
-
-        let monotonicity = if act.is_true() {
-            Some(Monotonicity::Activation)
-        } else if inh.is_true() {
-            Some(Monotonicity::Inhibition)
-        } else {
-            None
-        };
-
-        Some(Regulation {
-            regulator,
-            target,
-            observable,
-            monotonicity,
-        })
+        Self::infer_sufficient_regulation_with_limit(ctx, regulator, target, fn_is_true, usize::MAX)
+            .unwrap()
     }
 
-    /// Similar to [Self::infer_sufficient_regulation], but it tries to keep the constraints
-    /// from the given `old_regulation` assuming they are satisfiable and more restrictive
-    /// than the inferred constraints.
-    pub fn fix_regulation(
+    /// A version of [RegulationConstraint::fix_regulation] that accepts a node limit for
+    /// the underlying BDD operations.
+    ///
+    /// If the limit is exceeded, this function returns an error.
+    pub fn fix_regulation_with_limit(
         ctx: &SymbolicContext,
         old_regulation: &Regulation,
         fn_is_true: &Bdd,
-    ) -> Option<Regulation> {
+        limit: usize,
+    ) -> Result<Option<Regulation>, SizeLimitExceeded> {
         let inputs = ctx.input_parameter_variables();
 
-        let obs = Self::mk_observability(ctx, fn_is_true, old_regulation.regulator);
+        let obs =
+            Self::mk_observability_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
+        // TODO: This can be a source of memory issues.
         let obs = obs.exists(&inputs);
 
         let observable = if obs.is_true() {
@@ -162,12 +285,14 @@ impl RegulationConstraint {
             old_regulation.observable
         } else {
             // The regulation is *never* used, hence the regulation is irrelevant.
-            return None;
+            return Ok(None);
         };
 
-        let act = Self::mk_activation(ctx, fn_is_true, old_regulation.regulator);
+        let act = Self::mk_activation_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
+        // TODO: This can be a source of memory issues.
         let act = act.for_all(&inputs);
-        let inh = Self::mk_inhibition(ctx, fn_is_true, old_regulation.regulator);
+        let inh = Self::mk_inhibition_with_limit(ctx, fn_is_true, old_regulation.regulator, limit)?;
+        // TODO: This can be a source of memory issues.
         let inh = inh.for_all(&inputs);
 
         let monotonicity = if act.is_true() {
@@ -196,27 +321,40 @@ impl RegulationConstraint {
             }
         };
 
-        Some(Regulation {
+        Ok(Some(Regulation {
             regulator: old_regulation.regulator,
             target: old_regulation.target,
             observable,
             monotonicity,
-        })
+        }))
+    }
+
+    /// Similar to [Self::infer_sufficient_regulation], but it tries to keep the constraints
+    /// from the given `old_regulation` assuming they are satisfiable and more restrictive
+    /// than the inferred constraints.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [RegulationConstraint::fix_regulation_with_limit].
+    pub fn fix_regulation(
+        ctx: &SymbolicContext,
+        old_regulation: &Regulation,
+        fn_is_true: &Bdd,
+    ) -> Option<Regulation> {
+        Self::fix_regulation_with_limit(ctx, old_regulation, fn_is_true, usize::MAX).unwrap()
     }
 }
 
-/// Compute a `Bdd` which is a subset of the `initial` valuations that satisfies all
-/// constraints imposed by the given Boolean `network`.
+/// A version of `apply_regulation_constraints` that accepts a `limit` for node count of the
+/// underlying BDD operations.
 ///
-/// If there are no satisfying valuations, this function should return a human-readable
-/// message which explains problem (often in several lines). However, in some complex
-/// cases (inter-dependent parameters), this can be very hard and the error messages
-/// are thus purely a "best effort service".
-pub(crate) fn apply_regulation_constraints(
+/// If the limit is exceeded, this function returns an error.
+pub(crate) fn apply_regulation_constraints_with_limit(
     initial: Bdd,
     network: &BooleanNetwork,
     context: &SymbolicContext,
-) -> Result<Bdd, String> {
+    limit: usize,
+) -> Result<Result<Bdd, String>, SizeLimitExceeded> {
     // Detect "input parameters". For these, we don't actually want to apply any restrictions,
     // as these are typically just variables that are converted into parameters. Therefore,
     // they *can* have both values, even though one of them would make a particular constraint
@@ -224,16 +362,19 @@ pub(crate) fn apply_regulation_constraints(
     let inputs = context.input_parameter_variables();
 
     // For each variable, compute Bdd that is true exactly when its update function is true.
-    let update_function_is_true: Vec<Bdd> = network
-        .variables()
-        .map(|variable| {
-            if let Some(function) = network.get_update_function(variable) {
-                context.mk_fn_update_true(function)
-            } else {
-                context.mk_implicit_function_is_true(variable, &network.regulators(variable))
-            }
-        })
-        .collect();
+    let mut update_function_is_true: Vec<Bdd> = Vec::new();
+    for variable in network.variables() {
+        let function_bdd = if let Some(function) = network.get_update_function(variable) {
+            context.mk_fn_update_true_with_limit(function, limit)?
+        } else {
+            context.mk_implicit_function_is_true_with_limit(
+                variable,
+                &network.regulators(variable),
+                limit,
+            )?
+        };
+        update_function_is_true.push(function_bdd);
+    }
 
     let mut error_message = String::new();
     let mut unit_bdd = initial;
@@ -242,7 +383,9 @@ pub(crate) fn apply_regulation_constraints(
         let fn_is_true = &update_function_is_true[regulation.target.to_index()];
 
         let observability = if regulation.observable {
-            RegulationConstraint::mk_observability(context, fn_is_true, regulator)
+            RegulationConstraint::mk_observability_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?
         } else {
             context.mk_constant(true)
         };
@@ -257,16 +400,16 @@ pub(crate) fn apply_regulation_constraints(
                 network.get_variable_name(regulation.regulator),
                 network.get_variable_name(regulation.target),
             );
-            error_message = format!("{}{}", error_message, problem);
+            error_message = format!("{error_message}{problem}");
         }
 
         let monotonicity = match regulation.monotonicity {
-            Some(Monotonicity::Activation) => {
-                RegulationConstraint::mk_activation(context, fn_is_true, regulator)
-            }
-            Some(Monotonicity::Inhibition) => {
-                RegulationConstraint::mk_inhibition(context, fn_is_true, regulator)
-            }
+            Some(Monotonicity::Activation) => RegulationConstraint::mk_activation_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?,
+            Some(Monotonicity::Inhibition) => RegulationConstraint::mk_inhibition_with_limit(
+                context, fn_is_true, regulator, limit,
+            )?,
             None => context.mk_constant(true),
         };
 
@@ -286,28 +429,73 @@ pub(crate) fn apply_regulation_constraints(
                 monotonicity_str,
                 network.get_variable_name(regulation.target),
             );
-            error_message = format!("{}{}", error_message, problem);
+            error_message = format!("{error_message}{problem}");
         }
 
-        unit_bdd = bdd!(unit_bdd & (monotonicity & observability));
+        let both = Bdd::binary_op_with_limit(limit, &monotonicity, &observability, and)
+            .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+        unit_bdd = Bdd::binary_op_with_limit(limit, &unit_bdd, &both, and)
+            .ok_or_else(|| SizeLimitExceeded::new(limit))?;
     }
 
     if unit_bdd.is_false() {
-        Err(format!(
-            "No update functions satisfy given constraints: \n{}",
-            error_message
-        ))
+        Ok(Err(format!(
+            "No update functions satisfy given constraints: \n{error_message}"
+        )))
     } else {
-        Ok(unit_bdd)
+        Ok(Ok(unit_bdd))
     }
+}
+
+/// Compute a `Bdd` which is a subset of the `initial` valuations that satisfies all
+/// constraints imposed by the given Boolean `network`.
+///
+/// Note that this version panics if the underlying BDD operations exceed the default memory
+/// limit. If you want to handle this case gracefully, use
+/// [apply_regulation_constraints_with_limit].
+///
+/// If there are no satisfying valuations, this function should return a human-readable
+/// message which explains problem (often in several lines). However, in some complex
+/// cases (inter-dependent parameters), this can be very hard and the error messages
+/// are thus purely a "best effort service".
+pub(crate) fn apply_regulation_constraints(
+    initial: Bdd,
+    network: &BooleanNetwork,
+    context: &SymbolicContext,
+) -> Result<Bdd, String> {
+    apply_regulation_constraints_with_limit(initial, network, context, usize::MAX).unwrap()
 }
 
 #[cfg(test)]
 mod tests {
     use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
-    use crate::symbolic_async_graph::{RegulationConstraint, SymbolicAsyncGraph, SymbolicContext};
+    use crate::symbolic_async_graph::{
+        RegulationConstraint, SizeLimitExceeded, SymbolicAsyncGraph, SymbolicContext,
+    };
     use crate::Monotonicity::{Activation, Inhibition};
     use crate::{BooleanNetwork, Regulation, VariableId};
+
+    #[test]
+    fn test_observability_limit() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> b
+            $b: a & a & a & a & a & a & a & a & a & a & a & a & a & a & a & a & a & a & a
+        ",
+        )
+        .unwrap();
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let graph = SymbolicAsyncGraph::new(&bn).unwrap();
+        let a = bn.as_graph().find_variable("a").unwrap();
+        let b = bn.as_graph().find_variable("b").unwrap();
+        let b_is_true = graph.get_symbolic_fn_update(b);
+        let result = RegulationConstraint::mk_observability_with_limit(&ctx, b_is_true, a, 100);
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert!(!result.is_false());
+        let result = RegulationConstraint::mk_observability_with_limit(&ctx, b_is_true, a, 2);
+        assert!(matches!(result, Err(SizeLimitExceeded { .. })));
+    }
 
     #[test]
     fn input_parameter_constraints() {

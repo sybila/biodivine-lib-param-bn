@@ -27,7 +27,7 @@ pub fn sbml_transition_to_update_function(
                 } else if *i == 1 {
                     Ok(FnUpdate::Const(true))
                 } else {
-                    Err(format!("Cannot convert integer `{}` to Boolean.", i))
+                    Err(format!("Cannot convert integer `{i}` to Boolean."))
                 }
             }
             MathMl::Identifier(name) => {
@@ -129,7 +129,7 @@ pub fn sbml_transition_to_update_function(
                                 .fold(fst, |l, r| FnUpdate::Binary(op, Box::new(l), Box::new(r))))
                         }
                     }
-                    _ => Err(format!("Unknown MathML operator `{}`.", op)),
+                    _ => Err(format!("Unknown MathML operator `{op}`.")),
                 }
             }
         }
@@ -250,6 +250,6 @@ fn transform_comparison(op: &str, left: FnUpdate, right: FnUpdate) -> FnUpdate {
                 FnUpdate::Binary(BinaryOp::Imp, Box::new(left), Box::new(right))
             }
         }
-        _ => panic!("Unsupported comparison {}.", op),
+        _ => panic!("Unsupported comparison {op}."),
     }
 }

@@ -20,8 +20,7 @@ pub fn read_species(model: Node) -> Result<Vec<SbmlSpecie>, String> {
         Ok(list) => list,
         Err(e) => {
             return Err(format!(
-            "List of qualitative species is missing ({}). Are you sure this is an SBML-qual model?",
-            e
+            "List of qualitative species is missing ({e}). Are you sure this is an SBML-qual model?"
         ))
         }
     };
@@ -38,7 +37,7 @@ pub fn read_species(model: Node) -> Result<Vec<SbmlSpecie>, String> {
             let max_level = if let Some(max_level) = max_level {
                 let value = max_level.parse::<u32>();
                 if value.is_err() {
-                    return Err(format!("Invalid maxLevel value: {}", max_level));
+                    return Err(format!("Invalid maxLevel value: {max_level}"));
                 } else {
                     value.ok()
                 }

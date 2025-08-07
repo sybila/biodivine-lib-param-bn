@@ -25,14 +25,13 @@ impl BooleanNetwork {
             } else {
                 let segments = line.split(',').collect::<Vec<_>>();
                 if segments.len() != 2 {
-                    return Err(format!("Unexpected line: `{}`", line));
+                    return Err(format!("Unexpected line: `{line}`"));
                 }
 
                 let variable_name = segments[0].trim().to_string();
                 if model_map.contains_key(&variable_name) {
                     return Err(format!(
-                        "Duplicate function declaration for `{}`.",
-                        variable_name
+                        "Duplicate function declaration for `{variable_name}`."
                     ));
                 }
 

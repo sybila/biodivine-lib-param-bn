@@ -14,7 +14,7 @@ impl RegulatoryGraph {
     pub fn new(variables: Vec<String>) -> RegulatoryGraph {
         let variable_set = variables.iter().collect::<HashSet<_>>();
         if variable_set.len() != variables.len() {
-            panic!("Variables {:?} contain duplicates.", variables);
+            panic!("Variables {variables:?} contain duplicates.");
         }
         RegulatoryGraph {
             regulations: Vec::new(),
@@ -66,8 +66,7 @@ impl RegulatoryGraph {
             Ok(self.regulations.remove(index))
         } else {
             Err(format!(
-                "Regulation ({:?}, {:?}) does not exist.",
-                regulator, target
+                "Regulation ({regulator:?}, {target:?}) does not exist."
             ))
         }
     }
@@ -85,7 +84,7 @@ impl RegulatoryGraph {
     /// structures reference variables with ids.
     pub fn set_variable_name(&mut self, id: VariableId, name: &str) -> Result<(), String> {
         if self.find_variable(name).is_some() {
-            Err(format!("Variable named `{}` already exists.", name))
+            Err(format!("Variable named `{name}` already exists."))
         } else if let Some(variable) = self.variables.get_mut(id.0) {
             let mut name_string = name.to_string();
             std::mem::swap(&mut name_string, &mut variable.name);
@@ -93,20 +92,20 @@ impl RegulatoryGraph {
             self.variable_to_index.insert(name.to_string(), id);
             Ok(())
         } else {
-            Err(format!("Unknown variable id: {:?}", id))
+            Err(format!("Unknown variable id: {id:?}"))
         }
     }
 
     /// **(internal)** Utility method to safely obtain a regulator variable (using an appropriate error message).
     fn get_regulator(&self, name: &str) -> Result<VariableId, String> {
         self.find_variable(name)
-            .ok_or(format!("Invalid regulation: Unknown regulator {}.", name))
+            .ok_or(format!("Invalid regulation: Unknown regulator {name}."))
     }
 
     /// **(internal)** Utility method to safely obtain a target variable (using an appropriate error message).
     fn get_target(&self, name: &str) -> Result<VariableId, String> {
         self.find_variable(name)
-            .ok_or(format!("Invalid regulation: Unknown target {}.", name))
+            .ok_or(format!("Invalid regulation: Unknown target {name}."))
     }
 
     /// **(internal)** Utility method to ensure there is no regulation between the two variables yet.

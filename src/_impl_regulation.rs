@@ -10,10 +10,7 @@ lazy_static! {
     static ref REGULATION_REGEX: Regex = Regex::new(
         format!(
             // regulator ID, whitespace?, arrow string, whitespace?, target ID
-            r"^(?P<regulator>{})\s*{}\s*(?P<target>{})$",
-            ID_REGEX_STR,
-            REGULATION_ARROW_REGEX_STR,
-            ID_REGEX_STR,
+            r"^(?P<regulator>{ID_REGEX_STR})\s*{REGULATION_ARROW_REGEX_STR}\s*(?P<target>{ID_REGEX_STR})$",
         ).as_str()
     ).unwrap();
 }

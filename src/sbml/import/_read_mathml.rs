@@ -65,7 +65,7 @@ fn read_expression(math: Node) -> Result<MathMl, String> {
         return if let Ok(parsed) = value.parse::<i64>() {
             Ok(MathMl::Integer(parsed))
         } else {
-            Err(format!("Invalid integer constant: `{}`.", value))
+            Err(format!("Invalid integer constant: `{value}`."))
         };
     }
     if math.tag_name() == ExpandedName::from(APPLY_TAG) {

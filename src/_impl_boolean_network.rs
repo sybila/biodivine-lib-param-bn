@@ -56,7 +56,7 @@ impl BooleanNetwork {
                         Self::try_from_sbml(content.as_str()).map(|(x, _)| x)
                     }
                 }
-                Err(e) => Err(format!("File not readable: {}", e)),
+                Err(e) => Err(format!("File not readable: {e}")),
             }
         } else {
             Err("Unknown file format.".to_string())
@@ -125,8 +125,7 @@ impl BooleanNetwork {
             Ok(())
         } else {
             Err(format!(
-                "Cannot add parameter. '{}' is already a variable.",
-                name
+                "Cannot add parameter. '{name}' is already a variable."
             ))
         }
     }
@@ -136,7 +135,7 @@ impl BooleanNetwork {
         if self.find_parameter(name).is_none() {
             Ok(())
         } else {
-            Err(format!("Cannot add parameter. '{}' already added.", name))
+            Err(format!("Cannot add parameter. '{name}' already added."))
         }
     }
 
@@ -181,8 +180,7 @@ impl BooleanNetwork {
                 .collect();
             let var_name = self.graph.get_variable(variable);
             Err(format!(
-                "Variable '{}' is regulated by {:?}, but {:?} were found as arguments",
-                var_name, expected_names, actual_names
+                "Variable '{var_name}' is regulated by {expected_names:?}, but {actual_names:?} were found as arguments"
             ))
         }
     }
@@ -765,7 +763,7 @@ impl BooleanNetwork {
                 return name;
             }
             // If there is a collision with existing variable or parameter, prefix the name with an underscore.
-            name = format!("_{}", name);
+            name = format!("_{name}");
         }
     }
 

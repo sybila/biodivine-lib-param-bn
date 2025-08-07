@@ -14,7 +14,7 @@ impl TryFrom<&str> for RegulationTemp {
                 monotonicity: m,
             })
         } else {
-            Err(format!("String \"{}\" is not a valid regulation.", value))
+            Err(format!("String \"{value}\" is not a valid regulation."))
         }
     }
 }

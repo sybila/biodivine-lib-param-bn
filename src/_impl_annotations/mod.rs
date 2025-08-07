@@ -28,14 +28,12 @@ fn validate_path_segment(path: &str) {
     //  Ideally, we should specify a supported list of "escape-able" characters instead.
     if path.contains('`') {
         panic!(
-            "Annotation path segments cannot contain backtick. Current segment: \"{}\".",
-            path
+            "Annotation path segments cannot contain backtick. Current segment: \"{path}\"."
         );
     }
     if path.contains('\n') {
         panic!(
-            "Annotation path segments cannot contain a newline. Current segment: \"{}\".",
-            path
+            "Annotation path segments cannot contain a newline. Current segment: \"{path}\"."
         );
     }
 }

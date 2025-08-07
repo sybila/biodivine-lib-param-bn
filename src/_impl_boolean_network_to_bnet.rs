@@ -18,12 +18,11 @@ impl BooleanNetwork {
             let name = network.get_variable_name(var);
             if !name_re.is_match(name) {
                 if rename_if_necessary {
-                    let new_name = format!("_{}", name);
+                    let new_name = format!("_{name}");
                     network.as_graph_mut().set_variable_name(var, &new_name)?;
                 } else {
                     return Err(format!(
-                        "Variable {} cannot be exported to bnet. Please rename it first.",
-                        name
+                        "Variable {name} cannot be exported to bnet. Please rename it first."
                     ));
                 }
             }
@@ -33,7 +32,7 @@ impl BooleanNetwork {
             let name = network.get_variable_name(v);
             if let Some(function) = network.get_update_function(v) {
                 let function_string = fn_update_to_bnet_string(v, function, self)?;
-                let line = format!("{}, {}\n", name, function_string);
+                let line = format!("{name}, {function_string}\n");
                 model.push_str(line.as_str());
             } else {
                 // If there is no update function, we can skip it assuming it has no inputs (constant).
@@ -69,9 +68,9 @@ fn fn_update_to_bnet_string(
             // .bnet does not have constants, but we can simulate a constant like this:
             let name = network.get_variable_name(var);
             if *value {
-                format!("({} | !{})", name, name)
+                format!("({name} | !{name})")
             } else {
-                format!("({} & !{})", name, name)
+                format!("({name} & !{name})")
             }
         }
         FnUpdate::Not(inner) => {
@@ -81,11 +80,11 @@ fn fn_update_to_bnet_string(
             let left = fn_update_to_bnet_string(var, left, network)?;
             let right = fn_update_to_bnet_string(var, right, network)?;
             match *op {
-                BinaryOp::And => format!("({} & {})", left, right),
-                BinaryOp::Or => format!("({} | {})", left, right),
-                BinaryOp::Imp => format!("(!{} | {})", left, right),
-                BinaryOp::Iff => format!("(({} & {}) | (!{} & !{}))", left, right, left, right),
-                BinaryOp::Xor => format!("(({} & !{}) | (!{} & {}))", left, right, left, right),
+                BinaryOp::And => format!("({left} & {right})"),
+                BinaryOp::Or => format!("({left} | {right})"),
+                BinaryOp::Imp => format!("(!{left} | {right})"),
+                BinaryOp::Iff => format!("(({left} & {right}) | (!{left} & !{right}))"),
+                BinaryOp::Xor => format!("(({left} & !{right}) | (!{left} & {right}))"),
             }
         }
     })

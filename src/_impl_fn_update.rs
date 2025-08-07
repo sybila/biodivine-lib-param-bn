@@ -327,9 +327,9 @@ impl FnUpdate {
                 let r = r.to_string_rec(context, r_no_paren);
 
                 if no_paren {
-                    format!("{} {} {}", l, op, r)
+                    format!("{l} {op} {r}")
                 } else {
-                    format!("({} {} {})", l, op, r)
+                    format!("({l} {op} {r})")
                 }
             }
             Param(id, args) => {
@@ -348,7 +348,7 @@ impl FnUpdate {
                         arg_string =
                             format!("{}, {}", arg_string, arg.to_string_rec(context, true));
                     }
-                    format!("{}{})", name, arg_string)
+                    format!("{name}{arg_string})")
                 }
             }
         }

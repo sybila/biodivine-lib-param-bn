@@ -33,7 +33,7 @@ impl From<Option<bool>> for ExtendedBoolean {
 
 impl Display for ExtendedBoolean {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
