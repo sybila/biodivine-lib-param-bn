@@ -33,6 +33,10 @@ use crate::BooleanNetwork;
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet, ValuationsOfClauseIterator};
 use std::iter::Enumerate;
 
+pub use error::SizeLimitExceeded;
+
+mod error;
+
 /// **(internal)** Implementing conversion between `FnUpdate` and `BooleanExpression`.
 mod _impl_fn_update_from_boolean_expression;
 /// **(internal)** Implementation for `FunctionTable` and `FunctionTableIterator`.

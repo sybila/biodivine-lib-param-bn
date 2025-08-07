@@ -1,9 +1,9 @@
-use crate::symbolic_async_graph::{FunctionTable, SymbolicContext};
+use crate::symbolic_async_graph::{FunctionTable, SymbolicContext, SizeLimitExceeded};
 use crate::{
     BinaryOp, BooleanNetwork, FnUpdate, ParameterId, ParameterIdIterator, VariableId,
     VariableIdIterator,
 };
-use biodivine_lib_bdd::op_function::{and, and_not};
+use biodivine_lib_bdd::op_function::{and, and_not, iff, imp, or, xor};
 use biodivine_lib_bdd::{
     bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
 };
@@ -420,22 +420,42 @@ impl SymbolicContext {
             .mk_var(self.extra_state_variables[variable.0][offset])
     }
 
+    /// A version of [SymbolicContext::mk_uninterpreted_function_is_true] that accepts a node
+    /// limit for the underlying BDD operations.
+    pub fn mk_uninterpreted_function_is_true_with_limit(
+        &self,
+        parameter: ParameterId,
+        args: &[FnUpdate],
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
+        let table = &self.explicit_function_tables[parameter.0];
+        let args = self.prepare_args_with_limit(args, limit)?;
+        self.mk_function_table_true_with_limit(table, &args, limit)
+    }
+
     /// Create a `Bdd` that is true when given explicit uninterpreted function (aka parameter)
     /// is true for given arguments.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [SymbolicContext::mk_uninterpreted_function_is_true_with_limit].
     pub fn mk_uninterpreted_function_is_true(
         &self,
         parameter: ParameterId,
         args: &[FnUpdate],
     ) -> Bdd {
-        let table = &self.explicit_function_tables[parameter.0];
-        self.mk_function_table_true(table, &self.prepare_args(args))
+        self.mk_uninterpreted_function_is_true_with_limit(parameter, args, usize::MAX)
+            .unwrap()
     }
 
-    /// Create a `Bdd` that is true when given implicit uninterpreted function is true for
-    /// given arguments.
-    ///
-    /// Panic: Variable must have an implicit uninterpreted function.
-    pub fn mk_implicit_function_is_true(&self, variable: VariableId, args: &[VariableId]) -> Bdd {
+    /// A version of [SymbolicContext::mk_implicit_function_is_true] that accepts a node
+    /// limit for the underlying BDD operations.
+    pub fn mk_implicit_function_is_true_with_limit(
+        &self,
+        variable: VariableId,
+        args: &[VariableId],
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
         let table = &self.implicit_function_tables[variable.0];
         let table = table.as_ref().unwrap_or_else(|| {
             panic!(
@@ -444,45 +464,98 @@ impl SymbolicContext {
             );
         });
         let args = args.iter().map(|it| FnUpdate::Var(*it)).collect::<Vec<_>>();
-        self.mk_function_table_true(table, &self.prepare_args(&args))
+        let args = self.prepare_args_with_limit(&args, limit)?;
+        self.mk_function_table_true_with_limit(table, &args, limit)
     }
 
-    /// Create a `Bdd` that is true when given `FnUpdate` evaluates to true.
-    pub fn mk_fn_update_true(&self, function: &FnUpdate) -> Bdd {
+    /// Create a `Bdd` that is true when given implicit uninterpreted function is true for
+    /// given arguments.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [SymbolicContext::mk_implicit_function_is_true_with_limit].
+    ///
+    /// Panic: Variable must have an implicit uninterpreted function.
+    pub fn mk_implicit_function_is_true(&self, variable: VariableId, args: &[VariableId]) -> Bdd {
+        self.mk_implicit_function_is_true_with_limit(variable, args, usize::MAX)
+            .unwrap()
+    }
+
+    /// A version of [SymbolicContext::mk_fn_update_true] that accepts a node limit for the
+    /// underlying BDD operations.
+    pub fn mk_fn_update_true_with_limit(
+        &self,
+        function: &FnUpdate,
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
         match function {
-            FnUpdate::Const(value) => self.mk_constant(*value),
-            FnUpdate::Var(id) => self.mk_state_variable_is_true(*id),
-            FnUpdate::Not(inner) => self.mk_fn_update_true(inner).not(),
-            FnUpdate::Param(id, args) => self.mk_uninterpreted_function_is_true(*id, args),
+            FnUpdate::Const(value) => Ok(self.mk_constant(*value)),
+            FnUpdate::Var(id) => Ok(self.mk_state_variable_is_true(*id)),
+            FnUpdate::Not(inner) => Ok(self.mk_fn_update_true_with_limit(inner, limit)?.not()),
+            FnUpdate::Param(id, args) => {
+                self.mk_uninterpreted_function_is_true_with_limit(*id, args, limit)
+            }
             FnUpdate::Binary(op, left, right) => {
-                let l = self.mk_fn_update_true(left);
-                let r = self.mk_fn_update_true(right);
-                match op {
-                    BinaryOp::And => l.and(&r),
-                    BinaryOp::Or => l.or(&r),
-                    BinaryOp::Xor => l.xor(&r),
-                    BinaryOp::Imp => l.imp(&r),
-                    BinaryOp::Iff => l.iff(&r),
-                }
+                let l = self.mk_fn_update_true_with_limit(left, limit)?;
+                let r = self.mk_fn_update_true_with_limit(right, limit)?;
+                let op = match op {
+                    BinaryOp::And => and,
+                    BinaryOp::Or => or,
+                    BinaryOp::Xor => xor,
+                    BinaryOp::Imp => imp,
+                    BinaryOp::Iff => iff,
+                };
+                Bdd::binary_op_with_limit(limit, &l, &r, op)
+                    .ok_or_else(|| SizeLimitExceeded::new(limit))
             }
         }
     }
 
-    /// Create a `Bdd` that is true when given `FunctionTable` evaluates to true,
-    /// assuming each argument is true when the corresponding `Bdd` in the `args` array is true.
-    pub fn mk_function_table_true(&self, function_table: &FunctionTable, args: &[Bdd]) -> Bdd {
+    /// Create a `Bdd` that is true when given `FnUpdate` evaluates to true.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [SymbolicContext::mk_fn_update_true_with_limit].
+    pub fn mk_fn_update_true(&self, function: &FnUpdate) -> Bdd {
+        self.mk_fn_update_true_with_limit(function, usize::MAX)
+            .unwrap()
+    }
+
+    /// A version of [SymbolicContext::mk_function_table_true] that accepts a node limit for the
+    /// underlying BDD operations.
+    pub fn mk_function_table_true_with_limit(
+        &self,
+        function_table: &FunctionTable,
+        args: &[Bdd],
+        limit: usize,
+    ) -> Result<Bdd, SizeLimitExceeded> {
         let mut result = self.bdd.mk_true();
         for (input_row, output) in function_table {
-            let row_true = input_row
-                .into_iter()
-                .zip(args)
-                .fold(self.bdd.mk_true(), |result, (i, arg)| {
-                    Bdd::binary_op(&result, arg, if i { and } else { and_not })
-                });
+            let mut row_true = self.bdd.mk_true();
+            for (i, arg) in input_row.into_iter().zip(args) {
+                let op = if i { and } else { and_not };
+                row_true = Bdd::binary_op_with_limit(limit, &row_true, arg, op)
+                    .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+            }
+
             let output_true = self.bdd.mk_var(output);
-            result = bdd![result & (row_true => output_true)];
+            let implication = Bdd::binary_op_with_limit(limit, &row_true, &output_true, imp)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
+            result = Bdd::binary_op_with_limit(limit, &result, &implication, and)
+                .ok_or_else(|| SizeLimitExceeded::new(limit))?;
         }
-        result
+        Ok(result)
+    }
+
+    /// Create a `Bdd` that is true when given `FunctionTable` evaluates to true,
+    /// assuming each argument is true when the corresponding `Bdd` in the `args` array is true.
+    ///
+    /// Note that this version panics if the underlying BDD operations exceed the default memory
+    /// limit. If you want to handle this case gracefully, use
+    /// [SymbolicContext::mk_function_table_true_with_limit].
+    pub fn mk_function_table_true(&self, function_table: &FunctionTable, args: &[Bdd]) -> Bdd {
+        self.mk_function_table_true_with_limit(function_table, args, usize::MAX)
+            .unwrap()
     }
 
     /// Create a `Bdd` which represents an instantiated function table.
@@ -577,9 +650,23 @@ impl SymbolicContext {
         FnUpdate::build_from_bdd(self, &restricted)
     }
 
+    /// A version of [SymbolicContext::prepare_args] that accepts a node limit for the
+    /// underlying BDD operations.
+    fn prepare_args_with_limit(
+        &self,
+        args: &[FnUpdate],
+        limit: usize,
+    ) -> Result<Vec<Bdd>, SizeLimitExceeded> {
+        let mut result = Vec::new();
+        for arg in args {
+            result.push(self.mk_fn_update_true_with_limit(arg, limit)?);
+        }
+        Ok(result)
+    }
+
     /// **(internal)** Utility method for converting `FnUpdate` arguments to `Bdd` arguments.
     fn prepare_args(&self, args: &[FnUpdate]) -> Vec<Bdd> {
-        args.iter().map(|v| self.mk_fn_update_true(v)).collect()
+        self.prepare_args_with_limit(args, usize::MAX).unwrap()
     }
 
     /// This is similar to [BddVariableSet::transfer_from], but applied at the level of
@@ -688,12 +775,82 @@ impl Eq for SymbolicContext {}
 #[cfg(test)]
 mod tests {
     use crate::biodivine_std::traits::Set;
-    use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
+    use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext, SizeLimitExceeded};
     use crate::trap_spaces::SymbolicSpaceContext;
-    use crate::{BooleanNetwork, VariableId};
+    use crate::{BooleanNetwork, FnUpdate, VariableId};
     use biodivine_lib_bdd::BddPartialValuation;
     use std::collections::{HashMap, HashSet};
     use std::convert::TryFrom;
+
+    #[test]
+    fn test_context_limit() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            a -> a
+            b -> b
+            c -> c
+            d -> d
+            e -> e
+            f -> f
+            g -> g
+            h -> h
+            i -> i
+        ",
+        )
+        .unwrap();
+        let ctx = SymbolicContext::new(&bn).unwrap();
+        let a = bn.as_graph().find_variable("a").unwrap();
+        let b = bn.as_graph().find_variable("b").unwrap();
+        let c = bn.as_graph().find_variable("c").unwrap();
+        let d = bn.as_graph().find_variable("d").unwrap();
+        let e = bn.as_graph().find_variable("e").unwrap();
+        let f = bn.as_graph().find_variable("f").unwrap();
+        let g = bn.as_graph().find_variable("g").unwrap();
+        let h = bn.as_graph().find_variable("h").unwrap();
+        let i = bn.as_graph().find_variable("i").unwrap();
+
+        // a & b & c & d & e & f & g & h & i
+        let function = FnUpdate::Binary(
+            crate::BinaryOp::And,
+            Box::new(FnUpdate::Var(a)),
+            Box::new(FnUpdate::Binary(
+                crate::BinaryOp::And,
+                Box::new(FnUpdate::Var(b)),
+                Box::new(FnUpdate::Binary(
+                    crate::BinaryOp::And,
+                    Box::new(FnUpdate::Var(c)),
+                    Box::new(FnUpdate::Binary(
+                        crate::BinaryOp::And,
+                        Box::new(FnUpdate::Var(d)),
+                        Box::new(FnUpdate::Binary(
+                            crate::BinaryOp::And,
+                            Box::new(FnUpdate::Var(e)),
+                            Box::new(FnUpdate::Binary(
+                                crate::BinaryOp::And,
+                                Box::new(FnUpdate::Var(f)),
+                                Box::new(FnUpdate::Binary(
+                                    crate::BinaryOp::And,
+                                    Box::new(FnUpdate::Var(g)),
+                                    Box::new(FnUpdate::Binary(
+                                        crate::BinaryOp::And,
+                                        Box::new(FnUpdate::Var(h)),
+                                        Box::new(FnUpdate::Var(i)),
+                                    )),
+                                )),
+                            )),
+                        )),
+                    )),
+                )),
+            )),
+        );
+
+        let bdd = ctx.mk_fn_update_true_with_limit(&function, 100);
+        assert!(bdd.is_ok());
+        let bdd = bdd.unwrap();
+        assert_eq!(11, bdd.size());
+        let bdd = ctx.mk_fn_update_true_with_limit(&function, 5);
+        assert!(matches!(bdd, Err(SizeLimitExceeded { .. })));
+    }
 
     #[test]
     fn hmox_pathway() {
