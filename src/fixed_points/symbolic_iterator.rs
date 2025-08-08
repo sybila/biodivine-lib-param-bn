@@ -224,13 +224,13 @@ impl<'a> SymbolicIterator<'a> {
             .flat_map(|it| {
                 let can_step = stg.var_can_post(it, restriction);
                 let is_stable = restriction.minus(&can_step);
-                let clauses = is_stable
+
+                is_stable
                     .as_bdd()
                     .sat_clauses()
                     .take(200)
                     .collect::<Vec<_>>()
-                    .into_iter();
-                clauses
+                    .into_iter()
             })
             .collect();
 
@@ -289,10 +289,10 @@ impl<'a> SymbolicIterator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::fixed_points::{FixedPoints, SymbolicIterator};
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::BooleanNetwork;
 
     #[test]
     pub fn test_symbolic_iterator() {

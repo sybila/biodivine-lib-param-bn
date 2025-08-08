@@ -1,4 +1,4 @@
-use crate::sbml::import::{child_tags, read_unique_child, SBML_QUAL};
+use crate::sbml::import::{SBML_QUAL, child_tags, read_unique_child};
 use roxmltree::Node;
 
 /// Approximate representation of an SBML specie. Note that only ID is required, all other
@@ -20,9 +20,9 @@ pub fn read_species(model: Node) -> Result<Vec<SbmlSpecie>, String> {
         Ok(list) => list,
         Err(e) => {
             return Err(format!(
-            "List of qualitative species is missing ({}). Are you sure this is an SBML-qual model?",
-            e
-        ))
+                "List of qualitative species is missing ({}). Are you sure this is an SBML-qual model?",
+                e
+            ));
         }
     };
 

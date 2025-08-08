@@ -95,7 +95,7 @@ impl RawProjection {
         }
     }
 
-    pub fn iter(&self) -> RawSymbolicIterator {
+    pub fn iter(&self) -> RawSymbolicIterator<'_> {
         RawSymbolicIterator {
             raw_projection: self,
             inner_iterator: self.bdd.sat_valuations(),
@@ -180,7 +180,7 @@ impl StateProjection {
         }
     }
 
-    pub fn iter(&self) -> StateProjectionIterator {
+    pub fn iter(&self) -> StateProjectionIterator<'_> {
         StateProjectionIterator {
             projection: self,
             inner_iterator: self.raw_projection.bdd.sat_valuations(),
@@ -384,9 +384,9 @@ fn collect_fn_update_parameters(
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::BooleanNetwork;
 
     #[test]
     pub fn test_state_projection() {

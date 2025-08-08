@@ -1,6 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::{global_log_level, log_essential, never_stop, should_log, VariableId};
+use crate::{VariableId, global_log_level, log_essential, never_stop, should_log};
 use std::cmp::max;
 
 pub struct Reachability {

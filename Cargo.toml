@@ -2,7 +2,7 @@
 name = "biodivine-lib-param-bn"
 version = "0.5.14"
 authors = ["Samuel Pastva <sam.pastva@gmail.com>", "Eva Šmijáková <xsmijak1@fi.muni.cz>", "Ondřej Huvar <xhuvar@fi.muni.cz>"]
-edition = "2021"
+edition = "2024"
 description = "Library for working with parametrized Boolean networks."
 homepage = "https://github.com/sybila/biodivine-lib-param-bn"
 repository = "https://github.com/sybila/biodivine-lib-param-bn"
@@ -10,7 +10,7 @@ readme = "README.md"
 keywords = ["boolean-network", "asynchronous", "symbolic", "graph", "systems-biology"]
 categories = ["science", "simulation"]
 license = "MIT"
-rust-version = "1.60"
+rust-version = "1.85"
 
 [lib]
 name = "biodivine_lib_param_bn"
@@ -41,14 +41,14 @@ solver-z3 = ["dep:z3"]
 
 [dependencies]
 fxhash = "0.2.1"
-regex = "1.10.2"                # Regexes used for parsing of basic .aeon constructs.
-lazy_static = "1.4.0"           # Used for initialization of commonly used regexes.
-biodivine-lib-bdd = ">=0.5.13, <1.0.0"
-num-bigint = "0.4.4"            # Used as infinite-precision representation in BDDs.
-num-traits = "0.2.17"          # `BigInt::to_f64`
-roxmltree = "0.19.0"            # Used for SBML parsing.
+regex = "1.11.1"                # Regexes used for parsing of basic .aeon constructs.
+lazy_static = "1.5.0"           # Used for initialization of commonly used regexes.
+biodivine-lib-bdd = ">=0.5.26, <1.0.0"
+num-bigint = "0.4.6"            # Used as infinite-precision representation in BDDs.
+num-traits = "0.2.19"          # `BigInt::to_f64`
+roxmltree = "0.20.0"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
-z3 = { version = "0.12.1", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
+z3 = { version = "0.13.3", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"

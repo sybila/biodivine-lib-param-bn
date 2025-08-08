@@ -14,7 +14,7 @@ use crate::{
     VariableIdIterator,
 };
 use crate::{ExtendedBoolean, Space};
-use biodivine_lib_bdd::{bdd, Bdd, BddPartialValuation, BddValuation, BddVariable};
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddValuation, BddVariable, bdd};
 use std::collections::{HashMap, HashSet};
 
 impl SymbolicAsyncGraph {
@@ -335,7 +335,7 @@ impl SymbolicAsyncGraph {
     ///
     /// *Note:* The reason this method takes a slice and not, e.g., a `HashMap` is that:
     ///  - If constant, slices are much easier to write in code (i.e. we can write
-    ///    `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
+    ///    `graph.mk_subspace(&[(x, true), (y, false)])` -- there is no such syntax for a map).
     ///  - This is already used by the internal BDD API, so the conversion is less involved.
     pub fn mk_subspace(&self, values: &[(VariableId, bool)]) -> GraphColoredVertices {
         let partial_valuation: Vec<(BddVariable, bool)> = values
@@ -1123,11 +1123,11 @@ impl SymbolicAsyncGraph {
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::bitvector::BitVector;
     use crate::biodivine_std::traits::Set;
     use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
-    use crate::BooleanNetwork;
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
@@ -1717,10 +1717,12 @@ mod tests {
         let fixed_points_transferred = stg.transfer_from(&fixed_points, &reduced).unwrap();
         assert!(fixed_points_true.is_subset(&fixed_points_transferred));
         let fixed_points_restricted = FixedPoints::symbolic(&stg, &fixed_points_transferred);
-        assert!(fixed_points_true
-            .as_bdd()
-            .iff(fixed_points_restricted.as_bdd())
-            .is_true());
+        assert!(
+            fixed_points_true
+                .as_bdd()
+                .iff(fixed_points_restricted.as_bdd())
+                .is_true()
+        );
     }
 
     #[test]

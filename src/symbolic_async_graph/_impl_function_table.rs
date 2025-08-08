@@ -46,7 +46,7 @@ impl<'a> IntoIterator for &'a FunctionTable {
 
 impl FunctionTableIterator<'_> {
     /// Create a new `FunctionTableIterator` for a given `FunctionTable`.
-    pub fn new(table: &FunctionTable) -> FunctionTableIterator {
+    pub fn new(table: &FunctionTable) -> FunctionTableIterator<'_> {
         FunctionTableIterator {
             table,
             inner_iterator: ValuationsOfClauseIterator::new_unconstrained(table.arity).enumerate(),
@@ -60,7 +60,7 @@ impl Iterator for FunctionTableIterator<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((index, valuation)) = self.inner_iterator.next() {
-            Some((valuation.vector(), self.table.rows[index]))
+            Some((valuation.into_vector(), self.table.rows[index]))
         } else {
             None
         }

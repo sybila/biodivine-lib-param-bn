@@ -117,10 +117,10 @@ impl SymbolicAsyncGraph {
 
 #[cfg(test)]
 mod tests {
-    use crate::biodivine_std::traits::Set;
-    use crate::symbolic_async_graph::reachability::Reachability;
-    use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::ExtendedBoolean::Zero;
+    use crate::biodivine_std::traits::Set;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use crate::symbolic_async_graph::reachability::Reachability;
     use crate::{BooleanNetwork, ExtendedBoolean, Space};
     use ExtendedBoolean::One;
 

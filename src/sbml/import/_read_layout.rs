@@ -1,6 +1,6 @@
 //! Used for reading SBML layout specifications.
 
-use crate::sbml::import::{child_tags, read_unique_child, SBML_LAYOUT};
+use crate::sbml::import::{SBML_LAYOUT, child_tags, read_unique_child};
 use roxmltree::Node;
 use std::collections::HashMap;
 

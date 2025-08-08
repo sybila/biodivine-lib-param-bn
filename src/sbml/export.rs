@@ -19,7 +19,10 @@ impl BooleanNetwork {
             out,
             "<?xml version='1.0' encoding='UTF-8' standalone='no'?>"
         )?;
-        write!(out, "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" layout:required=\"false\" level=\"3\" qual:required=\"true\" xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" version=\"1\" xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
+        write!(
+            out,
+            "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" layout:required=\"false\" level=\"3\" qual:required=\"true\" xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" version=\"1\" xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">"
+        )?;
         write!(out, "<model>")?;
         if let Some(layout) = layout {
             if !layout.is_empty() {
@@ -34,16 +37,27 @@ impl BooleanNetwork {
     }
 
     fn write_species(&self, out: &mut dyn Write) -> Result<(), Error> {
-        write!(out, "<qual:listOfQualitativeSpecies xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
+        write!(
+            out,
+            "<qual:listOfQualitativeSpecies xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">"
+        )?;
         for v in self.variables() {
-            write!(out, "<qual:qualitativeSpecies qual:maxLevel=\"1\" qual:constant=\"false\" qual:name=\"{}\" qual:id=\"{}\"/>", self[v].get_name(), self[v].get_name())?;
+            write!(
+                out,
+                "<qual:qualitativeSpecies qual:maxLevel=\"1\" qual:constant=\"false\" qual:name=\"{}\" qual:id=\"{}\"/>",
+                self[v].get_name(),
+                self[v].get_name()
+            )?;
         }
         write!(out, "</qual:listOfQualitativeSpecies>")?;
         Ok(())
     }
 
     fn write_transitions(&self, out: &mut dyn Write) -> Result<(), Error> {
-        write!(out, "<qual:listOfTransitions xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">")?;
+        write!(
+            out,
+            "<qual:listOfTransitions xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">"
+        )?;
         for id in self.variables() {
             let var_name = self[id].get_name();
             write!(out, "<qual:transition qual:id=\"tr_{}\">", var_name)?;
@@ -65,13 +79,21 @@ impl BooleanNetwork {
                 } else {
                     "false"
                 };
-                write!(out, "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\" essential=\"{}\"/>", r_var_name, sign, var_name, r_var_name, essential)?;
+                write!(
+                    out,
+                    "<qual:input qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"none\" qual:sign=\"{}\" qual:id=\"tr_{}_in_{}\" essential=\"{}\"/>",
+                    r_var_name, sign, var_name, r_var_name, essential
+                )?;
             }
             write!(out, "</qual:listOfInputs>")?;
 
             // output outputs (self)
             write!(out, "<qual:listOfOutputs>")?;
-            write!(out, "<qual:output qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{}_out\"/>", var_name, var_name)?;
+            write!(
+                out,
+                "<qual:output qual:qualitativeSpecies=\"{}\" qual:transitionEffect=\"assignmentLevel\" qual:id=\"tr_{}_out\"/>",
+                var_name, var_name
+            )?;
             write!(out, "</qual:listOfOutputs>")?;
             if let Some(update_function) = self.get_update_function(id) {
                 write!(out, "<qual:listOfFunctionTerms>")?;
@@ -138,7 +160,10 @@ impl BooleanNetwork {
 }
 
 fn write_layout(out: &mut dyn Write, layout: &HashMap<String, (f64, f64)>) -> Result<(), Error> {
-    write!(out, "<layout:listOfLayouts xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">")?;
+    write!(
+        out,
+        "<layout:listOfLayouts xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">"
+    )?;
     write!(out, "<layout:layout layout:id=\"__layout__\">")?;
     write!(out, "<layout:listOfAdditionalGraphicalObjects>")?;
     for (name, (x, y)) in layout {

@@ -1,11 +1,16 @@
+use biodivine_lib_param_bn::BooleanNetwork;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::BooleanNetwork;
 
 fn main() {
     let args = Vec::from_iter(std::env::args());
+    if args.len() < 2 {
+        eprintln!("Usage: {} <model_file>", args[0]);
+        std::process::exit(2);
+    }
     let path = &args[1];
-    let model = BooleanNetwork::try_from_file(path).unwrap();
+    let model =
+        BooleanNetwork::try_from_file(path).expect("Failed to load Boolean network from file");
     let model = model.inline_inputs(true, true);
 
     println!(

@@ -1,5 +1,5 @@
-use crate::symbolic_async_graph::projected_iteration::OwnedRawSymbolicIterator;
 use crate::symbolic_async_graph::SymbolicContext;
+use crate::symbolic_async_graph::projected_iteration::OwnedRawSymbolicIterator;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 
 mod _impl_network_colored_spaces;

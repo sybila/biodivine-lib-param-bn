@@ -19,19 +19,19 @@ use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
 use std::collections::{HashMap, HashSet};
 
 #[cfg(feature = "solver-z3")]
+use crate::Space;
+#[cfg(feature = "solver-z3")]
 use crate::fixed_points::solver_iterator::{
     SolverColorIterator, SolverIterator, SolverVertexIterator,
 };
 #[cfg(feature = "solver-z3")]
 use crate::solver_context::{BnSolver, BnSolverContext};
-#[cfg(feature = "solver-z3")]
-use crate::Space;
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
 use crate::symbolic_async_graph::projected_iteration::MixedProjection;
-use crate::{global_log_level, log_essential, never_stop, should_log, BooleanNetwork, VariableId};
+use crate::{BooleanNetwork, VariableId, global_log_level, log_essential, never_stop, should_log};
 pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
@@ -359,9 +359,10 @@ impl FixedPoints {
                     interrupt()?;
 
                     if log_essential(log_level, result.size()) {
-                        println!(" > Projection. New result has {} BDD nodes. Remaining projections: {}.",
-                                 result.size(),
-                                 project.len()
+                        println!(
+                            " > Projection. New result has {} BDD nodes. Remaining projections: {}.",
+                            result.size(),
+                            project.len()
                         );
                     }
                 }

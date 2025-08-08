@@ -1,5 +1,5 @@
+use crate::_impl_annotations::{ALPHANUMERIC, validate_path_segment};
 use crate::ModelAnnotation;
-use crate::_impl_annotations::{validate_path_segment, ALPHANUMERIC};
 use std::fmt::{Display, Formatter};
 
 impl Display for ModelAnnotation {

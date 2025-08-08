@@ -1,6 +1,6 @@
+use crate::VariableId;
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::VariableId;
 use biodivine_lib_bdd::Bdd;
 
 /// Basic symbolic graph operators. For convenience, there is a wide variety of different
@@ -457,8 +457,8 @@ impl SymbolicAsyncGraph {
 mod tests {
 
     /* Basically a copy from of example from tutorial, but tutorials don't count towards coverage. */
-    use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::BooleanNetwork;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use std::convert::TryFrom;
 
     #[test]

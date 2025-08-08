@@ -5,17 +5,22 @@
    we compare it to the symbolic result.
 */
 
+use biodivine_lib_param_bn::BooleanNetwork;
+use biodivine_lib_param_bn::Space;
 use biodivine_lib_param_bn::biodivine_std::traits::Set;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::solver_context::BnSolverContext;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::BooleanNetwork;
-use biodivine_lib_param_bn::Space;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <model_file>", args[0]);
+        std::process::exit(2);
+    }
 
-    let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
+    let model = BooleanNetwork::try_from_file(args[1].as_str())
+        .expect("Failed to load Boolean network from file");
     let model = model.inline_inputs(true, true);
     println!(
         "Loaded model with {} variables and {} parameters/inputs.",

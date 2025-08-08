@@ -14,14 +14,17 @@ env:
   # A fixed version used for testing, so that the builds don't
   # spontaneously break after a few years.
   # Make sure to update this from time to time.
-  RUST_VERSION: "1.72.0"
+  RUST_VERSION: "1.89.0"
+  MIN_RUST_VERSION: "1.85.0"
+  Z3_VERSION: "4.13.3"
+  RUSTFLAGS: "-D warnings"
+  CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
+
 jobs:
   # Check formatting
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -35,8 +38,6 @@ jobs:
     needs: fmt
     name: Check
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -49,18 +50,18 @@ jobs:
     needs: check
     name: Test Suite
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v4
       # Tests need Z3 solver to run.
-      - name: Setup Z3
+      - name: Setup Z3.
         id: z3
         uses: cda-tum/setup-z3@v1
         with:
-          version: 4.11.2
+          version: ${{ env.Z3_VERSION }}
+          add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -72,8 +73,6 @@ jobs:
     needs: check
     name: Clippy
     runs-on: ubuntu-latest
-    env:
-      RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -82,11 +81,34 @@ jobs:
           components: clippy
       - run: cargo clippy --all-features
 
+  # Validate minimum supported Rust version declared in Cargo.toml.
+  minimum-supported:
+    name: Minimum supported version (1.85) - Check and Test
+    needs: fmt
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Z3.
+        id: z3
+        uses: cda-tum/setup-z3@v1
+        with:
+          version: ${{ env.Z3_VERSION }}
+          add_to_library_path: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.MIN_RUST_VERSION }}
+          components: clippy
+      - run: cargo check --all-features
+      - run: cargo test --all-features
+      - run: cargo clippy --all-features
+
   # Compute code coverage
   codecov:
     needs: test
     name: Code coverage
-    runs-on: ubuntu-latest
+    runs-on: macos-latest # Uses macOS because code coverage with z3-sys seems to be broken since version 0.13
     steps:
       - name: Checkout.
         uses: actions/checkout@v4
@@ -94,9 +116,11 @@ jobs:
         id: z3
         uses: cda-tum/setup-z3@v1
         with:
-          version: 4.11.2
+          version: ${{ env.Z3_VERSION }}
+          add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -107,6 +131,7 @@ jobs:
       - run: cargo tarpaulin --verbose --lib --examples --all-features --out xml
       - name: Upload to codecov.io
         uses: codecov/codecov-action@v4
+        if: ${{ env.CODECOV_TOKEN != '' }}
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: Archive code coverage results

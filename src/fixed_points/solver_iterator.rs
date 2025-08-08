@@ -123,7 +123,7 @@ impl<'z3> Iterator for SolverIterator<'z3> {
     }
 }
 
-impl<'z3> Iterator for SolverVertexIterator<'z3> {
+impl Iterator for SolverVertexIterator<'_> {
     type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -159,7 +159,7 @@ fn explicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
         let parameter = context.as_network().get_parameter(parameter_id);
         let arity = parameter.get_arity().to_u16().unwrap();
         for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
-            let inputs = row.vector();
+            let inputs = row.into_vector();
             let term = context.mk_explicit_const_parameter(parameter_id, &inputs);
             result.push(term);
         }
@@ -175,7 +175,7 @@ fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
             let arity = context.as_network().regulators(var).len();
             let arity = arity.to_u16().unwrap();
             for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
-                let inputs = row.vector();
+                let inputs = row.into_vector();
                 let term = context.mk_implicit_const_parameter(var, &inputs);
                 result.push(term);
             }
@@ -186,14 +186,14 @@ fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::FixedPoints;
     use crate::fixed_points::solver_iterator::{
         SolverColorIterator, SolverIterator, SolverVertexIterator,
     };
-    use crate::fixed_points::FixedPoints;
     use crate::solver_context::BnSolverContext;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::BooleanNetwork;
 
     #[test]
     pub fn basic_solver_test() {

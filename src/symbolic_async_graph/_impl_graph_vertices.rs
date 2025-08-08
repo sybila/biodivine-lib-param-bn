@@ -1,10 +1,10 @@
+use crate::VariableId;
 use crate::biodivine_std::bitvector::{ArrayBitVector, BitVector};
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::{RawProjection, StateProjection};
 use crate::symbolic_async_graph::{GraphVertexIterator, GraphVertices, SymbolicContext};
 use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
-use crate::VariableId;
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use num_bigint::BigInt;
 use std::convert::TryFrom;

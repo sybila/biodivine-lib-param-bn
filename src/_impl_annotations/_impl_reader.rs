@@ -1,5 +1,5 @@
-use crate::ModelAnnotation;
 use crate::_impl_annotations::{ESC_PATH_SEGMENT, SIMPLE_PATH_SEGMENT};
+use crate::ModelAnnotation;
 
 impl ModelAnnotation {
     /// Parse annotations from a particular model string.

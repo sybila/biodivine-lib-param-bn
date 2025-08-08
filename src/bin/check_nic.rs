@@ -32,9 +32,11 @@ fn main() {
 
     for var in model.variables() {
         if restriction.contains(&var) {
-            assert!(graph
-                .shortest_parity_cycle(&restriction, var, Negative, usize::MAX)
-                .is_none());
+            assert!(
+                graph
+                    .shortest_parity_cycle(&restriction, var, Negative, usize::MAX)
+                    .is_none()
+            );
         }
     }
 }

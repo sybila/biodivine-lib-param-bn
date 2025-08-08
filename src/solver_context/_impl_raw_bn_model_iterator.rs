@@ -1,6 +1,6 @@
 use crate::solver_context::{BnSolver, BnSolverModel, RawBnModelIterator};
-use z3::ast::Bool;
 use z3::SatResult::Sat;
+use z3::ast::Bool;
 
 impl<'z3> RawBnModelIterator<'z3> {
     /// Construct a new iterator using the given solver.
@@ -36,7 +36,7 @@ impl<'z3> RawBnModelIterator<'z3> {
     }
 
     /// Get a reference to the underlying enumeration terms.
-    pub fn enumeration_terms(&self) -> &Vec<Bool> {
+    pub fn enumeration_terms(&self) -> &Vec<Bool<'_>> {
         &self.enumeration_terms
     }
 
