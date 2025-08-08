@@ -360,7 +360,7 @@ impl SymbolicContext {
     pub fn extra_state_variables_by_offset(&self, offset: usize) -> Vec<(VariableId, BddVariable)> {
         let mut result = Vec::new();
         for i in 0..self.num_state_variables() {
-            if offset <= self.extra_state_variables[i].len() {
+            if offset < self.extra_state_variables[i].len() {
                 result.push((
                     VariableId::from_index(i),
                     self.extra_state_variables[i][offset],
@@ -880,5 +880,24 @@ mod tests {
         let translated = normal_stg.transfer_from(&unit_set, &space_stg).unwrap();
 
         assert_eq!(translated.exact_cardinality(), unit_set.exact_cardinality());
+    }
+
+    #[test]
+    fn test_extra_state_variables() {
+        let bn = BooleanNetwork::try_from_bnet(
+            r#"
+        a, b
+        b, a
+        "#,
+        )
+        .unwrap();
+        let mut map = HashMap::new();
+        map.insert(VariableId(0), 2);
+        map.insert(VariableId(1), 3);
+        let ctx = SymbolicContext::with_extra_state_variables(&bn, &map).unwrap();
+        assert_eq!(ctx.extra_state_variables_by_offset(0).len(), 2);
+        assert_eq!(ctx.extra_state_variables_by_offset(1).len(), 2);
+        assert_eq!(ctx.extra_state_variables_by_offset(2).len(), 1);
+        assert_eq!(ctx.extra_state_variables_by_offset(3).len(), 0);
     }
 }
