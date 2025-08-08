@@ -335,7 +335,7 @@ impl SymbolicAsyncGraph {
     ///
     /// *Note:* The reason this method takes a slice and not, e.g., a `HashMap` is that:
     ///  - If constant, slices are much easier to write in code (i.e. we can write
-    ///    `graph.mk_subspace(&[(a, true), (b, false)])` -- there is no such syntax for a map).
+    ///    `graph.mk_subspace(&[(x, true), (y, false)])` -- there is no such syntax for a map).
     ///  - This is already used by the internal BDD API, so the conversion is less involved.
     pub fn mk_subspace(&self, values: &[(VariableId, bool)]) -> GraphColoredVertices {
         let partial_valuation: Vec<(BddVariable, bool)> = values
