@@ -1,5 +1,5 @@
-use crate::symbolic_async_graph::SymbolicContext;
 use crate::ExtendedBoolean::{Any, One, Zero};
+use crate::symbolic_async_graph::SymbolicContext;
 use crate::{BooleanNetwork, ExtendedBoolean, Space, VariableId};
 use biodivine_lib_bdd::BddVariable;
 use std::cmp::Ordering;

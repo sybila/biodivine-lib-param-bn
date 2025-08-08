@@ -1,4 +1,4 @@
-use crate::{Monotonicity, Regulation, RegulatoryGraph, VariableId, ID_REGEX_STR};
+use crate::{ID_REGEX_STR, Monotonicity, Regulation, RegulatoryGraph, VariableId};
 use regex::Regex;
 
 /// **(internal)** Regex which matches the regulation arrow string with `monotonicity`

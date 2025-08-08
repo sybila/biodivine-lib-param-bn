@@ -1,6 +1,6 @@
 use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
 use crate::{BooleanNetwork, Monotonicity, Regulation, VariableId};
-use biodivine_lib_bdd::{bdd, Bdd};
+use biodivine_lib_bdd::{Bdd, bdd};
 impl RegulationConstraint {
     /// Compute a BDD representing all instantiations of a (partial) function where the given
     /// `input` is observable (also called essential).
@@ -304,9 +304,9 @@ pub(crate) fn apply_regulation_constraints(
 
 #[cfg(test)]
 mod tests {
+    use crate::Monotonicity::{Activation, Inhibition};
     use crate::symbolic_async_graph::_impl_regulation_constraint::apply_regulation_constraints;
     use crate::symbolic_async_graph::{RegulationConstraint, SymbolicAsyncGraph, SymbolicContext};
-    use crate::Monotonicity::{Activation, Inhibition};
     use crate::{BooleanNetwork, Regulation, VariableId};
 
     #[test]

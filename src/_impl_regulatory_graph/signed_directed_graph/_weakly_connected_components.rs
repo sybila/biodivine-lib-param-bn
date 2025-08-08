@@ -1,4 +1,4 @@
-use crate::{never_stop, should_log, SdGraph, VariableId, LOG_NOTHING};
+use crate::{LOG_NOTHING, SdGraph, VariableId, never_stop, should_log};
 use std::collections::HashSet;
 
 impl SdGraph {

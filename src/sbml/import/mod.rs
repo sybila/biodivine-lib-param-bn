@@ -1,9 +1,9 @@
+use crate::sbml::Layout;
 use crate::sbml::import::_convert_mathml_to_fn_update::sbml_transition_to_update_function;
 use crate::sbml::import::_read_layout::read_sbml_layout;
 use crate::sbml::import::_read_mathml::MathMl;
-use crate::sbml::import::_read_species::{read_species, SbmlSpecie};
-use crate::sbml::import::_read_transitions::{read_transitions, SbmlTransition};
-use crate::sbml::Layout;
+use crate::sbml::import::_read_species::{SbmlSpecie, read_species};
+use crate::sbml::import::_read_transitions::{SbmlTransition, read_transitions};
 use crate::{BooleanNetwork, Monotonicity, RegulatoryGraph};
 use regex::Regex;
 use roxmltree::{ExpandedName, Node};

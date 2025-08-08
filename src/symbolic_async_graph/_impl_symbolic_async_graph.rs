@@ -14,7 +14,7 @@ use crate::{
     VariableIdIterator,
 };
 use crate::{ExtendedBoolean, Space};
-use biodivine_lib_bdd::{bdd, Bdd, BddPartialValuation, BddValuation, BddVariable};
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddValuation, BddVariable, bdd};
 use std::collections::{HashMap, HashSet};
 
 impl SymbolicAsyncGraph {
@@ -1123,11 +1123,11 @@ impl SymbolicAsyncGraph {
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::bitvector::BitVector;
     use crate::biodivine_std::traits::Set;
     use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
-    use crate::BooleanNetwork;
     use std::collections::HashMap;
     use std::convert::TryFrom;
 
@@ -1717,10 +1717,12 @@ mod tests {
         let fixed_points_transferred = stg.transfer_from(&fixed_points, &reduced).unwrap();
         assert!(fixed_points_true.is_subset(&fixed_points_transferred));
         let fixed_points_restricted = FixedPoints::symbolic(&stg, &fixed_points_transferred);
-        assert!(fixed_points_true
-            .as_bdd()
-            .iff(fixed_points_restricted.as_bdd())
-            .is_true());
+        assert!(
+            fixed_points_true
+                .as_bdd()
+                .iff(fixed_points_restricted.as_bdd())
+                .is_true()
+        );
     }
 
     #[test]

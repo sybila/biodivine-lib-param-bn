@@ -1,9 +1,9 @@
+use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
 use crate::Sign::Negative;
 use crate::VariableId;
-use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
+use Sign::Positive;
 use fxhash::FxBuildHasher;
 use std::collections::{HashMap, HashSet};
-use Sign::Positive;
 
 impl SdGraph {
     /// Compute the shortest cycle (or one of the shortest cycles) within `restriction` that
@@ -239,9 +239,9 @@ impl SdGraph {
 
 #[cfg(test)]
 mod tests {
-    use crate::RegulatoryGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::SdGraph;
     use crate::_impl_regulatory_graph::signed_directed_graph::Sign::{Negative, Positive};
+    use crate::RegulatoryGraph;
 
     #[test]
     pub fn test_cycle_detection() {

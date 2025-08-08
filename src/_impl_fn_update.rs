@@ -1,7 +1,7 @@
-use crate::symbolic_async_graph::SymbolicContext;
+use crate::_aeon_parser::FnUpdateTemp;
 use crate::BinaryOp::{And, Iff, Imp, Or, Xor};
 use crate::FnUpdate::*;
-use crate::_aeon_parser::FnUpdateTemp;
+use crate::symbolic_async_graph::SymbolicContext;
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use biodivine_lib_bdd::{Bdd, BddVariable};
 use std::collections::{HashMap, HashSet};
@@ -233,11 +233,7 @@ impl FnUpdate {
                         } else {
                             unreachable!();
                         };
-                        if value {
-                            literal
-                        } else {
-                            literal.negation()
-                        }
+                        if value { literal } else { literal.negation() }
                     })
                     .collect::<Vec<_>>();
                 FnUpdate::mk_conjunction(&literals)
@@ -600,11 +596,7 @@ impl FnUpdate {
                         .map(|it| it.distribute_negation())
                         .collect::<Vec<_>>();
                     let param = Param(*id, args);
-                    if invert {
-                        param.negation()
-                    } else {
-                        param
-                    }
+                    if invert { param.negation() } else { param }
                 }
                 Not(inner) => recursion(inner, !invert),
                 Binary(op, left, right) => {

@@ -1,6 +1,6 @@
+use biodivine_lib_param_bn::BooleanNetwork;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::trap_spaces::{SymbolicSpaceContext, TrapSpaces};
-use biodivine_lib_param_bn::BooleanNetwork;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();

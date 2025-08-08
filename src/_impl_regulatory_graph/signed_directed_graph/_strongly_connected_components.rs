@@ -1,5 +1,5 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
-use crate::{never_stop, should_log, VariableId, LOG_NOTHING};
+use crate::{LOG_NOTHING, VariableId, never_stop, should_log};
 use std::collections::HashSet;
 
 impl SdGraph {

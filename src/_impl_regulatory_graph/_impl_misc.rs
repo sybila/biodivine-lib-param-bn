@@ -1,5 +1,5 @@
 use crate::biodivine_std::structs::build_index_map;
-use crate::{Monotonicity, RegulationIterator, VariableIdIterator, ID_REGEX};
+use crate::{ID_REGEX, Monotonicity, RegulationIterator, VariableIdIterator};
 use crate::{Regulation, RegulatoryGraph, Variable, VariableId};
 use std::cmp::Ordering;
 use std::collections::HashSet;

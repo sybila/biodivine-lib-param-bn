@@ -28,7 +28,9 @@ fn main() {
             restriction.remove(y);
         }
     }
-    assert!(graph
-        .restricted_strongly_connected_components(&restriction)
-        .is_empty());
+    assert!(
+        graph
+            .restricted_strongly_connected_components(&restriction)
+            .is_empty()
+    );
 }

@@ -1,7 +1,7 @@
-use biodivine_lib_param_bn::biodivine_std::traits::Set;
-use biodivine_lib_param_bn::symbolic_async_graph::reachability::Reachability;
-use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 use biodivine_lib_param_bn::BooleanNetwork;
+use biodivine_lib_param_bn::biodivine_std::traits::Set;
+use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
+use biodivine_lib_param_bn::symbolic_async_graph::reachability::Reachability;
 
 fn main() {
     let args = Vec::from_iter(std::env::args());

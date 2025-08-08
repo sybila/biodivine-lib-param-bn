@@ -1,7 +1,7 @@
 use crate::biodivine_std::traits::Set;
+use crate::symbolic_async_graph::GraphVertices;
 use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::RawProjection;
-use crate::symbolic_async_graph::GraphVertices;
 use crate::trap_spaces::{NetworkSpaces, SpaceIterator, SymbolicSpaceContext};
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{Bdd, BddVariable};

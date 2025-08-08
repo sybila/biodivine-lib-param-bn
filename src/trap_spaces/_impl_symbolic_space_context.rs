@@ -1,9 +1,9 @@
 use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
 use crate::trap_spaces::{NetworkColoredSpaces, NetworkSpaces, SymbolicSpaceContext};
 use crate::{
-    global_log_level, log_essential, never_stop, BooleanNetwork, ExtendedBoolean, Space, VariableId,
+    BooleanNetwork, ExtendedBoolean, Space, VariableId, global_log_level, log_essential, never_stop,
 };
-use biodivine_lib_bdd::{bdd, Bdd, BddPartialValuation, BddVariable, BddVariableSet};
+use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet, bdd};
 use std::collections::HashMap;
 
 impl SymbolicSpaceContext {
@@ -384,10 +384,10 @@ fn and_and_not(a: Option<bool>, b: Option<bool>, c: Option<bool>) -> Option<bool
 
 #[cfg(test)]
 mod tests {
+    use crate::ExtendedBoolean::{One, Zero};
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
-    use crate::ExtendedBoolean::{One, Zero};
     use crate::{BooleanNetwork, FnUpdate, Space, VariableId};
     use biodivine_lib_bdd::bdd;
 
@@ -561,13 +561,15 @@ mod tests {
         );
         assert_eq!(ctx.dual_variables.len(), ctx2.dual_variables.len() + 1);
 
-        assert!(ctx
-            .vertex_to_space_bdd
-            .imp(&ctx2.vertex_to_space_bdd)
-            .is_true());
-        assert!(ctx
-            .space_to_vertex_bdd
-            .imp(&ctx2.space_to_vertex_bdd)
-            .is_true());
+        assert!(
+            ctx.vertex_to_space_bdd
+                .imp(&ctx2.vertex_to_space_bdd)
+                .is_true()
+        );
+        assert!(
+            ctx.space_to_vertex_bdd
+                .imp(&ctx2.space_to_vertex_bdd)
+                .is_true()
+        );
     }
 }

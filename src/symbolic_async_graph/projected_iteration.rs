@@ -384,9 +384,9 @@ fn collect_fn_update_parameters(
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use crate::BooleanNetwork;
 
     #[test]
     pub fn test_state_projection() {

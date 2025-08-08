@@ -1,6 +1,6 @@
+use biodivine_lib_param_bn::BooleanNetwork;
 use biodivine_lib_param_bn::fixed_points::FixedPoints;
 use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
-use biodivine_lib_param_bn::BooleanNetwork;
 
 fn main() {
     let args = Vec::from_iter(std::env::args());

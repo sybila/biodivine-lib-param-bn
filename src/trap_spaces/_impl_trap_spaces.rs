@@ -288,10 +288,10 @@ impl TrapSpaces {
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{SymbolicSpaceContext, TrapSpaces};
-    use crate::BooleanNetwork;
 
     #[test]
     fn test_trap_spaces() {

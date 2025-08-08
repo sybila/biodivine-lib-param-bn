@@ -1,7 +1,7 @@
 use crate::solver_context::{BnSolver, BnSolverContext, BnSolverModel};
 use crate::{Monotonicity, Space, VariableId};
 use std::ops::Not;
-use z3::ast::{forall_const, Ast, Bool};
+use z3::ast::{Ast, Bool, forall_const};
 use z3::{FuncDecl, SatResult, Solver};
 
 impl<'z3> BnSolver<'z3> {

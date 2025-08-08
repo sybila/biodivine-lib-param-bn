@@ -5,7 +5,7 @@ use crate::{
 };
 use biodivine_lib_bdd::op_function::{and, and_not};
 use biodivine_lib_bdd::{
-    bdd, Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder,
+    Bdd, BddValuation, BddVariable, BddVariableSet, BddVariableSetBuilder, bdd,
 };
 use std::collections::HashMap;
 use std::convert::TryInto;

@@ -1,5 +1,5 @@
-use crate::RegulatoryGraph;
 use crate::_aeon_parser::RegulationTemp;
+use crate::RegulatoryGraph;
 use std::collections::HashSet;
 use std::convert::TryFrom;
 

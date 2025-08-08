@@ -1,5 +1,5 @@
-use crate::ModelAnnotation;
 use crate::_impl_annotations::validate_path_segment;
+use crate::ModelAnnotation;
 use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 

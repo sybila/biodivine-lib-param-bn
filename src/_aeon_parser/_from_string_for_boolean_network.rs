@@ -90,8 +90,8 @@ impl TryFrom<&str> for BooleanNetwork {
 
 #[cfg(test)]
 mod tests {
-    use crate::biodivine_std::structs::build_index_map;
     use crate::BinaryOp::{And, Iff, Imp, Or, Xor};
+    use crate::biodivine_std::structs::build_index_map;
     use crate::{BooleanNetwork, FnUpdate, Parameter, ParameterId, RegulatoryGraph, VariableId};
     use std::convert::TryFrom;
 

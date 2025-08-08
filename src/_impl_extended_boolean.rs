@@ -1,7 +1,7 @@
 use crate::ExtendedBoolean;
+use ExtendedBoolean::{Any, One, Zero};
 use std::cmp::Ordering;
 use std::fmt::{Debug, Display, Formatter};
-use ExtendedBoolean::{Any, One, Zero};
 impl Debug for ExtendedBoolean {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -14,11 +14,7 @@ impl Debug for ExtendedBoolean {
 
 impl From<bool> for ExtendedBoolean {
     fn from(value: bool) -> Self {
-        if value {
-            One
-        } else {
-            Zero
-        }
+        if value { One } else { Zero }
     }
 }
 

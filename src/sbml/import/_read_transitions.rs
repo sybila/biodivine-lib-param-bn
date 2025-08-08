@@ -1,5 +1,5 @@
-use crate::sbml::import::_read_mathml::{read_mathml, MathMl};
-use crate::sbml::import::{child_tags, read_unique_child, MATHML, SBML_QUAL};
+use crate::sbml::import::_read_mathml::{MathMl, read_mathml};
+use crate::sbml::import::{MATHML, SBML_QUAL, child_tags, read_unique_child};
 use roxmltree::{ExpandedName, Node};
 
 /// Maps almost directly to the SBML transition input tag.

@@ -1,13 +1,13 @@
-use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
 use crate::Monotonicity::Inhibition;
+use crate::symbolic_async_graph::{RegulationConstraint, SymbolicContext};
 use crate::{
-    BooleanNetwork, FnUpdate, Monotonicity, Parameter, ParameterId, ParameterIdIterator,
-    RegulatoryGraph, Variable, VariableId, VariableIdIterator, ID_REGEX,
+    BooleanNetwork, FnUpdate, ID_REGEX, Monotonicity, Parameter, ParameterId, ParameterIdIterator,
+    RegulatoryGraph, Variable, VariableId, VariableIdIterator,
 };
+use Monotonicity::Activation;
 use std::collections::{HashMap, HashSet};
 use std::ops::Index;
 use std::path::Path;
-use Monotonicity::Activation;
 
 /// Basic methods for safely building `BooleanNetwork`s.
 impl BooleanNetwork {

@@ -28,8 +28,8 @@
 //! any custom BDD operations, but it should be used with caution.
 //!
 
-use crate::symbolic_async_graph::projected_iteration::{OwnedRawSymbolicIterator, RawProjection};
 use crate::BooleanNetwork;
+use crate::symbolic_async_graph::projected_iteration::{OwnedRawSymbolicIterator, RawProjection};
 use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet, ValuationsOfClauseIterator};
 use std::iter::Enumerate;
 
@@ -192,9 +192,9 @@ pub struct RegulationConstraint {
 
 #[cfg(test)]
 mod tests {
+    use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-    use crate::BooleanNetwork;
     use std::convert::TryFrom;
 
     #[test]

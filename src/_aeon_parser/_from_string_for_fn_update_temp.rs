@@ -1,6 +1,6 @@
-use crate::BinaryOp::*;
 use crate::_aeon_parser::FnUpdateTemp;
 use crate::_aeon_parser::FnUpdateTemp::*;
+use crate::BinaryOp::*;
 use std::convert::TryFrom;
 use std::iter::Peekable;
 use std::str::Chars;
@@ -72,7 +72,7 @@ fn tokenize_function_group(
                     Ok(output)
                 } else {
                     Err("Unexpected ')'.".to_string())
-                }
+                };
             }
             '(' => {
                 // start a nested token group
@@ -184,7 +184,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
                         Ok(Box::new(Const(false)))
                     } else {
                         Ok(Box::new(Var(name.clone())))
-                    }
+                    };
                 }
                 Token::Tokens(inner) => return parse_update_function(inner),
                 _ => {} // otherwise, fall through to the error at the end.
@@ -225,8 +225,8 @@ fn read_args(data: &[Token]) -> Result<Vec<FnUpdateTemp>, String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::BinaryOp;
     use crate::_aeon_parser::FnUpdateTemp;
+    use crate::BinaryOp;
     use std::convert::TryFrom;
 
     #[test]

@@ -1,8 +1,8 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::Sign::Positive;
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
 use crate::{Monotonicity, RegulatoryGraph, VariableId};
-use std::collections::HashSet;
 use Sign::Negative;
+use std::collections::HashSet;
 
 impl SdGraph {
     pub fn mk_all_vertices(&self) -> HashSet<VariableId> {
@@ -66,12 +66,16 @@ mod tests {
 
         for regulator in rg.variables() {
             for target in rg.targets(regulator) {
-                assert!(sd_graph.successors[regulator.to_index()]
-                    .iter()
-                    .any(|(it, _)| *it == target));
-                assert!(sd_graph.predecessors[target.to_index()]
-                    .iter()
-                    .any(|(it, _)| *it == regulator));
+                assert!(
+                    sd_graph.successors[regulator.to_index()]
+                        .iter()
+                        .any(|(it, _)| *it == target)
+                );
+                assert!(
+                    sd_graph.predecessors[target.to_index()]
+                        .iter()
+                        .any(|(it, _)| *it == regulator)
+                );
             }
         }
 
