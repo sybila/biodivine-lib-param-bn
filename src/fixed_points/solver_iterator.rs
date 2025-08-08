@@ -123,7 +123,7 @@ impl<'z3> Iterator for SolverIterator<'z3> {
     }
 }
 
-impl<'z3> Iterator for SolverVertexIterator<'z3> {
+impl Iterator for SolverVertexIterator<'_> {
     type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
