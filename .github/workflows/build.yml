@@ -15,6 +15,8 @@ env:
   # spontaneously break after a few years.
   # Make sure to update this from time to time.
   RUST_VERSION: "1.89.0"
+  Z3_VERSION: "4.13.3"
+
 jobs:
   # Check formatting
   fmt:
@@ -54,13 +56,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       # Tests need Z3 solver to run.
-      - name: Setup Z3
+      - name: Setup Z3.
         id: z3
         uses: cda-tum/setup-z3@v1
         with:
-          version: 4.11.2
+          version: ${{ env.Z3_VERSION }}
+          add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
@@ -86,7 +90,7 @@ jobs:
   codecov:
     needs: test
     name: Code coverage
-    runs-on: ubuntu-latest
+    runs-on: macos-latest # Uses macOS because code coverage with z3-sys seems to be broken since version 0.13
     steps:
       - name: Checkout.
         uses: actions/checkout@v4
@@ -94,9 +98,11 @@ jobs:
         id: z3
         uses: cda-tum/setup-z3@v1
         with:
-          version: 4.11.2
+          version: ${{ env.Z3_VERSION }}
+          add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
