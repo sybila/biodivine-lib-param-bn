@@ -46,7 +46,7 @@ impl<'a> IntoIterator for &'a FunctionTable {
 
 impl FunctionTableIterator<'_> {
     /// Create a new `FunctionTableIterator` for a given `FunctionTable`.
-    pub fn new(table: &FunctionTable) -> FunctionTableIterator {
+    pub fn new(table: &FunctionTable) -> FunctionTableIterator<'_> {
         FunctionTableIterator {
             table,
             inner_iterator: ValuationsOfClauseIterator::new_unconstrained(table.arity).enumerate(),

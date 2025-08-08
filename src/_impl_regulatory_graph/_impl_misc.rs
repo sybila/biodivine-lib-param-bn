@@ -244,7 +244,7 @@ impl RegulatoryGraph {
     }
 
     /// Return an iterator over all regulations of this graph.
-    pub fn regulations(&self) -> RegulationIterator {
+    pub fn regulations(&self) -> RegulationIterator<'_> {
         self.regulations.iter()
     }
 
