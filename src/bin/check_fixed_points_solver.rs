@@ -14,8 +14,13 @@ use biodivine_lib_param_bn::symbolic_async_graph::SymbolicAsyncGraph;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
+    if args.len() < 2 {
+        eprintln!("Usage: {} <model_file>", args[0]);
+        std::process::exit(2);
+    }
 
-    let model = BooleanNetwork::try_from_file(args[1].as_str()).unwrap();
+    let model = BooleanNetwork::try_from_file(args[1].as_str())
+        .expect("Failed to load Boolean network from file");
     let model = model.inline_inputs(true, true);
     println!(
         "Loaded model with {} variables and {} parameters/inputs.",
