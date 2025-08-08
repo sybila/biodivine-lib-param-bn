@@ -60,7 +60,7 @@ impl Iterator for FunctionTableIterator<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some((index, valuation)) = self.inner_iterator.next() {
-            Some((valuation.vector(), self.table.rows[index]))
+            Some((valuation.into_vector(), self.table.rows[index]))
         } else {
             None
         }

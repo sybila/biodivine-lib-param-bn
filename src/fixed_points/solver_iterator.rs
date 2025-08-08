@@ -159,7 +159,7 @@ fn explicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
         let parameter = context.as_network().get_parameter(parameter_id);
         let arity = parameter.get_arity().to_u16().unwrap();
         for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
-            let inputs = row.vector();
+            let inputs = row.into_vector();
             let term = context.mk_explicit_const_parameter(parameter_id, &inputs);
             result.push(term);
         }
@@ -175,7 +175,7 @@ fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
             let arity = context.as_network().regulators(var).len();
             let arity = arity.to_u16().unwrap();
             for row in ValuationsOfClauseIterator::new_unconstrained(arity) {
-                let inputs = row.vector();
+                let inputs = row.into_vector();
                 let term = context.mk_implicit_const_parameter(var, &inputs);
                 result.push(term);
             }

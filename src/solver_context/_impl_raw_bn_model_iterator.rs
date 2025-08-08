@@ -36,7 +36,7 @@ impl<'z3> RawBnModelIterator<'z3> {
     }
 
     /// Get a reference to the underlying enumeration terms.
-    pub fn enumeration_terms(&self) -> &Vec<Bool> {
+    pub fn enumeration_terms(&self) -> &Vec<Bool<'_>> {
         &self.enumeration_terms
     }
 
