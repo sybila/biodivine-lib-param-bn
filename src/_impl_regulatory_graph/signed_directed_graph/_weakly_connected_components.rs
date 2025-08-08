@@ -4,7 +4,7 @@ use std::collections::HashSet;
 impl SdGraph {
     /// The list of all weakly connected components in this graph.
     pub fn weakly_connected_components(&self) -> Vec<HashSet<VariableId>> {
-        self.restricted_strongly_connected_components(&self.mk_all_vertices())
+        self.restricted_weakly_connected_components(&self.mk_all_vertices())
     }
 
     /// Weakly connected components within the sub-graph induced by the given `restriction` set.
@@ -89,5 +89,19 @@ mod tests {
                 .len(),
             2
         );
+
+        let rg = RegulatoryGraph::try_from(
+            r"
+            a -> b
+            b -> a
+            a -> c
+            c -> d
+            d -> c
+        ",
+        )
+        .unwrap();
+        let sd = SdGraph::from(&rg);
+
+        assert_eq!(sd.weakly_connected_components().len(), 1);
     }
 }
