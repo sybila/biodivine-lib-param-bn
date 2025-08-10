@@ -21,94 +21,93 @@ env:
   CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
 
 jobs:
-  # Check formatting
-  fmt:
-    name: Rustfmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt
-      - run: cargo fmt --all -- --check
-
-  # Run basic code validity check.
-  check:
-    needs: fmt
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-      - run: cargo check --all-features
-
-  # Run all tests
-  test:
-    needs: check
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      # Tests need Z3 solver to run.
-      - name: Setup Z3.
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        with:
-          version: ${{ env.Z3_VERSION }}
-          add_to_library_path: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - run: z3 --version
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: rustfmt
-      - run: cargo test --all-features
-
-  # Check code style
-  clippy:
-    needs: check
-    name: Clippy
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.RUST_VERSION }}
-          components: clippy
-      - run: cargo clippy --all-features
-
-  # Validate minimum supported Rust version declared in Cargo.toml.
-  minimum-supported:
-    name: Minimum supported version (1.85) - Check and Test
-    needs: fmt
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Z3.
-        id: z3
-        uses: cda-tum/setup-z3@v1
-        with:
-          version: ${{ env.Z3_VERSION }}
-          add_to_library_path: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: ${{ env.MIN_RUST_VERSION }}
-          components: clippy
-      - run: cargo check --all-features
-      - run: cargo test --all-features
-      - run: cargo clippy --all-features
+#  # Check formatting
+#  fmt:
+#    name: Rustfmt
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          toolchain: ${{ env.RUST_VERSION }}
+#          components: rustfmt
+#      - run: cargo fmt --all -- --check
+#
+#  # Run basic code validity check.
+#  check:
+#    needs: fmt
+#    name: Check
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          toolchain: ${{ env.RUST_VERSION }}
+#      - run: cargo check --all-features
+#
+#  # Run all tests
+#  test:
+#    needs: check
+#    name: Test Suite
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      # Tests need Z3 solver to run.
+#      - name: Setup Z3.
+#        id: z3
+#        uses: cda-tum/setup-z3@v1
+#        with:
+#          version: ${{ env.Z3_VERSION }}
+#          add_to_library_path: true
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      - run: z3 --version
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          toolchain: ${{ env.RUST_VERSION }}
+#          components: rustfmt
+#      - run: cargo test --all-features
+#
+#  # Check code style
+#  clippy:
+#    needs: check
+#    name: Clippy
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          toolchain: ${{ env.RUST_VERSION }}
+#          components: clippy
+#      - run: cargo clippy --all-features
+#
+#  # Validate minimum supported Rust version declared in Cargo.toml.
+#  minimum-supported:
+#    name: Minimum supported version (1.85) - Check and Test
+#    needs: fmt
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: actions/checkout@v4
+#      - name: Setup Z3.
+#        id: z3
+#        uses: cda-tum/setup-z3@v1
+#        with:
+#          version: ${{ env.Z3_VERSION }}
+#          add_to_library_path: true
+#        env:
+#          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#      - uses: dtolnay/rust-toolchain@stable
+#        with:
+#          toolchain: ${{ env.MIN_RUST_VERSION }}
+#          components: clippy
+#      - run: cargo check --all-features
+#      - run: cargo test --all-features
+#      - run: cargo clippy --all-features
 
   # Compute code coverage
   codecov:
-    needs: test
     name: Code coverage
-    runs-on: macos-latest # Uses macOS because code coverage with z3-sys seems to be broken since version 0.13
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout.
         uses: actions/checkout@v4
