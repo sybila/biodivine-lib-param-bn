@@ -108,7 +108,7 @@ jobs:
   codecov:
     needs: test
     name: Code coverage
-    runs-on: macos-latest # Uses macOS because code coverage with z3-sys seems to be broken since version 0.13
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout.
         uses: actions/checkout@v4
@@ -120,6 +120,10 @@ jobs:
           add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # For some reason, `tarpaulin` can't see the newer version of Z3 installed
+      # by `setup-z3` assuming an older version is already installed.
+      # So, let's remove the older version...
+      - run: sudo apt remove libz3-dev
       - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
