@@ -119,6 +119,8 @@ jobs:
           add_to_library_path: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: wget http://ftp.de.debian.org/debian/pool/main/z/z3/libz3-4_4.13.3-1_amd64.deb
+      - run: sudo apt install -y ./libz3-4_4.13.3-1_amd64.deb
       - run: z3 --version
       - uses: dtolnay/rust-toolchain@stable
         with:
