@@ -122,6 +122,9 @@ jobs:
       #- run: wget http://ftp.de.debian.org/debian/pool/main/z/z3/libz3-4_4.13.3-1_amd64.deb
       #- run: sudo apt install -y ./libz3-4_4.13.3-1_amd64.deb
       - run: z3 --version
+      - run: echo $LIBRARY_PATH
+      - run: echo $LD_LIBRARY_PATH
+      - run: sudo apt remove libz3-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ env.RUST_VERSION }}
