@@ -375,7 +375,6 @@ impl FixedPoints {
             // Ensure deterministic iteration of results.
             let mut merge_iter: Vec<usize> = to_merge.keys().cloned().collect();
             merge_iter.sort_by_cached_key(|it| to_merge[it].size());
-            merge_iter.reverse();
 
             for i in merge_iter {
                 let set = &to_merge[&i];
