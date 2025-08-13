@@ -145,63 +145,58 @@ impl TrapSpaces {
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let mut original = spaces.clone();
+        let mut remaining = spaces.clone();
         let mut minimal = ctx.mk_empty_colored_spaces();
-
         if should_log(log_level) {
             println!(
                 "Start minimal subspace search with {}x{}[nodes:{}] candidates.",
-                original.colors().approx_cardinality(),
-                original.spaces().approx_cardinality(),
-                original.symbolic_size()
+                remaining.colors().approx_cardinality(),
+                remaining.spaces().approx_cardinality(),
+                remaining.symbolic_size()
             );
         }
+        interrupt()?;
 
-        while !original.is_empty() {
-            // TODO:
-            //  The pick-space process could probably be optimized somewhat to prioritize
-            //  the most specific trap spaces (most "false" dual variables) instead of any
-            //  just any trap space. On the other hand, the pick method already favors "lower"
-            //  valuations, so there might not be that much space for improvement.
+        while !remaining.is_empty() {
+            let most_fixed_path = remaining
+                .spaces()
+                .as_bdd()
+                .most_negative_valuation()
+                .unwrap();
 
-            // TODO:
-            //  The other option would be to also consider sub-spaces and basically do something
-            //  like normal attractor search, where next candidate is picked only from the
-            //  sub-spaces of the original pick. This would guarantee that every iteration always
-            //  discovers a minimal trap space, but it could just mean extra overhead if the
-            //  "greedy" method using pick is good enough. Initial tests indicate that the
-            //  greedy approach is enough.
-            let minimum_candidate = original.pick_space();
+            let mut free_vars = 0;
+            for (t_var, f_var) in &ctx.dual_variables {
+                if most_fixed_path[*t_var] && most_fixed_path[*f_var] {
+                    free_vars += 1;
+                }
+            }
+
+            let k_free = ctx.mk_exactly_k_free_spaces(free_vars);
+            let k_minimal = remaining.intersect_spaces(&k_free);
+            assert!(!k_minimal.is_empty());
             interrupt()?;
 
-            // Compute the set of strict super spaces.
-            // TODO:
-            //  This can take a long time if there are colors and a lot of traps, e.g.
-            //  fixed-points, even though individual colors are easy. We should probably
-            //  find a way to get rid of fixed points and any related super-spaces first,
-            //  as these are clearly minimal. The other option would be to tune the super
-            //  space enumeration to avoid spaces that are clearly irrelevant anyway.
-            let super_spaces =
-                ctx._mk_super_spaces(minimum_candidate.as_bdd(), log_level, interrupt)?;
+            minimal = minimal.union(&k_minimal);
+            interrupt()?;
+
+            let super_spaces = ctx.mk_super_spaces(minimal.as_bdd());
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
-            interrupt()?;
-
-            original = original.minus(&super_spaces);
-            minimal = minimal.minus(&super_spaces).union(&minimum_candidate);
+            remaining = remaining.minus(&super_spaces);
             interrupt()?;
 
             if log_essential(
                 log_level,
-                original.symbolic_size() + minimal.symbolic_size(),
+                remaining.symbolic_size() + minimal.symbolic_size(),
             ) {
                 println!(
-                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] candidates.",
-                    original.colors().approx_cardinality(),
-                    original.spaces().approx_cardinality(),
-                    original.symbolic_size(),
+                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] minimal traps found, at most {} free variables tested.",
+                    remaining.colors().approx_cardinality(),
+                    remaining.spaces().approx_cardinality(),
+                    remaining.symbolic_size(),
                     minimal.colors().approx_cardinality(),
                     minimal.spaces().approx_cardinality(),
                     minimal.symbolic_size(),
+                    free_vars,
                 );
             }
         }
@@ -209,7 +204,7 @@ impl TrapSpaces {
         if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] minimal spaces.",
-                minimal.approx_cardinality(),
+                minimal.exact_cardinality(),
                 minimal.symbolic_size(),
             );
         }
