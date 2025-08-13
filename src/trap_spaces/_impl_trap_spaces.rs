@@ -106,14 +106,31 @@ impl TrapSpaces {
     /// Computes the minimal coloured trap spaces of the provided `network` within the specified
     /// `restriction` set.
     ///
-    /// This method currently uses [Self::essential_symbolic], hence is always slower than
-    /// this method.
+    /// This is similar to running [Self::essential_symbolic] and [Self::minimize], but the
+    /// method adds an extra optimization step. Before computing all "non-trivial" minimal trap
+    /// spaces, it first searches for fixed points using [FixedPoints::symbolic] and excludes
+    /// them from trap space search. Asymptotically, this is not really helpful, but the encoding
+    /// for fixed-points is simpler, so the overhead is greatly reduced by doing it this way.
+    ///
+    /// Note that in rare cases, it can be actually faster to just run [Self::essential_symbolic]
+    /// and [Self::minimize], simply because the set of fixed-points is complex and complicates
+    /// subsequent search for essential trap spaces. As such, it is possible to disable this
+    /// behavior using the `optimize_fixed_points` flag.
     pub fn minimal_symbolic(
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
+        optimize_fixed_points: bool,
     ) -> NetworkColoredSpaces {
-        Self::_minimal_symbolic(ctx, graph, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_minimal_symbolic(
+            ctx,
+            graph,
+            restriction,
+            optimize_fixed_points,
+            global_log_level(),
+            &never_stop,
+        )
+        .unwrap()
     }
 
     /// A version of [TrapSpaces::minimal_symbolic] with cancellation
@@ -122,11 +139,36 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
+        optimize_fixed_points: bool,
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let essential = Self::_essential_symbolic(ctx, graph, restriction, log_level, interrupt)?;
-        Self::_minimize(ctx, &essential, log_level, interrupt)
+        let (restriction, fixed_points) = if optimize_fixed_points {
+            if should_log(log_level) {
+                println!(
+                    "Prepare for minimal trap space computation by first computing fixed points."
+                );
+            }
+            let restriction_vertices = restriction.to_colored_vertices(ctx);
+            let fixed_points =
+                FixedPoints::_symbolic(graph, &restriction_vertices, log_level, interrupt)?;
+            let fixed_points = fixed_points.to_singleton_spaces(ctx);
+            let fix_super_spaces =
+                ctx._mk_super_spaces(fixed_points.as_bdd(), log_level, interrupt)?;
+            let fix_super_spaces = NetworkColoredSpaces::new(fix_super_spaces, ctx);
+            let restriction = restriction.minus(&fix_super_spaces);
+            if should_log(log_level) {
+                println!(
+                    "Fixed points computed. Restriction set reduced to {} elements.",
+                    restriction.exact_cardinality()
+                );
+            }
+            (restriction, fixed_points)
+        } else {
+            (restriction.clone(), ctx.mk_empty_colored_spaces())
+        };
+        let essential = Self::_essential_symbolic(ctx, graph, &restriction, log_level, interrupt)?;
+        Ok(Self::_minimize(ctx, &essential, log_level, interrupt)?.union(&fixed_points))
     }
 
     /// Compute the minimal spaces within a particular subset.
@@ -296,7 +338,7 @@ mod tests {
         let unit = ctx.mk_unit_colored_spaces(&stg);
 
         let essential_traps = TrapSpaces::essential_symbolic(&ctx, &stg, &unit);
-        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit);
+        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, true);
         let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
 
         assert!(minimal_traps.is_subset(&essential_traps));
