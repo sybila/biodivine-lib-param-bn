@@ -126,6 +126,34 @@ impl SymbolicSpaceContext {
         }
     }
 
+    /// Compute the set of network spaces that have *exactly* `k` free variables.
+    ///
+    /// Under normal circumstances, this should be a relatively fast operation, where the
+    /// resulting BDD is linear in the number of network variables.
+    pub fn mk_exactly_k_free_spaces(&self, k: usize) -> NetworkSpaces {
+        let spaces = self.mk_unit_spaces().into_bdd();
+        let bdd_set = self.bdd_variable_set();
+
+        let mut free_var_constraints = Vec::new();
+        for (t_var, f_var) in self.dual_variables.clone() {
+            free_var_constraints.push(bdd!(bdd_set, t_var & f_var));
+        }
+
+        // At the moment, there isn't a method that will do this on BDDs directly, so we first
+        // build it on variables, and then use substitution to swap variables for (t_var & f_var)
+        // expressions that enforce the variable is free in a subspace.
+        let state_vars = self.inner_ctx.state_variables();
+        let mut at_most_k_free = bdd_set.mk_sat_exactly_k(k, state_vars);
+        for (i, s_var) in state_vars.iter().enumerate() {
+            at_most_k_free = at_most_k_free.substitute(*s_var, &free_var_constraints[i]);
+        }
+
+        NetworkSpaces {
+            bdd: spaces.and(&at_most_k_free),
+            dual_variables: self.dual_variables.clone(),
+        }
+    }
+
     /// Compute a [Bdd] which encodes all spaces in which the value of `function` can be
     /// `true` for some state. We assume that `function` can depend on state variables and
     /// parameter variables, but not on the dual variables used for space encoding.
@@ -204,7 +232,7 @@ impl SymbolicSpaceContext {
     ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
-        for (t_var, f_var) in self.dual_variables.iter().rev() {
+        for (i, (t_var, f_var)) in self.dual_variables.iter().rev().enumerate() {
             // Select every space in which we have `t_var=false`, but there is
             // no equivalent space with `t_var=true`. Flips `t_var` on output,
             // meaning we actually get the set of super spaces where `true` is added.
@@ -234,7 +262,9 @@ impl SymbolicSpaceContext {
                 interrupt()?;
                 if log_essential(log_level, result.size()) {
                     println!(
-                        "Computing super-spaces: {}[nodes:{}].",
+                        "Computing super-spaces[{}/{}]: {}[nodes:{}].",
+                        i + 1,
+                        self.dual_variables.len(),
                         result.cardinality(),
                         result.size(),
                     );
@@ -260,7 +290,7 @@ impl SymbolicSpaceContext {
     ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
-        for (t_var, f_var) in self.dual_variables.clone().into_iter().rev() {
+        for (i, (t_var, f_var)) in self.dual_variables.clone().into_iter().rev().enumerate() {
             // A value can go down only in subspaces where both variables are set.
             // If only one variable is set, going down will just break the encoding.
             let can_go_down = bdd!(vars, t_var & f_var);
@@ -291,7 +321,9 @@ impl SymbolicSpaceContext {
 
                 if log_essential(log_level, result.size()) {
                     println!(
-                        "Computing sub-spaces: {}[nodes:{}].",
+                        "Computing sub-spaces[{}/{}]: {}[nodes:{}].",
+                        i + 1,
+                        self.dual_variables.len(),
                         result.cardinality(),
                         result.size(),
                     );
@@ -390,6 +422,7 @@ mod tests {
     use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
     use crate::{BooleanNetwork, FnUpdate, Space, VariableId};
     use biodivine_lib_bdd::bdd;
+    use num_bigint::BigInt;
 
     #[test]
     fn test_basic_getter_functionality() {
@@ -571,5 +604,34 @@ mod tests {
                 .imp(&ctx2.space_to_vertex_bdd)
                 .is_true()
         );
+    }
+
+    #[test]
+    fn exactly_k_free() {
+        // This does not depend on update functions at all, we just need to make them fixed
+        // to avoid blowing up parameter space.
+        let network = BooleanNetwork::try_from_bnet(
+            r#"
+        a,a
+        b,b
+        c,c
+        d,d
+        "#,
+        )
+        .unwrap();
+
+        let ctx = SymbolicSpaceContext::new(&network);
+
+        // Zero-size spaces are exactly vertices:
+        let size_0 = ctx.mk_exactly_k_free_spaces(0);
+        assert_eq!(size_0.exact_cardinality(), BigInt::from(2 * 2 * 2 * 2));
+
+        // Size four is exactly one subspace (****).
+        let size_4 = ctx.mk_exactly_k_free_spaces(4);
+        assert!(size_4.is_singleton());
+
+        // Size one is 4 * 2^3
+        let size_1 = ctx.mk_exactly_k_free_spaces(1);
+        assert_eq!(size_1.exact_cardinality(), BigInt::from(4 * 8));
     }
 }

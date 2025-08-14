@@ -1,6 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use crate::fixed_points::FixedPoints;
-use crate::symbolic_async_graph::SymbolicAsyncGraph;
+use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext, TrapSpaces};
 use crate::{global_log_level, log_essential, never_stop, should_log};
 use std::collections::HashSet;
@@ -106,14 +106,33 @@ impl TrapSpaces {
     /// Computes the minimal coloured trap spaces of the provided `network` within the specified
     /// `restriction` set.
     ///
-    /// This method currently uses [Self::essential_symbolic], hence is always slower than
-    /// this method.
+    /// This is similar to running [Self::essential_symbolic] and [Self::minimize], but the
+    /// method adds an extra optional optimization step. Before computing all "non-trivial"
+    /// minimal trap spaces, it can first exclude all trap spaces that are already known to
+    /// contain a fixed-point (given as `exclude_fixed_points` parameter). **These fixed points
+    /// then won't be part of the result.** In some cases, this can help speed up trap space
+    /// search. However, it is not universally better and is therefore left as an
+    /// optional parameter (if the set of fixed points is very complex, it can complicate the
+    /// trap space search, even though the number of results is strictly smaller). Note that
+    /// the method assumes the provided `exclude_fixed_points` set is correct, i.e. it won't check
+    /// that it only contains fixed points. In theory, you can also use this to exclude
+    /// super-spaces of any vertex.
+    ///
     pub fn minimal_symbolic(
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
+        exclude_fixed_points: Option<&GraphColoredVertices>,
     ) -> NetworkColoredSpaces {
-        Self::_minimal_symbolic(ctx, graph, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_minimal_symbolic(
+            ctx,
+            graph,
+            restriction,
+            exclude_fixed_points,
+            global_log_level(),
+            &never_stop,
+        )
+        .unwrap()
     }
 
     /// A version of [TrapSpaces::minimal_symbolic] with cancellation
@@ -122,10 +141,32 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
+        exclude_fixed_points: Option<&GraphColoredVertices>,
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let essential = Self::_essential_symbolic(ctx, graph, restriction, log_level, interrupt)?;
+        let restriction = if let Some(exclude_fixed_points) = exclude_fixed_points {
+            if should_log(log_level) {
+                println!(
+                    "Prepare for minimal trap space computation by first eliminating provided fixed-points."
+                );
+            }
+            let fixed_points = exclude_fixed_points.to_singleton_spaces(ctx);
+            let fix_super_spaces =
+                ctx._mk_super_spaces(fixed_points.as_bdd(), log_level, interrupt)?;
+            let fix_super_spaces = NetworkColoredSpaces::new(fix_super_spaces, ctx);
+            let restriction = restriction.minus(&fix_super_spaces);
+            if should_log(log_level) {
+                println!(
+                    "Fixed points eliminated. Restriction set reduced to {} elements.",
+                    restriction.exact_cardinality()
+                );
+            }
+            restriction
+        } else {
+            restriction.clone()
+        };
+        let essential = Self::_essential_symbolic(ctx, graph, &restriction, log_level, interrupt)?;
         Self::_minimize(ctx, &essential, log_level, interrupt)
     }
 
@@ -145,63 +186,55 @@ impl TrapSpaces {
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let mut original = spaces.clone();
+        let mut remaining = spaces.clone();
         let mut minimal = ctx.mk_empty_colored_spaces();
-
         if should_log(log_level) {
             println!(
                 "Start minimal subspace search with {}x{}[nodes:{}] candidates.",
-                original.colors().approx_cardinality(),
-                original.spaces().approx_cardinality(),
-                original.symbolic_size()
+                remaining.colors().approx_cardinality(),
+                remaining.spaces().approx_cardinality(),
+                remaining.symbolic_size()
             );
         }
+        interrupt()?;
 
-        while !original.is_empty() {
-            // TODO:
-            //  The pick-space process could probably be optimized somewhat to prioritize
-            //  the most specific trap spaces (most "false" dual variables) instead of any
-            //  just any trap space. On the other hand, the pick method already favors "lower"
-            //  valuations, so there might not be that much space for improvement.
+        while !remaining.is_empty() {
+            let most_fixed_path = remaining
+                .spaces()
+                .as_bdd()
+                .most_negative_valuation()
+                .unwrap();
 
-            // TODO:
-            //  The other option would be to also consider sub-spaces and basically do something
-            //  like normal attractor search, where next candidate is picked only from the
-            //  sub-spaces of the original pick. This would guarantee that every iteration always
-            //  discovers a minimal trap space, but it could just mean extra overhead if the
-            //  "greedy" method using pick is good enough. Initial tests indicate that the
-            //  greedy approach is enough.
-            let minimum_candidate = original.pick_space();
+            let mut free_vars = 0;
+            for (t_var, f_var) in &ctx.dual_variables {
+                if most_fixed_path[*t_var] && most_fixed_path[*f_var] {
+                    free_vars += 1;
+                }
+            }
+
+            let k_free = ctx.mk_exactly_k_free_spaces(free_vars);
+            let k_minimal = remaining.intersect_spaces(&k_free);
+            assert!(!k_minimal.is_empty());
             interrupt()?;
 
-            // Compute the set of strict super spaces.
-            // TODO:
-            //  This can take a long time if there are colors and a lot of traps, e.g.
-            //  fixed-points, even though individual colors are easy. We should probably
-            //  find a way to get rid of fixed points and any related super-spaces first,
-            //  as these are clearly minimal. The other option would be to tune the super
-            //  space enumeration to avoid spaces that are clearly irrelevant anyway.
-            let super_spaces =
-                ctx._mk_super_spaces(minimum_candidate.as_bdd(), log_level, interrupt)?;
+            minimal = minimal.union(&k_minimal);
+            interrupt()?;
+
+            let super_spaces = ctx._mk_super_spaces(k_minimal.as_bdd(), log_level, interrupt)?;
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
+            remaining = remaining.minus(&super_spaces);
             interrupt()?;
 
-            original = original.minus(&super_spaces);
-            minimal = minimal.minus(&super_spaces).union(&minimum_candidate);
-            interrupt()?;
-
-            if log_essential(
-                log_level,
-                original.symbolic_size() + minimal.symbolic_size(),
-            ) {
+            if should_log(log_level) {
                 println!(
-                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] candidates.",
-                    original.colors().approx_cardinality(),
-                    original.spaces().approx_cardinality(),
-                    original.symbolic_size(),
+                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] minimal traps found, at most {} free variables tested.",
+                    remaining.colors().approx_cardinality(),
+                    remaining.spaces().approx_cardinality(),
+                    remaining.symbolic_size(),
                     minimal.colors().approx_cardinality(),
                     minimal.spaces().approx_cardinality(),
                     minimal.symbolic_size(),
+                    free_vars,
                 );
             }
         }
@@ -209,7 +242,7 @@ impl TrapSpaces {
         if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] minimal spaces.",
-                minimal.approx_cardinality(),
+                minimal.exact_cardinality(),
                 minimal.symbolic_size(),
             );
         }
@@ -290,6 +323,7 @@ impl TrapSpaces {
 mod tests {
     use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{SymbolicSpaceContext, TrapSpaces};
 
@@ -300,9 +334,16 @@ mod tests {
         let stg = SymbolicAsyncGraph::with_space_context(&network, &ctx).unwrap();
         let unit = ctx.mk_unit_colored_spaces(&stg);
 
+        let fix = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
         let essential_traps = TrapSpaces::essential_symbolic(&ctx, &stg, &unit);
-        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit);
+        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, None);
+        let minimal_traps_minus_fix = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, Some(&fix));
         let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
+
+        assert_eq!(
+            minimal_traps_minus_fix,
+            minimal_traps.minus(&fix.to_singleton_spaces(&ctx))
+        );
 
         assert!(minimal_traps.is_subset(&essential_traps));
         assert!(maximal_traps.is_subset(&essential_traps));
