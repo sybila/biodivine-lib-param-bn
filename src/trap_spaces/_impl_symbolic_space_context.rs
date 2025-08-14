@@ -154,6 +154,44 @@ impl SymbolicSpaceContext {
         }
     }
 
+    /// Compute a [Bdd] which encodes all spaces in which the value of `function` is true
+    /// in some state where `var` is false, i.e. the function can cause `var` to update from
+    /// `0` to `1`.
+    ///
+    /// Note that this is similar to [`Self::mk_can_go_to_true`], but it guarantees that the
+    /// given variable must be `0` in the state where `function` is `1`. In particular, this
+    /// means that a subspace where `var` is fixed to `1` cannot be a result of this operation.
+    /// Also note that `var` must be a state variable.
+    pub fn mk_has_up_transition(&self, var: BddVariable, function: &Bdd) -> Bdd {
+        assert!(self.inner_ctx.state_variables().contains(&var));
+        let function_true_in_false_state = function.var_select(var, false);
+        self._mk_can_go_to_true(
+            &function_true_in_false_state,
+            global_log_level(),
+            &never_stop,
+        )
+        .unwrap()
+    }
+
+    /// Compute a [Bdd] which encodes all spaces in which the value of `function` is false
+    /// in some state where `var` is true, i.e. the function can cause `var` to update from
+    /// `1` to `0`.
+    ///
+    /// Note that this is similar to [`Self::mk_can_go_to_true`] with a negated input function,
+    /// but it guarantees that the given variable must be `1` in the state where `function` is `1`.
+    /// In particular, this means that a subspace where `var` is fixed to `0` cannot be a
+    /// result of this operation. Also note that `var` must be a state variable.
+    pub fn mk_has_down_transition(&self, var: BddVariable, function: &Bdd) -> Bdd {
+        assert!(self.inner_ctx.state_variables().contains(&var));
+        let function_false_in_true_state = function.not().var_select(var, true);
+        self._mk_can_go_to_true(
+            &function_false_in_true_state,
+            global_log_level(),
+            &never_stop,
+        )
+        .unwrap()
+    }
+
     /// Compute a [Bdd] which encodes all spaces in which the value of `function` can be
     /// `true` for some state. We assume that `function` can depend on state variables and
     /// parameter variables, but not on the dual variables used for space encoding.
@@ -169,6 +207,13 @@ impl SymbolicSpaceContext {
     ///
     pub fn mk_can_go_to_true(&self, function: &Bdd) -> Bdd {
         self._mk_can_go_to_true(function, global_log_level(), &never_stop)
+            .unwrap()
+    }
+
+    /// An alternative to [`Self::mk_can_go_to_true`] which returns the subset of spaces
+    /// in which exists a state that evaluates the given `function` to `0`.
+    pub fn mk_can_go_to_false(&self, function: &Bdd) -> Bdd {
+        self._mk_can_go_to_true(&function.not(), global_log_level(), &never_stop)
             .unwrap()
     }
 
@@ -509,6 +554,30 @@ mod tests {
     }
 
     #[test]
+    fn test_can_go_to_false() {
+        let network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
+        let ctx = SymbolicSpaceContext::new(&network);
+        let vars = ctx.bdd_variable_set();
+        let and_function = bdd!(vars, "v_ADD" & "v_ATM");
+        let or_function = bdd!(vars, "v_ADD" | "v_ATM");
+        let and_down = ctx.mk_can_go_to_false(&and_function);
+        let or_down = ctx.mk_can_go_to_false(&or_function);
+
+        let unit = ctx.mk_unit_spaces();
+        let and_down = NetworkSpaces::new(and_down, &ctx).intersect(&unit);
+        let or_down = NetworkSpaces::new(or_down, &ctx).intersect(&unit);
+
+        // In every space where (x | y) goes to false, (x & y) also goes to false.
+        assert!(or_down.is_subset(&and_down));
+        assert!(!and_down.is_subset(&or_down));
+        // In this case, the number of such spaces is k*3^26 (remaining variables are unconstrained)
+        // where `k=4` for OR ([*,*], [1,*], [*,1], [1,1]) and `k=8` for AND ([*,*], [*,0], [0,*]
+        // [*,1], [1,*], [0,1], [1,0], [1,1]; everything except [0,0]).
+        assert_eq!(8.0 * 2541865828329.0, and_down.approx_cardinality());
+        assert_eq!(4.0 * 2541865828329.0, or_down.approx_cardinality());
+    }
+
+    #[test]
     fn conversions() {
         let network = BooleanNetwork::try_from_file("./aeon_models/005.aeon").unwrap();
         let ctx = SymbolicSpaceContext::new(&network);
@@ -633,5 +702,75 @@ mod tests {
         // Size one is 4 * 2^3
         let size_1 = ctx.mk_exactly_k_free_spaces(1);
         assert_eq!(size_1.exact_cardinality(), BigInt::from(4 * 8));
+    }
+
+    #[test]
+    fn has_up_down_transition() {
+        let network = BooleanNetwork::try_from_bnet(
+            r#"
+            a,a
+            b,a
+            "#,
+        )
+        .unwrap();
+        // Subspaces where `f_a` can be true: **, *0, *1, 1*, 11, 10
+        // Subspaces where `a` updates to true: -
+        // Subspaces where `f_b` can be true: **, *0, *1, 1*, 11, 10
+        // Subspaces where `b` updates to true: **, 1*, *0, 10
+
+        let a = VariableId::from_index(0);
+        let b = VariableId::from_index(1);
+
+        let f_a = network.get_update_function(a).as_ref().unwrap();
+        let f_b = network.get_update_function(b).as_ref().unwrap();
+
+        let ctx = SymbolicSpaceContext::new(&network);
+
+        let a_var = ctx.get_state_variable(a);
+        let b_var = ctx.get_state_variable(b);
+        let f_a_bdd = ctx.inner_ctx.mk_fn_update_true(f_a);
+        let f_b_bdd = ctx.inner_ctx.mk_fn_update_true(f_b);
+
+        let a_can_be_true = ctx.mk_can_go_to_true(&f_a_bdd).and(&ctx.mk_unit_bdd());
+        let b_can_be_true = ctx.mk_can_go_to_true(&f_b_bdd).and(&ctx.mk_unit_bdd());
+
+        assert_eq!(a_can_be_true, b_can_be_true);
+        assert_eq!(
+            NetworkSpaces::new(a_can_be_true, &ctx).exact_cardinality(),
+            BigInt::from(6)
+        );
+
+        let a_goes_up = ctx
+            .mk_has_up_transition(a_var, &f_a_bdd)
+            .and(&ctx.mk_unit_bdd());
+        let a_goes_down = ctx
+            .mk_has_down_transition(a_var, &f_a_bdd)
+            .and(&ctx.mk_unit_bdd());
+        let b_goes_up = ctx
+            .mk_has_up_transition(b_var, &f_b_bdd)
+            .and(&ctx.mk_unit_bdd());
+        let b_goes_down = ctx
+            .mk_has_down_transition(b_var, &f_b_bdd)
+            .and(&ctx.mk_unit_bdd());
+
+        assert_ne!(a_goes_up, b_goes_up);
+        assert_eq!(
+            NetworkSpaces::new(a_goes_up, &ctx).exact_cardinality(),
+            BigInt::from(0)
+        );
+        assert_eq!(
+            NetworkSpaces::new(b_goes_up, &ctx).exact_cardinality(),
+            BigInt::from(4)
+        );
+
+        // The down case is symmetric.
+        assert_eq!(
+            NetworkSpaces::new(a_goes_down, &ctx).exact_cardinality(),
+            BigInt::from(0)
+        );
+        assert_eq!(
+            NetworkSpaces::new(b_goes_down, &ctx).exact_cardinality(),
+            BigInt::from(4)
+        );
     }
 }
