@@ -220,7 +220,7 @@ impl TrapSpaces {
             minimal = minimal.union(&k_minimal);
             interrupt()?;
 
-            let super_spaces = ctx.mk_super_spaces(minimal.as_bdd());
+            let super_spaces = ctx.mk_super_spaces(k_minimal.as_bdd());
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
             remaining = remaining.minus(&super_spaces);
             interrupt()?;
