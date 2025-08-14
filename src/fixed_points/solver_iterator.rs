@@ -10,16 +10,16 @@ use z3::ast::Bool;
 ///
 /// The items of the iterator as `BnSolverModel` instances, from which you can extract both
 /// state and color information.
-pub struct SolverIterator<'z3> {
-    context: &'z3 BnSolverContext<'z3>,
-    inner: RawBnModelIterator<'z3>,
+pub struct SolverIterator {
+    context: BnSolverContext,
+    inner: RawBnModelIterator,
 }
 
 /// A version of the `SolverIterator` that only goes through all the distinct fixed-point
 /// vertices.
-pub struct SolverVertexIterator<'z3> {
-    context: &'z3 BnSolverContext<'z3>,
-    inner: RawBnModelIterator<'z3>,
+pub struct SolverVertexIterator {
+    context: BnSolverContext,
+    inner: RawBnModelIterator,
 }
 
 /// A version of the `SolverIterator` that only goes through all the distinct fixed-point
@@ -27,124 +27,115 @@ pub struct SolverVertexIterator<'z3> {
 ///
 /// Note that at the moment, these are just represented as generic `BnSolverModel` instances,
 /// since there is no better type-safe object to represent them.
-pub struct SolverColorIterator<'z3> {
-    context: &'z3 BnSolverContext<'z3>,
-    inner: RawBnModelIterator<'z3>,
+pub struct SolverColorIterator {
+    context: BnSolverContext,
+    inner: RawBnModelIterator,
 }
 
-impl<'z3> SolverIterator<'z3> {
+impl SolverIterator {
     /// Create a `SolverIterator` from a pre-existing solver, assuming that the solver
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
     /// Don't use it unless you are really sure you need a custom solver.
-    pub fn new_with_solver(
-        context: &'z3 BnSolverContext<'z3>,
-        solver: BnSolver<'z3>,
-    ) -> SolverIterator<'z3> {
+    pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverIterator {
         let mut enumeration_terms = Vec::new();
         enumeration_terms.append(&mut variable_enumeration_terms(context));
         enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
         enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
 
         SolverIterator {
-            context,
+            context: context.clone(),
             inner: RawBnModelIterator::new(solver, enumeration_terms),
         }
     }
 
-    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverIterator<'z3> {
+    pub fn new(context: &BnSolverContext) -> SolverIterator {
         SolverIterator::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
     }
 }
 
-impl<'z3> SolverVertexIterator<'z3> {
+impl SolverVertexIterator {
     /// Create a `SolverVertexIterator` from a pre-existing solver, assuming that the solver
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
     /// Don't use it unless you are really sure you need a custom solver.
-    pub fn new_with_solver(
-        context: &'z3 BnSolverContext<'z3>,
-        solver: BnSolver<'z3>,
-    ) -> SolverVertexIterator<'z3> {
+    pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverVertexIterator {
         // List only vertex enumeration terms.
         let mut enumeration_terms = Vec::new();
         enumeration_terms.append(&mut variable_enumeration_terms(context));
 
         SolverVertexIterator {
-            context,
+            context: context.clone(),
             inner: RawBnModelIterator::new(solver, enumeration_terms),
         }
     }
 
     /// Create a new `SolverVertexIterator` with default constraints applied
     /// based on the provided `BnSolverContext`.
-    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverVertexIterator<'z3> {
+    pub fn new(context: &BnSolverContext) -> SolverVertexIterator {
         Self::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
     }
 }
 
-impl<'z3> SolverColorIterator<'z3> {
+impl SolverColorIterator {
     /// Create a `SolverColorIterator` from a pre-existing solver, assuming that the solver
     /// has all fixed-points constraints applied (e.g. using
     /// `FixedPoints::make_fixed_points_solver`).
     ///
     /// Don't use it unless you are really sure you need a custom solver.
-    pub fn new_with_solver(
-        context: &'z3 BnSolverContext<'z3>,
-        solver: BnSolver<'z3>,
-    ) -> SolverColorIterator<'z3> {
+    pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverColorIterator {
         // List only vertex enumeration terms.
         let mut enumeration_terms = Vec::new();
         enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
         enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
 
         SolverColorIterator {
-            context,
+            context: context.clone(),
             inner: RawBnModelIterator::new(solver, enumeration_terms),
         }
     }
 
     /// Create a new `SolverColorIterator` with default constraints applied
     /// based on the provided `BnSolverContext`.
-    pub fn new(context: &'z3 BnSolverContext<'z3>) -> SolverColorIterator<'z3> {
+    pub fn new(context: &BnSolverContext) -> SolverColorIterator {
         Self::new_with_solver(context, FixedPoints::make_fixed_points_solver(context))
     }
 }
 
-impl<'z3> Iterator for SolverIterator<'z3> {
-    type Item = BnSolverModel<'z3>;
+impl Iterator for SolverIterator {
+    type Item = BnSolverModel;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|it| BnSolverModel::new(self.context, it))
+            .map(|it| BnSolverModel::new(&self.context, it))
     }
 }
 
-impl Iterator for SolverVertexIterator<'_> {
+impl Iterator for SolverVertexIterator {
     type Item = ArrayBitVector;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|it| BnSolverModel::new(self.context, it).get_state())
+            .map(|it| BnSolverModel::new(&self.context, it).get_state())
     }
 }
 
-impl<'z3> Iterator for SolverColorIterator<'z3> {
-    type Item = BnSolverModel<'z3>;
+impl Iterator for SolverColorIterator {
+    type Item = BnSolverModel;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner
             .next()
-            .map(|it| BnSolverModel::new(self.context, it))
+            .map(|it| BnSolverModel::new(&self.context, it))
     }
 }
 
 /// **(internal)** List the Boolean terms that distinguish all state variables.
-fn variable_enumeration_terms<'z3>(context: &BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+fn variable_enumeration_terms(context: &BnSolverContext) -> Vec<Bool> {
     context
         .as_network()
         .variables()
@@ -153,7 +144,7 @@ fn variable_enumeration_terms<'z3>(context: &BnSolverContext<'z3>) -> Vec<Bool<'
 }
 
 /// **(internal)** List the Boolean terms that distinguish all explicit parameter valuations.
-fn explicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+fn explicit_parameter_enumeration_terms(context: &BnSolverContext) -> Vec<Bool> {
     let mut result = Vec::new();
     for parameter_id in context.as_network().parameters() {
         let parameter = context.as_network().get_parameter(parameter_id);
@@ -168,7 +159,7 @@ fn explicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>)
 }
 
 /// **(internal)** List the Boolean terms that distinguish all implicit parameter valuations.
-fn implicit_parameter_enumeration_terms<'z3>(context: &'z3 BnSolverContext<'z3>) -> Vec<Bool<'z3>> {
+fn implicit_parameter_enumeration_terms(context: &BnSolverContext) -> Vec<Bool> {
     let mut result = Vec::new();
     for var in context.as_network().variables() {
         if context.as_network().get_update_function(var).is_none() {
