@@ -3,13 +3,17 @@ use crate::fixed_points::FixedPoints;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext, TrapSpaces};
 use crate::{global_log_level, log_essential, never_stop, should_log};
+use biodivine_lib_bdd::bdd;
 use std::collections::HashSet;
 
 impl TrapSpaces {
     /// Computes the coloured subset of "essential" trap spaces of a Boolean network.
     ///
-    /// A trap space is essential if it cannot be reduced through percolation. In general, every
-    /// minimal trap space is always essential.
+    /// A trap space is essential if it cannot be reduced to a smaller trap space through
+    /// percolation. In general, every minimal trap space is always essential.
+    ///
+    /// Note that this set corresponds exactly to the vertices of a
+    /// [succession diagram](https://jcrozum.github.io/biobalm/autoapi/biobalm/index.html).
     pub fn essential_symbolic(
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
@@ -101,6 +105,110 @@ impl TrapSpaces {
         }
 
         Ok(trap_spaces)
+    }
+
+    /// Compute the set of long-lived subspaces of the given networ.
+    ///
+    /// A subspace is long-lived if:
+    ///  - It contains both up and down transitions in every free variable.
+    ///  - For every fixed variable, there is at least one state where this value can be obtained
+    ///    as a result of the corresponding update function (it cannot be escaped by percolation).
+    ///
+    /// Intuitively, such trap spaces over-approximate possible oscillations across different
+    /// update schemes of the Boolean network. **Currently, this is an experimental feature
+    /// and the semantics of this function can change in the future.**
+    pub fn long_lived_symbolic(
+        ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
+        restriction: &NetworkColoredSpaces,
+    ) -> NetworkColoredSpaces {
+        Self::_long_lived_symbolic(ctx, graph, restriction, global_log_level(), &never_stop)
+            .unwrap()
+    }
+    pub fn _long_lived_symbolic<E, F: Fn() -> Result<(), E>>(
+        ctx: &SymbolicSpaceContext,
+        graph: &SymbolicAsyncGraph,
+        restriction: &NetworkColoredSpaces,
+        log_level: usize,
+        interrupt: &F,
+    ) -> Result<NetworkColoredSpaces, E> {
+        if should_log(log_level) {
+            println!(
+                "Start symbolic long-lived trap space search with {}[nodes:{}] candidates.",
+                restriction.approx_cardinality(),
+                restriction.symbolic_size()
+            );
+        }
+
+        let bdd_ctx = ctx.bdd_variable_set();
+
+        // We always start with the restriction set, because it should carry the information
+        // about valid encoding of spaces.
+        let mut to_merge = vec![restriction.as_bdd().clone()];
+        for var in graph.variables() {
+            let bdd_var = ctx.get_state_variable(var);
+            let update_bdd = graph.get_symbolic_fn_update(var);
+            let not_update_bdd = &update_bdd.not();
+            interrupt()?;
+
+            let has_one = ctx._mk_can_go_to_true(update_bdd, log_level, interrupt)?;
+            let has_zero = ctx._mk_can_go_to_true(not_update_bdd, log_level, interrupt)?;
+            interrupt()?;
+
+            let up_states = update_bdd.var_select(bdd_var, false);
+            let goes_up = ctx._mk_can_go_to_true(&up_states, log_level, interrupt)?;
+            interrupt()?;
+
+            let down_states = not_update_bdd.var_select(bdd_var, true);
+            let goes_down = ctx._mk_can_go_to_true(&down_states, log_level, interrupt)?;
+            interrupt()?;
+
+            let true_var = ctx.get_positive_variable(var);
+            let false_var = ctx.get_negative_variable(var);
+
+            // Is essential: If subspace has var=*, then it must contain up and down transitions.
+            let is_live = bdd!(bdd_ctx, (true_var & false_var) => (goes_up & goes_down));
+            interrupt()?;
+
+            // Cannot percolate (0): If var=0, then f(x)=0 for some state x.
+            // Cannot percolate (1): If var=1, then f(x)=1 for some state x.
+            let cannot_percolate_0 = bdd!(bdd_ctx, ((!true_var) & false_var) => has_zero);
+            let cannot_percolate_1 = bdd!(bdd_ctx, (true_var & (!false_var)) => has_one);
+            let cannot_percolate = bdd!(cannot_percolate_0 & cannot_percolate_1);
+            interrupt()?;
+
+            if log_essential(log_level, cannot_percolate.size() + is_live.size()) {
+                println!(
+                    " > Created initial sets for {:?} using {}+{} BDD nodes.",
+                    var,
+                    cannot_percolate.size(),
+                    is_live.size(),
+                );
+            }
+
+            to_merge.push(cannot_percolate.and(&is_live));
+        }
+
+        let live_spaces = FixedPoints::_symbolic_merge(
+            bdd_ctx,
+            to_merge,
+            HashSet::default(),
+            log_level,
+            interrupt,
+        )?;
+        let long_lived_spaces = NetworkColoredSpaces::new(live_spaces, ctx);
+        interrupt()?;
+
+        if should_log(log_level) {
+            println!(
+                "Found {}x{}[nodes:{}] long-lived spaces.",
+                long_lived_spaces.colors().approx_cardinality(),
+                long_lived_spaces.spaces().approx_cardinality(),
+                long_lived_spaces.symbolic_size(),
+            );
+        }
+
+        Ok(long_lived_spaces)
     }
 
     /// Computes the minimal coloured trap spaces of the provided `network` within the specified
@@ -336,6 +444,7 @@ mod tests {
 
         let fix = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
         let essential_traps = TrapSpaces::essential_symbolic(&ctx, &stg, &unit);
+        let long_lived_traps = TrapSpaces::long_lived_symbolic(&ctx, &stg, &unit);
         let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, None);
         let minimal_traps_minus_fix = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, Some(&fix));
         let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
@@ -347,10 +456,13 @@ mod tests {
 
         assert!(minimal_traps.is_subset(&essential_traps));
         assert!(maximal_traps.is_subset(&essential_traps));
+        assert!(minimal_traps.is_subset(&long_lived_traps));
         assert_eq!(7.0, essential_traps.approx_cardinality());
         assert_eq!(7, essential_traps.spaces().iter().count());
         assert_eq!(1.0, minimal_traps.approx_cardinality());
         assert_eq!(1.0, maximal_traps.approx_cardinality());
+        // The number of long-lived traps is quite high in this model...
+        assert_eq!(16853358.0, long_lived_traps.approx_cardinality());
 
         assert!(minimal_traps.is_singleton());
         assert!(maximal_traps.is_singleton());
