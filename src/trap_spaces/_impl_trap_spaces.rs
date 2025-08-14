@@ -220,15 +220,12 @@ impl TrapSpaces {
             minimal = minimal.union(&k_minimal);
             interrupt()?;
 
-            let super_spaces = ctx.mk_super_spaces(k_minimal.as_bdd());
+            let super_spaces = ctx._mk_super_spaces(k_minimal.as_bdd(), log_level, interrupt)?;
             let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
             remaining = remaining.minus(&super_spaces);
             interrupt()?;
 
-            if log_essential(
-                log_level,
-                remaining.symbolic_size() + minimal.symbolic_size(),
-            ) {
+            if should_log(log_level) {
                 println!(
                     "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] minimal traps found, at most {} free variables tested.",
                     remaining.colors().approx_cardinality(),
