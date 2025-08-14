@@ -227,7 +227,7 @@ impl TrapSpaces {
 
             if should_log(log_level) {
                 println!(
-                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] minimal traps found, at most {} free variables tested.",
+                    "Minimization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] minimal spaces found, at most {} free variables tested.",
                     remaining.colors().approx_cardinality(),
                     remaining.spaces().approx_cardinality(),
                     remaining.symbolic_size(),
@@ -266,43 +266,55 @@ impl TrapSpaces {
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let mut original = spaces.clone();
+        let mut remaining = spaces.clone();
         let mut maximal = ctx.mk_empty_colored_spaces();
-
         if should_log(log_level) {
             println!(
                 "Start maximal subspace search with {}x{}[nodes:{}] candidates.",
-                original.colors().approx_cardinality(),
-                original.spaces().approx_cardinality(),
-                original.symbolic_size()
+                remaining.colors().approx_cardinality(),
+                remaining.spaces().approx_cardinality(),
+                remaining.symbolic_size()
             );
         }
+        interrupt()?;
 
-        while !original.is_empty() {
-            let maximum_candidate = original.pick_space();
+        while !remaining.is_empty() {
+            let most_free_path = remaining
+                .spaces()
+                .as_bdd()
+                .most_positive_valuation()
+                .unwrap();
+
+            let mut free_vars = 0;
+            for (t_var, f_var) in &ctx.dual_variables {
+                if most_free_path[*t_var] && most_free_path[*f_var] {
+                    free_vars += 1;
+                }
+            }
+
+            let k_free = ctx.mk_exactly_k_free_spaces(free_vars);
+            let k_maximal = remaining.intersect_spaces(&k_free);
+            assert!(!k_maximal.is_empty());
             interrupt()?;
 
-            // Compute the set of strict sub spaces.
-            let super_spaces = ctx.mk_sub_spaces(maximum_candidate.as_bdd());
-            let super_spaces = NetworkColoredSpaces::new(super_spaces, ctx);
+            maximal = maximal.union(&k_maximal);
             interrupt()?;
 
-            original = original.minus(&super_spaces);
-            maximal = maximal.minus(&super_spaces).union(&maximum_candidate);
+            let sub_spaces = ctx._mk_sub_spaces(k_maximal.as_bdd(), log_level, interrupt)?;
+            let sub_spaces = NetworkColoredSpaces::new(sub_spaces, ctx);
+            remaining = remaining.minus(&sub_spaces);
             interrupt()?;
 
-            if log_essential(
-                log_level,
-                original.symbolic_size() + maximal.symbolic_size(),
-            ) {
+            if should_log(log_level) {
                 println!(
-                    "Maximization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] candidates.",
-                    original.colors().approx_cardinality(),
-                    original.spaces().approx_cardinality(),
-                    original.symbolic_size(),
+                    "Maximization in progress: {}x{}[nodes:{}] unprocessed, {}x{}[nodes:{}] maximal spaces found, at least {} free variables tested.",
+                    remaining.colors().approx_cardinality(),
+                    remaining.spaces().approx_cardinality(),
+                    remaining.symbolic_size(),
                     maximal.colors().approx_cardinality(),
                     maximal.spaces().approx_cardinality(),
                     maximal.symbolic_size(),
+                    free_vars,
                 );
             }
         }
@@ -310,7 +322,7 @@ impl TrapSpaces {
         if should_log(log_level) {
             println!(
                 "Found {}[nodes:{}] maximal spaces.",
-                maximal.approx_cardinality(),
+                maximal.exact_cardinality(),
                 maximal.symbolic_size(),
             );
         }
