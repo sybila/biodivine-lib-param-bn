@@ -9,18 +9,21 @@ use biodivine_lib_bdd::{BddPartialValuation, BddVariable};
 use std::fmt::{Debug, Formatter};
 use z3::ast::Bool;
 
-impl Debug for BnSolverModel<'_> {
+impl Debug for BnSolverModel {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}", self.model)
     }
 }
 
-impl<'z3> BnSolverModel<'z3> {
-    pub fn new(context: &'z3 BnSolverContext<'z3>, model: z3::Model<'z3>) -> BnSolverModel<'z3> {
-        BnSolverModel { context, model }
+impl BnSolverModel {
+    pub fn new(context: &BnSolverContext, model: z3::Model) -> BnSolverModel {
+        BnSolverModel {
+            context: context.clone(),
+            model,
+        }
     }
 
-    pub fn as_z3_model(&self) -> &z3::Model<'z3> {
+    pub fn as_z3_model(&self) -> &z3::Model {
         &self.model
     }
 
@@ -81,6 +84,7 @@ impl<'z3> BnSolverModel<'z3> {
     pub fn get_state(&self) -> ArrayBitVector {
         let data: Vec<bool> = self
             .context
+            .data
             .variable_constants
             .iter()
             .map(|var| self.get_bool(var))
@@ -90,7 +94,7 @@ impl<'z3> BnSolverModel<'z3> {
 
     /// **(internal)** A helper method for reading the value of a Boolean term from
     /// the underlying model.
-    fn get_bool(&self, term: &Bool<'z3>) -> bool {
+    fn get_bool(&self, term: &Bool) -> bool {
         self.model.eval(term, true).unwrap().as_bool().unwrap()
     }
 
@@ -141,8 +145,8 @@ impl<'z3> BnSolverModel<'z3> {
     ///
     /// Note that it is your responsibility to ensure that the variable expressions match the
     /// order of variables in the original Boolean network.
-    pub fn get_raw_state(&self, variables: &[Bool<'z3>]) -> Vec<bool> {
-        assert_eq!(variables.len(), self.context.network.num_vars());
+    pub fn get_raw_state(&self, variables: &[Bool]) -> Vec<bool> {
+        assert_eq!(variables.len(), self.context.data.network.num_vars());
         let mut state = Vec::new();
         for var in variables {
             state.push(self.get_bool(var));
@@ -150,11 +154,7 @@ impl<'z3> BnSolverModel<'z3> {
         state
     }
 
-    pub fn get_space(
-        &self,
-        positive_variables: &[Bool<'z3>],
-        negative_variables: &[Bool<'z3>],
-    ) -> Space {
+    pub fn get_space(&self, positive_variables: &[Bool], negative_variables: &[Bool]) -> Space {
         let mut space = Space::new(self.context.as_network());
         let ones = self.get_raw_state(positive_variables);
         let zeros = self.get_raw_state(negative_variables);

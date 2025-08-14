@@ -630,11 +630,11 @@ impl FixedPoints {
     /// However, you can conceivably use it to sample the space of possible fixed-points
     /// using various values for the `restriction` set.
     #[cfg(feature = "solver-z3")]
-    pub fn solver_iterator<'z3>(
-        context: &'z3 BnSolverContext<'z3>,
+    pub fn solver_iterator(
+        context: &BnSolverContext,
         positive_restrictions: &[Space],
         negative_restriction: &[Space],
-    ) -> SolverIterator<'z3> {
+    ) -> SolverIterator {
         let solver = Self::make_fixed_points_solver(context);
         solver.assert_within_spaces(positive_restrictions);
         solver.assert_not_within_spaces(negative_restriction);
@@ -644,11 +644,11 @@ impl FixedPoints {
     /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
     /// the unique fixed-point vertices, ignoring the associated colors.
     #[cfg(feature = "solver-z3")]
-    pub fn solver_vertex_iterator<'z3>(
-        context: &'z3 BnSolverContext<'z3>,
+    pub fn solver_vertex_iterator(
+        context: &BnSolverContext,
         positive_restrictions: &[Space],
         negative_restriction: &[Space],
-    ) -> SolverVertexIterator<'z3> {
+    ) -> SolverVertexIterator {
         let solver = Self::make_fixed_points_solver(context);
         solver.assert_within_spaces(positive_restrictions);
         solver.assert_not_within_spaces(negative_restriction);
@@ -658,11 +658,11 @@ impl FixedPoints {
     /// Same as `FixedPoints::solver_iterator`, but the resulting iterator only goes through
     /// the unique fixed-point colors, ignoring the associated colors.
     #[cfg(feature = "solver-z3")]
-    pub fn solver_color_iterator<'z3>(
-        context: &'z3 BnSolverContext<'z3>,
+    pub fn solver_color_iterator(
+        context: &BnSolverContext,
         positive_restrictions: &[Space],
         negative_restriction: &[Space],
-    ) -> SolverColorIterator<'z3> {
+    ) -> SolverColorIterator {
         let solver = Self::make_fixed_points_solver(context);
         solver.assert_within_spaces(positive_restrictions);
         solver.assert_not_within_spaces(negative_restriction);
@@ -675,7 +675,7 @@ impl FixedPoints {
     /// This is mainly for building very custom fixed-point iterators, and you don't have to call
     /// it explicitly unless you really know that you need a custom solver.
     #[cfg(feature = "solver-z3")]
-    pub fn make_fixed_points_solver<'z3>(context: &'z3 BnSolverContext<'z3>) -> BnSolver<'z3> {
+    pub fn make_fixed_points_solver(context: &BnSolverContext) -> BnSolver {
         // Make a solver with all static constraints applied.
         let solver = context.mk_network_solver();
 

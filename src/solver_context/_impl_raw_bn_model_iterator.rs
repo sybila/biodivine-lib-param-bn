@@ -2,12 +2,9 @@ use crate::solver_context::{BnSolver, BnSolverModel, RawBnModelIterator};
 use z3::SatResult::Sat;
 use z3::ast::Bool;
 
-impl<'z3> RawBnModelIterator<'z3> {
+impl RawBnModelIterator {
     /// Construct a new iterator using the given solver.
-    pub fn new(
-        solver: BnSolver<'z3>,
-        enumeration_terms: Vec<Bool<'z3>>,
-    ) -> RawBnModelIterator<'z3> {
+    pub fn new(solver: BnSolver, enumeration_terms: Vec<Bool>) -> RawBnModelIterator {
         RawBnModelIterator {
             solver,
             enumeration_terms,
@@ -24,24 +21,24 @@ impl<'z3> RawBnModelIterator<'z3> {
     ///
     /// If you modify the solver in any way, you have to undo all your changes before calling
     /// `next` on the iterator again.
-    pub fn as_solver(&self) -> &BnSolver<'z3> {
+    pub fn as_solver(&self) -> &BnSolver {
         &self.solver
     }
 
     /// Get a reference to the underlying solver.
     ///
     /// Same restrictions as in `Self::as_solver` apply.
-    pub fn as_z3_solver(&self) -> &z3::Solver<'z3> {
+    pub fn as_z3_solver(&self) -> &z3::Solver {
         self.solver.as_z3_solver()
     }
 
     /// Get a reference to the underlying enumeration terms.
-    pub fn enumeration_terms(&self) -> &Vec<Bool<'_>> {
+    pub fn enumeration_terms(&self) -> &Vec<Bool> {
         &self.enumeration_terms
     }
 
     /// A utility method to read the current model of the underlying solver.
-    pub fn get_z3_model(&self) -> Option<z3::Model<'z3>> {
+    pub fn get_z3_model(&self) -> Option<z3::Model> {
         self.solver.get_z3_model()
     }
 
@@ -49,27 +46,27 @@ impl<'z3> RawBnModelIterator<'z3> {
     ///
     /// In theory, you can use this method to "replay" the last iterator item,
     /// but don't quote me on that.
-    pub fn get_model(&self) -> Option<BnSolverModel<'z3>> {
+    pub fn get_model(&self) -> Option<BnSolverModel> {
         self.solver.get_model()
     }
 
     /// Use the enumeration term specified by `index` to assert that its value must be
     /// different from what it currently is in the given `model`.
-    fn block_term(&self, model: &z3::Model<'z3>, index: usize) -> Bool<'z3> {
+    fn block_term(&self, model: &z3::Model, index: usize) -> Bool {
         self.fix_term(model, index).not()
     }
 
     /// Use the enumeration term specified by `index` to assert that its value must be
     /// the same as in the given `model`.
-    fn fix_term(&self, model: &z3::Model<'z3>, index: usize) -> Bool<'z3> {
-        let term: &Bool<'z3> = &self.enumeration_terms[index];
+    fn fix_term(&self, model: &z3::Model, index: usize) -> Bool {
+        let term: &Bool = &self.enumeration_terms[index];
         let term_value = model.eval(term, true).unwrap();
         self.enumeration_terms[index].iff(&term_value)
     }
 }
 
-impl<'z3> Iterator for RawBnModelIterator<'z3> {
-    type Item = z3::Model<'z3>;
+impl Iterator for RawBnModelIterator {
+    type Item = z3::Model;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.stack.is_empty() {

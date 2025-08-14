@@ -1,14 +1,15 @@
-use crate::solver_context::{BnSolver, BnSolverContext};
+use crate::solver_context::{BnSolver, BnSolverContext, BnSolverContextData};
 use crate::{BinaryOp, BooleanNetwork, FnUpdate, ParameterId, VariableId};
 use crate::{ExtendedBoolean, Space};
+use std::rc::Rc;
 use z3::ast::{Ast, Bool};
 use z3::{FuncDecl, Solver, Sort};
 
-impl<'z3> BnSolverContext<'z3> {
+impl BnSolverContext {
     /// Wrap a `BooleanNetwork` into a `SolverContext` that is attached to the given Z3
     /// context. `SolverContext` will then create the network variables and parameters in this
     /// Z3 context for future manipulation.
-    pub fn new(z3: &'z3 z3::Context, network: BooleanNetwork) -> BnSolverContext<'z3> {
+    pub fn new(z3: &z3::Context, network: BooleanNetwork) -> BnSolverContext {
         let bool_sort = Sort::bool(z3);
 
         let variable_constructors = network
@@ -52,25 +53,30 @@ impl<'z3> BnSolverContext<'z3> {
             })
             .collect::<Vec<_>>();
 
-        BnSolverContext {
+        let data = BnSolverContextData {
             network,
-            z3,
+            z3: z3.clone(),
             variable_constructors,
             variable_constants,
             explicit_parameter_constructors,
             implicit_parameter_constructors,
+        };
+
+        BnSolverContext {
+            data: Rc::new(data),
         }
     }
 
     /// Create fresh declarations of `n` Boolean variables (zero-arity functions) corresponding
     /// to the `n` network variables, using the given `prefix` when naming the variables.
-    pub fn declare_state_variables(&self, prefix: &str) -> Vec<FuncDecl<'z3>> {
-        let bool_sort = Sort::bool(self.z3);
-        self.network
+    pub fn declare_state_variables(&self, prefix: &str) -> Vec<FuncDecl> {
+        let bool_sort = Sort::bool(self.as_z3());
+        self.data
+            .network
             .variables()
             .map(|it| {
-                let name = format!("{}{}", prefix, self.network.get_variable_name(it));
-                FuncDecl::new(self.z3, name.as_str(), &[], &bool_sort)
+                let name = format!("{}{}", prefix, self.data.network.get_variable_name(it));
+                FuncDecl::new(self.as_z3(), name.as_str(), &[], &bool_sort)
             })
             .collect::<Vec<_>>()
     }
@@ -79,8 +85,8 @@ impl<'z3> BnSolverContext<'z3> {
     /// corresponding to one of the network variables.
     ///
     /// The function has zero arguments and type `Bool`.
-    pub fn get_variable_constructor(&self, var: VariableId) -> &FuncDecl<'z3> {
-        &self.variable_constructors[var.to_index()]
+    pub fn get_variable_constructor(&self, var: VariableId) -> &FuncDecl {
+        &self.data.variable_constructors[var.to_index()]
     }
 
     /// Low level method to obtain the constructor of the uninterpreted function
@@ -88,8 +94,8 @@ impl<'z3> BnSolverContext<'z3> {
     ///
     /// The function arity is the same as the corresponding parameter and both arguments
     /// and return value are of type `Bool`.
-    pub fn get_explicit_parameter_constructor(&self, param: ParameterId) -> &FuncDecl<'z3> {
-        &self.explicit_parameter_constructors[param.to_index()]
+    pub fn get_explicit_parameter_constructor(&self, param: ParameterId) -> &FuncDecl {
+        &self.data.explicit_parameter_constructors[param.to_index()]
     }
 
     /// Low level method to obtain the constructor of the uninterpreted function
@@ -98,8 +104,8 @@ impl<'z3> BnSolverContext<'z3> {
     /// The function arity matches the number of regulators of `var` (the arguments
     /// also follow the order given by `network.regulators(var)`). Argument types and return
     /// type is `Bool`.
-    pub fn get_implicit_parameter_constructor(&self, var: VariableId) -> &FuncDecl<'z3> {
-        self.implicit_parameter_constructors[var.to_index()]
+    pub fn get_implicit_parameter_constructor(&self, var: VariableId) -> &FuncDecl {
+        self.data.implicit_parameter_constructors[var.to_index()]
             .as_ref()
             .unwrap()
     }
@@ -108,10 +114,10 @@ impl<'z3> BnSolverContext<'z3> {
     ///
     /// In particular, this solver does not respect the static constraints of the network's
     /// regulatory graph like monotonicity and observability.
-    pub fn mk_empty_solver(&'z3 self) -> BnSolver<'z3> {
+    pub fn mk_empty_solver(&self) -> BnSolver {
         BnSolver {
-            context: self,
-            solver: Solver::new(self.z3),
+            context: self.clone(),
+            solver: Solver::new(self.as_z3()),
         }
     }
 
@@ -120,10 +126,10 @@ impl<'z3> BnSolverContext<'z3> {
     ///
     /// Note that the constraints should not influence the network variables in any way, but they
     /// do eliminate invalid uninterpreted function instantiations.
-    pub fn mk_network_solver(&'z3 self) -> BnSolver<'z3> {
+    pub fn mk_network_solver(&self) -> BnSolver {
         let solver = self.mk_empty_solver();
 
-        for reg in self.network.as_graph().regulations() {
+        for reg in self.data.network.as_graph().regulations() {
             let source = reg.get_regulator();
             let target = reg.get_target();
             if reg.is_observable() {
@@ -138,13 +144,13 @@ impl<'z3> BnSolverContext<'z3> {
     }
 
     /// Get an existing AST node representing the validity of the given network variable.
-    pub fn var(&self, var: VariableId) -> &Bool<'z3> {
-        &self.variable_constants[var.to_index()]
+    pub fn var(&self, var: VariableId) -> &Bool {
+        &self.data.variable_constants[var.to_index()]
     }
 
     /// Create a new AST node representing the validity of the given network variable.
-    pub fn mk_var(&self, var: VariableId) -> Bool<'z3> {
-        self.variable_constructors[var.to_index()]
+    pub fn mk_var(&self, var: VariableId) -> Bool {
+        self.data.variable_constructors[var.to_index()]
             .apply(&[])
             .as_bool()
             .unwrap()
@@ -152,12 +158,12 @@ impl<'z3> BnSolverContext<'z3> {
 
     /// Create an AST node representing the validity of the given explicit parameter
     /// under the given arguments.
-    pub fn mk_explicit_parameter(&self, parameter: ParameterId, args: &[VariableId]) -> Bool<'z3> {
+    pub fn mk_explicit_parameter(&self, parameter: ParameterId, args: &[VariableId]) -> Bool {
         // I have no idea if this is the best way to do this, but right now, I've got
         // nothing better.
         let args: Vec<Bool> = args.iter().map(|it| self.mk_var(*it)).collect::<Vec<_>>();
-        let arg_refs: Vec<&dyn Ast<'z3>> = args.iter().map(|it| it as &dyn Ast).collect();
-        self.explicit_parameter_constructors[parameter.to_index()]
+        let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
+        self.data.explicit_parameter_constructors[parameter.to_index()]
             .apply(&arg_refs)
             .as_bool()
             .unwrap()
@@ -165,17 +171,13 @@ impl<'z3> BnSolverContext<'z3> {
 
     /// Create an AST node representing the validity of the given explicit parameter
     /// under the given constant arguments.
-    pub fn mk_explicit_const_parameter(
-        &'z3 self,
-        parameter: ParameterId,
-        args: &[bool],
-    ) -> Bool<'z3> {
-        let args: Vec<Bool<'z3>> = args
+    pub fn mk_explicit_const_parameter(&self, parameter: ParameterId, args: &[bool]) -> Bool {
+        let args: Vec<Bool> = args
             .iter()
             .map(|it| Bool::from_bool(self.as_z3(), *it))
             .collect::<Vec<_>>();
-        let arg_refs: Vec<&dyn Ast<'z3>> = args.iter().map(|it| it as &dyn Ast).collect();
-        self.explicit_parameter_constructors[parameter.to_index()]
+        let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
+        self.data.explicit_parameter_constructors[parameter.to_index()]
             .apply(&arg_refs)
             .as_bool()
             .unwrap()
@@ -183,16 +185,17 @@ impl<'z3> BnSolverContext<'z3> {
 
     /// Create an AST node representing the validity of the given implicit parameter
     /// under the regulators declared in the associated network.
-    pub fn mk_implicit_parameter(&self, var: VariableId) -> Bool<'z3> {
-        assert!(self.network.get_update_function(var).is_none());
+    pub fn mk_implicit_parameter(&self, var: VariableId) -> Bool {
+        assert!(self.data.network.get_update_function(var).is_none());
         let args = self
+            .data
             .network
             .regulators(var)
             .into_iter()
             .map(|it| self.mk_var(it))
             .collect::<Vec<_>>();
         let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
-        self.implicit_parameter_constructors[var.to_index()]
+        self.data.implicit_parameter_constructors[var.to_index()]
             .as_ref()
             .unwrap()
             .apply(&arg_refs)
@@ -202,14 +205,14 @@ impl<'z3> BnSolverContext<'z3> {
 
     /// Create an AST node representing the validity of the given implicit parameter
     /// under the given constant values.
-    pub fn mk_implicit_const_parameter(&'z3 self, var: VariableId, args: &[bool]) -> Bool<'z3> {
-        assert!(self.network.get_update_function(var).is_none());
+    pub fn mk_implicit_const_parameter(&self, var: VariableId, args: &[bool]) -> Bool {
+        assert!(self.data.network.get_update_function(var).is_none());
         let args = args
             .iter()
             .map(|it| Bool::from_bool(self.as_z3(), *it))
             .collect::<Vec<_>>();
         let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
-        self.implicit_parameter_constructors[var.to_index()]
+        self.data.implicit_parameter_constructors[var.to_index()]
             .as_ref()
             .unwrap()
             .apply(&arg_refs)
@@ -219,12 +222,12 @@ impl<'z3> BnSolverContext<'z3> {
 
     /// Create an AST node representing the update function (or implicit parameter) of the
     /// given network variable.
-    pub fn mk_update_function(&self, var: VariableId) -> Bool<'z3> {
-        if let Some(function) = self.network.get_update_function(var) {
+    pub fn mk_update_function(&self, var: VariableId) -> Bool {
+        if let Some(function) = self.data.network.get_update_function(var) {
             self.translate_update_function(
                 function,
-                &self.variable_constructors,
-                &self.explicit_parameter_constructors,
+                &self.data.variable_constructors,
+                &self.data.explicit_parameter_constructors,
             )
         } else {
             self.mk_implicit_parameter(var)
@@ -232,18 +235,14 @@ impl<'z3> BnSolverContext<'z3> {
     }
 
     /// Build a formula that is satisfied by all states which belong to the given subspace.
-    pub fn mk_space(&'z3 self, space: &Space) -> Bool<'z3> {
-        self.translate_space(space, &self.variable_constructors)
+    pub fn mk_space(&self, space: &Space) -> Bool {
+        self.translate_space(space, &self.data.variable_constructors)
     }
 
     /// A helper method for translating between a `Space` and Z3 AST.
     ///
     /// You can supply your own variable constructors.
-    pub fn translate_space(
-        &'z3 self,
-        space: &Space,
-        variable_constructors: &[FuncDecl<'z3>],
-    ) -> Bool<'z3> {
+    pub fn translate_space(&self, space: &Space, variable_constructors: &[FuncDecl]) -> Bool {
         let mut args = Vec::new();
         for var in self.as_network().variables() {
             let term = variable_constructors[var.to_index()]
@@ -258,7 +257,7 @@ impl<'z3> BnSolverContext<'z3> {
                 ExtendedBoolean::Any => (),
             }
         }
-        let args: Vec<&Bool<'z3>> = args.iter().collect();
+        let args: Vec<&Bool> = args.iter().collect();
         Bool::and(self.as_z3(), &args)
     }
 
@@ -269,11 +268,11 @@ impl<'z3> BnSolverContext<'z3> {
     pub fn translate_update_function(
         &self,
         update: &FnUpdate,
-        variable_constructors: &[FuncDecl<'z3>],
-        parameter_constructors: &[FuncDecl<'z3>],
-    ) -> Bool<'z3> {
+        variable_constructors: &[FuncDecl],
+        parameter_constructors: &[FuncDecl],
+    ) -> Bool {
         match update {
-            FnUpdate::Const(value) => Bool::from_bool(self.z3, *value),
+            FnUpdate::Const(value) => Bool::from_bool(self.as_z3(), *value),
             FnUpdate::Var(id) => {
                 // Call the variable constructor - result must be a Bool because variables
                 // are declared as Bools
@@ -293,7 +292,7 @@ impl<'z3> BnSolverContext<'z3> {
                         )
                     })
                     .collect::<Vec<_>>();
-                let arg_refs: Vec<&dyn Ast<'z3>> = args.iter().map(|it| it as &dyn Ast).collect();
+                let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
                 parameter_constructors[id.to_index()]
                     .apply(&arg_refs)
                     .as_bool()
@@ -319,8 +318,8 @@ impl<'z3> BnSolverContext<'z3> {
                     parameter_constructors,
                 );
                 match op {
-                    BinaryOp::And => Bool::and(self.z3, &[&left, &right]),
-                    BinaryOp::Or => Bool::or(self.z3, &[&left, &right]),
+                    BinaryOp::And => Bool::and(self.as_z3(), &[&left, &right]),
+                    BinaryOp::Or => Bool::or(self.as_z3(), &[&left, &right]),
                     BinaryOp::Xor => left.xor(&right),
                     BinaryOp::Iff => left.iff(&right),
                     BinaryOp::Imp => left.implies(&right),
@@ -330,10 +329,10 @@ impl<'z3> BnSolverContext<'z3> {
     }
 
     pub fn as_z3(&self) -> &z3::Context {
-        self.z3
+        &self.data.z3
     }
 
     pub fn as_network(&self) -> &BooleanNetwork {
-        &self.network
+        &self.data.network
     }
 }

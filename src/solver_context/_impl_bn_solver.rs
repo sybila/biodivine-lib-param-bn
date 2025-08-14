@@ -4,17 +4,17 @@ use std::ops::Not;
 use z3::ast::{Ast, Bool, forall_const};
 use z3::{FuncDecl, SatResult, Solver};
 
-impl<'z3> BnSolver<'z3> {
+impl BnSolver {
     pub fn as_z3(&self) -> &z3::Context {
-        self.context.z3
+        &self.context.data.z3
     }
 
-    pub fn as_z3_solver(&self) -> &Solver<'z3> {
+    pub fn as_z3_solver(&self) -> &Solver {
         &self.solver
     }
 
-    pub fn as_context(&self) -> &BnSolverContext<'z3> {
-        self.context
+    pub fn as_context(&self) -> &BnSolverContext {
+        &self.context
     }
 
     pub fn check(&self) -> SatResult {
@@ -25,16 +25,16 @@ impl<'z3> BnSolver<'z3> {
     ///
     /// The result is `None` if last check was not `Sat`, or if `check` was not called
     /// after last assertions were added.
-    pub fn get_model(&self) -> Option<BnSolverModel<'z3>> {
+    pub fn get_model(&self) -> Option<BnSolverModel> {
         self.solver.get_model().map(|it| BnSolverModel {
-            context: self.context,
+            context: self.context.clone(),
             model: it,
         })
     }
 
     /// Retrieve the native model stored by the solver. All restrictions and caveats
     /// of `get_model` apply as well.
-    pub fn get_z3_model(&self) -> Option<z3::Model<'z3>> {
+    pub fn get_z3_model(&self) -> Option<z3::Model> {
         self.solver.get_model()
     }
 
@@ -49,11 +49,11 @@ impl<'z3> BnSolver<'z3> {
     /// Add an assertion to this solver that the results must be within
     /// some of the given subspaces.
     pub fn assert_within_spaces(&self, spaces: &[Space]) {
-        let spaces: Vec<Bool<'z3>> = spaces
+        let spaces: Vec<Bool> = spaces
             .iter()
             .map(|space| self.context.mk_space(space))
             .collect();
-        let spaces: Vec<&Bool<'z3>> = spaces.iter().collect();
+        let spaces: Vec<&Bool> = spaces.iter().collect();
         let assertion = Bool::or(self.as_z3(), &spaces);
         self.solver.assert(&assertion);
     }
@@ -61,11 +61,11 @@ impl<'z3> BnSolver<'z3> {
     /// Add an assertion to this solver that the results must **not** be within any of the
     /// given subspaces.
     pub fn assert_not_within_spaces(&self, spaces: &[Space]) {
-        let spaces: Vec<Bool<'z3>> = spaces
+        let spaces: Vec<Bool> = spaces
             .iter()
             .map(|space| self.context.mk_space(space))
             .collect();
-        let spaces: Vec<&Bool<'z3>> = spaces.iter().collect();
+        let spaces: Vec<&Bool> = spaces.iter().collect();
         let assertion = Bool::or(self.as_z3(), &spaces).not();
         self.solver.assert(&assertion);
     }
@@ -75,7 +75,7 @@ impl<'z3> BnSolver<'z3> {
     ///
     /// The function panics if `source` is not an input of the `target` update function.
     pub fn assert_regulation_observability(&self, source: VariableId, target: VariableId) {
-        let regulators = self.context.network.regulators(target);
+        let regulators = self.context.data.network.regulators(target);
         assert!(regulators.contains(&source));
 
         let mut positive_update = self.context.mk_update_function(target);
@@ -110,7 +110,7 @@ impl<'z3> BnSolver<'z3> {
         target: VariableId,
         monotonicity: Monotonicity,
     ) {
-        let regulators = self.context.network.regulators(target);
+        let regulators = self.context.data.network.regulators(target);
         assert!(regulators.contains(&source));
 
         let mut positive_update = self.context.mk_update_function(target);
@@ -153,7 +153,7 @@ impl<'z3> BnSolver<'z3> {
     /// must be observable.
     ///
     /// Panics if the argument is outside of function arity, or the function isn't Boolean.
-    pub fn assert_function_observability(&self, function: &FuncDecl<'z3>, i: usize) {
+    pub fn assert_function_observability(&self, function: &FuncDecl, i: usize) {
         assert!(i < function.arity());
         // (exists) x1...x(n-1) such that f(x1,...,x(n-1),1) != f(x1,...,x(n-1),0)
         let fresh_args: Vec<Bool> = (0..function.arity())
@@ -187,7 +187,7 @@ impl<'z3> BnSolver<'z3> {
     /// Panics if the argument is outside of function arity, or the function isn't Boolean.
     pub fn assert_function_monotonicity(
         &self,
-        function: &FuncDecl<'z3>,
+        function: &FuncDecl,
         i: usize,
         monotonicity: Monotonicity,
     ) {

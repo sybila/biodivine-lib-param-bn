@@ -7,6 +7,7 @@
 //!
 
 use crate::BooleanNetwork;
+use std::rc::Rc;
 use z3::ast::Bool;
 use z3::{FuncDecl, Model, Solver};
 
@@ -17,13 +18,19 @@ mod _impl_raw_bn_model_iterator;
 
 /// A helper object that tracks the mapping between Boolean network entities and variables
 /// or uninterpreted functions in Z3.
-pub struct BnSolverContext<'z3> {
+#[derive(Clone)]
+pub struct BnSolverContext {
+    data: Rc<BnSolverContextData>,
+}
+
+/// Internal structure which actually contains all the data managed by [`BnSolverContext`].
+struct BnSolverContextData {
     network: BooleanNetwork,
-    z3: &'z3 z3::Context,
-    variable_constructors: Vec<FuncDecl<'z3>>,
-    variable_constants: Vec<Bool<'z3>>,
-    explicit_parameter_constructors: Vec<FuncDecl<'z3>>,
-    implicit_parameter_constructors: Vec<Option<FuncDecl<'z3>>>,
+    z3: z3::Context,
+    variable_constructors: Vec<FuncDecl>,
+    variable_constants: Vec<Bool>,
+    explicit_parameter_constructors: Vec<FuncDecl>,
+    implicit_parameter_constructors: Vec<Option<FuncDecl>>,
 }
 
 /// A helper object that encapsulates Z3 `Solver` with an API that is more friendly when used
@@ -32,9 +39,9 @@ pub struct BnSolverContext<'z3> {
 /// At the moment, it mostly contains utility methods for translating static regulation
 /// constraints to solver constraints, such that the space of admissible interpretations
 /// is captured correctly.
-pub struct BnSolver<'z3> {
-    context: &'z3 BnSolverContext<'z3>,
-    solver: Solver<'z3>,
+pub struct BnSolver {
+    context: BnSolverContext,
+    solver: Solver,
 }
 
 /// A helper object that encapsulates Z3 `Model` with API that is more friendly when used for
@@ -54,9 +61,9 @@ pub struct BnSolver<'z3> {
 ///     but it is not exported to `z3`. It would be nice to add support for it, and then add
 ///     some kind of wrapper in this crate so that it can safely interact with Boolean network
 ///     and similar objects.
-pub struct BnSolverModel<'z3> {
-    context: &'z3 BnSolverContext<'z3>,
-    model: Model<'z3>,
+pub struct BnSolverModel {
+    context: BnSolverContext,
+    model: Model,
 }
 
 /// An iterator which goes through `BnSolverModel` instances that satisfy a particular
@@ -80,12 +87,12 @@ pub struct BnSolverModel<'z3> {
 ///
 /// The enumeration approach is based on this more involved discussion:
 /// <https://stackoverflow.com/questions/11867611/z3py-checking-all-solutions-for-equation/70656700#70656700>
-pub struct RawBnModelIterator<'z3> {
-    solver: BnSolver<'z3>,
-    enumeration_terms: Vec<Bool<'z3>>,
+pub struct RawBnModelIterator {
+    solver: BnSolver,
+    enumeration_terms: Vec<Bool>,
     // Stack which guides the exhaustive search.
     //  - Model is a saved copy of the model which is used for conditioning at this "layer".
     //  - First integer is the index of the first enumeration term that we consider.
     //  - Second integer is the index of the conditioning term for this iteration.
-    stack: Vec<(Model<'z3>, usize, usize)>,
+    stack: Vec<(Model, usize, usize)>,
 }

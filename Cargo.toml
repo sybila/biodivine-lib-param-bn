@@ -48,7 +48,7 @@ num-bigint = "0.4.6"            # Used as infinite-precision representation in B
 num-traits = "0.2.19"          # `BigInt::to_f64`
 roxmltree = "0.20.0"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
-z3 = { version = "0.13.3", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
+z3 = { version = "0.14.2", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
 
 [dev-dependencies]
 pretty_assertions = "1.4.0"
