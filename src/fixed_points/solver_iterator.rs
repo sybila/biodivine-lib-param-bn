@@ -40,9 +40,9 @@ impl SolverIterator {
     /// Don't use it unless you are really sure you need a custom solver.
     pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverIterator {
         let mut enumeration_terms = Vec::new();
-        enumeration_terms.append(&mut variable_enumeration_terms(context));
-        enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
-        enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
+        enumeration_terms.extend(variable_enumeration_terms(context));
+        enumeration_terms.extend(explicit_parameter_enumeration_terms(context));
+        enumeration_terms.extend(implicit_parameter_enumeration_terms(context));
 
         SolverIterator {
             context: context.clone(),
@@ -64,7 +64,7 @@ impl SolverVertexIterator {
     pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverVertexIterator {
         // List only vertex enumeration terms.
         let mut enumeration_terms = Vec::new();
-        enumeration_terms.append(&mut variable_enumeration_terms(context));
+        enumeration_terms.extend(variable_enumeration_terms(context));
 
         SolverVertexIterator {
             context: context.clone(),
@@ -88,8 +88,8 @@ impl SolverColorIterator {
     pub fn new_with_solver(context: &BnSolverContext, solver: BnSolver) -> SolverColorIterator {
         // List only vertex enumeration terms.
         let mut enumeration_terms = Vec::new();
-        enumeration_terms.append(&mut explicit_parameter_enumeration_terms(context));
-        enumeration_terms.append(&mut implicit_parameter_enumeration_terms(context));
+        enumeration_terms.extend(explicit_parameter_enumeration_terms(context));
+        enumeration_terms.extend(implicit_parameter_enumeration_terms(context));
 
         SolverColorIterator {
             context: context.clone(),

@@ -5,7 +5,7 @@ use std::rc::Rc;
 use z3::ast::{Ast, Bool};
 use z3::{FuncDecl, Solver, Sort};
 
-impl<'z3> BnSolverContext {
+impl BnSolverContext {
     /// Wrap a `BooleanNetwork` into a `SolverContext` that is attached to the given Z3
     /// context. `SolverContext` will then create the network variables and parameters in this
     /// Z3 context for future manipulation.
@@ -114,7 +114,7 @@ impl<'z3> BnSolverContext {
     ///
     /// In particular, this solver does not respect the static constraints of the network's
     /// regulatory graph like monotonicity and observability.
-    pub fn mk_empty_solver(&'z3 self) -> BnSolver {
+    pub fn mk_empty_solver(&self) -> BnSolver {
         BnSolver {
             context: self.clone(),
             solver: Solver::new(self.as_z3()),
@@ -126,7 +126,7 @@ impl<'z3> BnSolverContext {
     ///
     /// Note that the constraints should not influence the network variables in any way, but they
     /// do eliminate invalid uninterpreted function instantiations.
-    pub fn mk_network_solver(&'z3 self) -> BnSolver {
+    pub fn mk_network_solver(&self) -> BnSolver {
         let solver = self.mk_empty_solver();
 
         for reg in self.data.network.as_graph().regulations() {
@@ -171,7 +171,7 @@ impl<'z3> BnSolverContext {
 
     /// Create an AST node representing the validity of the given explicit parameter
     /// under the given constant arguments.
-    pub fn mk_explicit_const_parameter(&'z3 self, parameter: ParameterId, args: &[bool]) -> Bool {
+    pub fn mk_explicit_const_parameter(&self, parameter: ParameterId, args: &[bool]) -> Bool {
         let args: Vec<Bool> = args
             .iter()
             .map(|it| Bool::from_bool(self.as_z3(), *it))
@@ -205,7 +205,7 @@ impl<'z3> BnSolverContext {
 
     /// Create an AST node representing the validity of the given implicit parameter
     /// under the given constant values.
-    pub fn mk_implicit_const_parameter(&'z3 self, var: VariableId, args: &[bool]) -> Bool {
+    pub fn mk_implicit_const_parameter(&self, var: VariableId, args: &[bool]) -> Bool {
         assert!(self.data.network.get_update_function(var).is_none());
         let args = args
             .iter()
@@ -235,14 +235,14 @@ impl<'z3> BnSolverContext {
     }
 
     /// Build a formula that is satisfied by all states which belong to the given subspace.
-    pub fn mk_space(&'z3 self, space: &Space) -> Bool {
+    pub fn mk_space(&self, space: &Space) -> Bool {
         self.translate_space(space, &self.data.variable_constructors)
     }
 
     /// A helper method for translating between a `Space` and Z3 AST.
     ///
     /// You can supply your own variable constructors.
-    pub fn translate_space(&'z3 self, space: &Space, variable_constructors: &[FuncDecl]) -> Bool {
+    pub fn translate_space(&self, space: &Space, variable_constructors: &[FuncDecl]) -> Bool {
         let mut args = Vec::new();
         for var in self.as_network().variables() {
             let term = variable_constructors[var.to_index()]
