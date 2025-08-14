@@ -232,7 +232,7 @@ impl SymbolicSpaceContext {
     ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
-        for (t_var, f_var) in self.dual_variables.iter().rev() {
+        for (i, (t_var, f_var)) in self.dual_variables.iter().rev().enumerate() {
             // Select every space in which we have `t_var=false`, but there is
             // no equivalent space with `t_var=true`. Flips `t_var` on output,
             // meaning we actually get the set of super spaces where `true` is added.
@@ -262,7 +262,9 @@ impl SymbolicSpaceContext {
                 interrupt()?;
                 if log_essential(log_level, result.size()) {
                     println!(
-                        "Computing super-spaces: {}[nodes:{}].",
+                        "Computing super-spaces[{}/{}]: {}[nodes:{}].",
+                        i + 1,
+                        self.dual_variables.len(),
                         result.cardinality(),
                         result.size(),
                     );
@@ -288,7 +290,7 @@ impl SymbolicSpaceContext {
     ) -> Result<Bdd, E> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
-        for (t_var, f_var) in self.dual_variables.clone().into_iter().rev() {
+        for (i, (t_var, f_var)) in self.dual_variables.clone().into_iter().rev().enumerate() {
             // A value can go down only in subspaces where both variables are set.
             // If only one variable is set, going down will just break the encoding.
             let can_go_down = bdd!(vars, t_var & f_var);
@@ -319,7 +321,9 @@ impl SymbolicSpaceContext {
 
                 if log_essential(log_level, result.size()) {
                     println!(
-                        "Computing sub-spaces: {}[nodes:{}].",
+                        "Computing sub-spaces[{}/{}]: {}[nodes:{}].",
+                        i + 1,
+                        self.dual_variables.len(),
                         result.cardinality(),
                         result.size(),
                     );
