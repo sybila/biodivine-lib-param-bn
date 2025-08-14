@@ -1,6 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use crate::fixed_points::FixedPoints;
-use crate::symbolic_async_graph::SymbolicAsyncGraph;
+use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext, TrapSpaces};
 use crate::{global_log_level, log_essential, never_stop, should_log};
 use std::collections::HashSet;
@@ -107,26 +107,28 @@ impl TrapSpaces {
     /// `restriction` set.
     ///
     /// This is similar to running [Self::essential_symbolic] and [Self::minimize], but the
-    /// method adds an extra optimization step. Before computing all "non-trivial" minimal trap
-    /// spaces, it first searches for fixed points using [FixedPoints::symbolic] and excludes
-    /// them from trap space search. Asymptotically, this is not really helpful, but the encoding
-    /// for fixed-points is simpler, so the overhead is greatly reduced by doing it this way.
+    /// method adds an extra optional optimization step. Before computing all "non-trivial"
+    /// minimal trap spaces, it can first exclude all trap spaces that are already known to
+    /// contain a fixed-point (given as `exclude_fixed_points` parameter). **These fixed points
+    /// then won't be part of the result.** In some cases, this can help speed up trap space
+    /// search. However, it is not universally better and is therefore left as an
+    /// optional parameter (if the set of fixed points is very complex, it can complicate the
+    /// trap space search, even though the number of results is strictly smaller). Note that
+    /// the method assumes the provided `exclude_fixed_points` set is correct, i.e. it won't check
+    /// that it only contains fixed points. In theory, you can also use this to exclude
+    /// super-spaces of any vertex.
     ///
-    /// Note that in rare cases, it can be actually faster to just run [Self::essential_symbolic]
-    /// and [Self::minimize], simply because the set of fixed-points is complex and complicates
-    /// subsequent search for essential trap spaces. As such, it is possible to disable this
-    /// behavior using the `optimize_fixed_points` flag.
     pub fn minimal_symbolic(
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
-        optimize_fixed_points: bool,
+        exclude_fixed_points: Option<&GraphColoredVertices>,
     ) -> NetworkColoredSpaces {
         Self::_minimal_symbolic(
             ctx,
             graph,
             restriction,
-            optimize_fixed_points,
+            exclude_fixed_points,
             global_log_level(),
             &never_stop,
         )
@@ -139,36 +141,33 @@ impl TrapSpaces {
         ctx: &SymbolicSpaceContext,
         graph: &SymbolicAsyncGraph,
         restriction: &NetworkColoredSpaces,
-        optimize_fixed_points: bool,
+        exclude_fixed_points: Option<&GraphColoredVertices>,
         log_level: usize,
         interrupt: &F,
     ) -> Result<NetworkColoredSpaces, E> {
-        let (restriction, fixed_points) = if optimize_fixed_points {
+        let restriction = if let Some(exclude_fixed_points) = exclude_fixed_points {
             if should_log(log_level) {
                 println!(
-                    "Prepare for minimal trap space computation by first computing fixed points."
+                    "Prepare for minimal trap space computation by first eliminating provided fixed-points."
                 );
             }
-            let restriction_vertices = restriction.to_colored_vertices(ctx);
-            let fixed_points =
-                FixedPoints::_symbolic(graph, &restriction_vertices, log_level, interrupt)?;
-            let fixed_points = fixed_points.to_singleton_spaces(ctx);
+            let fixed_points = exclude_fixed_points.to_singleton_spaces(ctx);
             let fix_super_spaces =
                 ctx._mk_super_spaces(fixed_points.as_bdd(), log_level, interrupt)?;
             let fix_super_spaces = NetworkColoredSpaces::new(fix_super_spaces, ctx);
             let restriction = restriction.minus(&fix_super_spaces);
             if should_log(log_level) {
                 println!(
-                    "Fixed points computed. Restriction set reduced to {} elements.",
+                    "Fixed points eliminated. Restriction set reduced to {} elements.",
                     restriction.exact_cardinality()
                 );
             }
-            (restriction, fixed_points)
+            restriction
         } else {
-            (restriction.clone(), ctx.mk_empty_colored_spaces())
+            restriction.clone()
         };
         let essential = Self::_essential_symbolic(ctx, graph, &restriction, log_level, interrupt)?;
-        Ok(Self::_minimize(ctx, &essential, log_level, interrupt)?.union(&fixed_points))
+        Self::_minimize(ctx, &essential, log_level, interrupt)
     }
 
     /// Compute the minimal spaces within a particular subset.
@@ -327,6 +326,7 @@ impl TrapSpaces {
 mod tests {
     use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
+    use crate::fixed_points::FixedPoints;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{SymbolicSpaceContext, TrapSpaces};
 
@@ -337,9 +337,16 @@ mod tests {
         let stg = SymbolicAsyncGraph::with_space_context(&network, &ctx).unwrap();
         let unit = ctx.mk_unit_colored_spaces(&stg);
 
+        let fix = FixedPoints::symbolic(&stg, stg.unit_colored_vertices());
         let essential_traps = TrapSpaces::essential_symbolic(&ctx, &stg, &unit);
-        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, true);
+        let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, None);
+        let minimal_traps_minus_fix = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit, Some(&fix));
         let maximal_traps = TrapSpaces::maximize(&ctx, &essential_traps);
+
+        assert_eq!(
+            minimal_traps_minus_fix,
+            minimal_traps.minus(&fix.to_singleton_spaces(&ctx))
+        );
 
         assert!(minimal_traps.is_subset(&essential_traps));
         assert!(maximal_traps.is_subset(&essential_traps));

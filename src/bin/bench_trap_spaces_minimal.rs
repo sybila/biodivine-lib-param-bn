@@ -9,7 +9,7 @@ fn main() {
     let stg = SymbolicAsyncGraph::with_space_context(&bn, &ctx).unwrap();
 
     let unit_set = ctx.mk_unit_colored_spaces(&stg);
-    let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit_set, false);
+    let minimal_traps = TrapSpaces::minimal_symbolic(&ctx, &stg, &unit_set, None);
     println!(
         "Found {}/{}({}) minimal trap(s).",
         minimal_traps.spaces().approx_cardinality(),
