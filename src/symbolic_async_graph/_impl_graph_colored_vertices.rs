@@ -9,7 +9,7 @@ use crate::symbolic_async_graph::{
 };
 use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 
 /// Basic utility operations.
 impl GraphColoredVertices {
@@ -60,7 +60,7 @@ impl GraphColoredVertices {
     }
 
     /// Compute exact `BigInt` cardinality of this set.
-    pub fn exact_cardinality(&self) -> BigInt {
+    pub fn exact_cardinality(&self) -> BigUint {
         BddSet::exact_cardinality(self)
     }
 
@@ -246,7 +246,7 @@ mod tests {
     use crate::BooleanNetwork;
     use crate::biodivine_std::traits::Set;
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
-    use num_bigint::BigInt;
+    use num_bigint::BigUint;
     use num_traits::One;
 
     #[test]
@@ -260,7 +260,7 @@ mod tests {
 
         let singleton = unit.pick_singleton();
         assert_eq!(1.0, singleton.approx_cardinality());
-        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        assert_eq!(BigUint::one(), singleton.exact_cardinality());
         let singleton_color = singleton.colors();
         let singleton_vertices = singleton.vertices();
         assert!(singleton_color.is_singleton());

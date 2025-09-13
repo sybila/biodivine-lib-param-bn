@@ -5,7 +5,7 @@ use crate::symbolic_async_graph::projected_iteration::{FnUpdateProjection, RawPr
 use crate::symbolic_async_graph::{GraphColoredVertices, GraphColors, SymbolicAsyncGraph};
 use crate::trap_spaces::{NetworkColoredSpaces, NetworkSpaces, SymbolicSpaceContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 
 impl NetworkColoredSpaces {
     /// Construct a new [NetworkColoredSpaces] from a raw [Bdd] and a [SymbolicSpaceContext].
@@ -46,7 +46,7 @@ impl NetworkColoredSpaces {
     }
 
     /// Compute exact `BigInt` cardinality of this set.
-    pub fn exact_cardinality(&self) -> BigInt {
+    pub fn exact_cardinality(&self) -> BigUint {
         BddSet::exact_cardinality(self)
     }
 
@@ -229,7 +229,7 @@ mod tests {
     use crate::symbolic_async_graph::SymbolicAsyncGraph;
     use crate::trap_spaces::{NetworkColoredSpaces, SymbolicSpaceContext};
     use crate::{BooleanNetwork, ExtendedBoolean, Space};
-    use num_bigint::BigInt;
+    use num_bigint::BigUint;
     use num_traits::One;
 
     #[test]
@@ -244,7 +244,7 @@ mod tests {
 
         let singleton = unit.pick_singleton();
         assert_eq!(1.0, singleton.approx_cardinality());
-        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        assert_eq!(BigUint::one(), singleton.exact_cardinality());
         let singleton_color = singleton.colors();
         let singleton_space = singleton.spaces();
         assert!(singleton_color.is_singleton());

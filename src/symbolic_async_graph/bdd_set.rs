@@ -1,6 +1,6 @@
 use crate::biodivine_std::traits::Set;
 use biodivine_lib_bdd::Bdd;
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use num_traits::ToPrimitive;
 use std::ops::Shr;
 
@@ -27,7 +27,7 @@ pub trait BddSet {
     }
 
     /// Compute the exact cardinality of this symbolic set.
-    fn exact_cardinality(&self) -> BigInt {
+    fn exact_cardinality(&self) -> BigUint {
         let unused_variables = self.as_bdd().num_vars() - self.active_variables();
         self.as_bdd().exact_cardinality().shr(unused_variables)
     }

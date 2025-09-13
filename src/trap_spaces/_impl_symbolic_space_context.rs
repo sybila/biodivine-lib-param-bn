@@ -467,7 +467,7 @@ mod tests {
     use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
     use crate::{BooleanNetwork, FnUpdate, Space, VariableId};
     use biodivine_lib_bdd::bdd;
-    use num_bigint::BigInt;
+    use num_bigint::BigUint;
 
     #[test]
     fn test_basic_getter_functionality() {
@@ -693,7 +693,7 @@ mod tests {
 
         // Zero-size spaces are exactly vertices:
         let size_0 = ctx.mk_exactly_k_free_spaces(0);
-        assert_eq!(size_0.exact_cardinality(), BigInt::from(2 * 2 * 2 * 2));
+        assert_eq!(size_0.exact_cardinality(), BigUint::from(2u32 * 2 * 2 * 2));
 
         // Size four is exactly one subspace (****).
         let size_4 = ctx.mk_exactly_k_free_spaces(4);
@@ -701,7 +701,7 @@ mod tests {
 
         // Size one is 4 * 2^3
         let size_1 = ctx.mk_exactly_k_free_spaces(1);
-        assert_eq!(size_1.exact_cardinality(), BigInt::from(4 * 8));
+        assert_eq!(size_1.exact_cardinality(), BigUint::from(4u32 * 8));
     }
 
     #[test]
@@ -737,7 +737,7 @@ mod tests {
         assert_eq!(a_can_be_true, b_can_be_true);
         assert_eq!(
             NetworkSpaces::new(a_can_be_true, &ctx).exact_cardinality(),
-            BigInt::from(6)
+            BigUint::from(6u32)
         );
 
         let a_goes_up = ctx
@@ -756,21 +756,21 @@ mod tests {
         assert_ne!(a_goes_up, b_goes_up);
         assert_eq!(
             NetworkSpaces::new(a_goes_up, &ctx).exact_cardinality(),
-            BigInt::from(0)
+            BigUint::from(0u32)
         );
         assert_eq!(
             NetworkSpaces::new(b_goes_up, &ctx).exact_cardinality(),
-            BigInt::from(4)
+            BigUint::from(4u32)
         );
 
         // The down case is symmetric.
         assert_eq!(
             NetworkSpaces::new(a_goes_down, &ctx).exact_cardinality(),
-            BigInt::from(0)
+            BigUint::from(0u32)
         );
         assert_eq!(
             NetworkSpaces::new(b_goes_down, &ctx).exact_cardinality(),
-            BigInt::from(4)
+            BigUint::from(4u32)
         );
     }
 }
