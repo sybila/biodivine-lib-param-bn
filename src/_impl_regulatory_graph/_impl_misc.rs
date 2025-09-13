@@ -51,7 +51,7 @@ impl RegulatoryGraph {
 
     /// Remove a [Regulation] from this [RegulatoryGraph] assuming it exists.
     ///
-    /// Note that if there is a [BooleanNetwork] that uses this graph internally, this can make some if its functions
+    /// Note that if there is a [crate::BooleanNetwork] that uses this graph internally, this can make some if its functions
     /// invalid if they depend on the existence of this regulation.
     pub fn remove_regulation(
         &mut self,

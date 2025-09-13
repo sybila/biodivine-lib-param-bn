@@ -224,7 +224,7 @@ impl BnSolverContext {
     /// given network variable.
     pub fn mk_update_function(&self, var: VariableId) -> Bool {
         if let Some(function) = self.data.network.get_update_function(var) {
-            self.translate_update_function(
+            Self::translate_update_function(
                 function,
                 &self.data.variable_constructors,
                 &self.data.explicit_parameter_constructors,
@@ -266,7 +266,6 @@ impl BnSolverContext {
     /// It explicitly takes as arguments the variable and parameter constructors such that you
     /// can build the AST using other than the default set of variables if you so desire.
     pub fn translate_update_function(
-        &self,
         update: &FnUpdate,
         variable_constructors: &[FuncDecl],
         parameter_constructors: &[FuncDecl],
@@ -285,7 +284,7 @@ impl BnSolverContext {
                 let args: Vec<Bool> = args
                     .iter()
                     .map(|it| {
-                        self.translate_update_function(
+                        Self::translate_update_function(
                             it,
                             variable_constructors,
                             parameter_constructors,
@@ -299,7 +298,7 @@ impl BnSolverContext {
                     .unwrap()
             }
             FnUpdate::Not(inner) => {
-                let inner = self.translate_update_function(
+                let inner = Self::translate_update_function(
                     inner,
                     variable_constructors,
                     parameter_constructors,
@@ -307,12 +306,12 @@ impl BnSolverContext {
                 inner.not()
             }
             FnUpdate::Binary(op, left, right) => {
-                let left = self.translate_update_function(
+                let left = Self::translate_update_function(
                     left,
                     variable_constructors,
                     parameter_constructors,
                 );
-                let right = self.translate_update_function(
+                let right = Self::translate_update_function(
                     right,
                     variable_constructors,
                     parameter_constructors,

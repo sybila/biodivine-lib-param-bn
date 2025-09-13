@@ -178,7 +178,7 @@ impl BnSolver {
         let pos_invoke = function.apply(&positive_args).as_bool().unwrap();
         let neg_invoke = function.apply(&negative_args).as_bool().unwrap();
 
-        self.solver.assert(&pos_invoke.iff(&neg_invoke).not());
+        self.solver.assert(pos_invoke.iff(&neg_invoke).not());
     }
 
     /// Add an assertion to this solver that the `i`-th argument of the given Boolean function must

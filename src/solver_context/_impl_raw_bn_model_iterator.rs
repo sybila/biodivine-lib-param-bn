@@ -104,10 +104,9 @@ impl Iterator for RawBnModelIterator {
             } else {
                 // Apply the current block term restriction.
                 self.solver.push();
-                self.as_z3_solver()
-                    .assert(&self.block_term(&model, i_block));
+                self.as_z3_solver().assert(self.block_term(&model, i_block));
                 for i in i_start..i_block {
-                    self.as_z3_solver().assert(&self.fix_term(&model, i));
+                    self.as_z3_solver().assert(self.fix_term(&model, i));
                 }
 
                 if self.solver.check() == Sat {
