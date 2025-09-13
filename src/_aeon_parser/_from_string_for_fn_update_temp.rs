@@ -192,11 +192,11 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
         } else if data.len() == 2 {
             // If more tokens remain, it means this should be a parameter (function call).
             // Anything else is invalid.
-            if let Token::Name(name) = &data[0] {
-                if let Token::Tokens(args) = &data[1] {
-                    let args = read_args(args)?;
-                    return Ok(Box::new(Param(name.clone(), args)));
-                }
+            if let Token::Name(name) = &data[0]
+                && let Token::Tokens(args) = &data[1]
+            {
+                let args = read_args(args)?;
+                return Ok(Box::new(Param(name.clone(), args)));
             }
         }
         Err(format!("Unexpected: {:?}. Expecting formula.", data))

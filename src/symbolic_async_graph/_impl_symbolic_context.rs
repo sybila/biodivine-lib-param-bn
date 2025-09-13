@@ -276,18 +276,15 @@ impl SymbolicContext {
                 }
             }
             for function in &self.implicit_function_tables {
-                if let Some(function) = function.as_ref() {
-                    if function.contains(var) {
-                        let new_table = FunctionTable::new(
-                            function.name.as_str(),
-                            function.arity,
-                            &mut builder,
-                        );
-                        to_skip = new_table.rows.len() - 1;
-                        assert!(next_var_id > 0);
-                        implicit_function_tables[next_var_id - 1] = Some(new_table);
-                        continue 'var_loop;
-                    }
+                if let Some(function) = function.as_ref()
+                    && function.contains(var)
+                {
+                    let new_table =
+                        FunctionTable::new(function.name.as_str(), function.arity, &mut builder);
+                    to_skip = new_table.rows.len() - 1;
+                    assert!(next_var_id > 0);
+                    implicit_function_tables[next_var_id - 1] = Some(new_table);
+                    continue 'var_loop;
                 }
             }
             unreachable!("There shouldn't be any other symbolic variables.");

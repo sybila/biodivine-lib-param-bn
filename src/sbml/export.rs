@@ -24,10 +24,10 @@ impl BooleanNetwork {
             "<sbml xmlns=\"http://www.sbml.org/sbml/level3/version1/core\" layout:required=\"false\" level=\"3\" qual:required=\"true\" xmlns:layout=\"http://www.sbml.org/sbml/level3/version1/layout/version1\" version=\"1\" xmlns:qual=\"http://www.sbml.org/sbml/level3/version1/qual/version1\">"
         )?;
         write!(out, "<model>")?;
-        if let Some(layout) = layout {
-            if !layout.is_empty() {
-                write_layout(out, layout)?;
-            }
+        if let Some(layout) = layout
+            && !layout.is_empty()
+        {
+            write_layout(out, layout)?;
         }
         self.write_species(out)?;
         self.write_transitions(out)?;
