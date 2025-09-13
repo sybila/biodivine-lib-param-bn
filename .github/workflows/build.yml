@@ -122,8 +122,6 @@ jobs:
     needs: test
     name: Code coverage
     runs-on: ubuntu-latest
-    env:
-      CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
     steps:
       - name: Checkout.
         uses: actions/checkout@v4
@@ -152,7 +150,9 @@ jobs:
         uses: codecov/codecov-action@v4
         if: ${{ env.CODECOV_TOKEN != '' }}
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
+        env:
+          CODECOV_TOKEN: "${{ secrets.CODECOV_TOKEN }}"
       - name: Archive code coverage results
         uses: actions/upload-artifact@v4
         with:
