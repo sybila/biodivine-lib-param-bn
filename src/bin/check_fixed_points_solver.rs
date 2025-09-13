@@ -28,8 +28,7 @@ fn main() {
         model.num_parameters()
     );
 
-    let z3 = z3::Context::new(&z3::Config::new());
-    let ctx = BnSolverContext::new(&z3, model.clone());
+    let ctx = BnSolverContext::new(model.clone());
     let stg = SymbolicAsyncGraph::new(&model).unwrap();
 
     let all_vertices = vec![Space::new(&model)];

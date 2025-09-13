@@ -26,7 +26,7 @@ pub struct BnSolverContext {
 /// Internal structure which actually contains all the data managed by [`BnSolverContext`].
 struct BnSolverContextData {
     network: BooleanNetwork,
-    z3: z3::Context,
+    z3: z3::Context, // This is no longer needed, only keeping it for compatibility reasons.
     variable_constructors: Vec<FuncDecl>,
     variable_constants: Vec<Bool>,
     explicit_parameter_constructors: Vec<FuncDecl>,

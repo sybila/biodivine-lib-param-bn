@@ -97,7 +97,7 @@ impl Iterator for RawBnModelIterator {
                     // This was the last item, we are done.
                     // Just add an explicit contradiction to the solver
                     // so that it is not satisfiable ever again.
-                    let contradiction = Bool::from_bool(self.as_z3(), false);
+                    let contradiction = Bool::from_bool(false);
                     self.as_z3_solver().assert(&contradiction);
                     return None;
                 }
