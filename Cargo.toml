@@ -41,14 +41,14 @@ solver-z3 = ["dep:z3"]
 
 [dependencies]
 fxhash = "0.2.1"
-regex = "1.11.1"                # Regexes used for parsing of basic .aeon constructs.
-lazy_static = "1.5.0"           # Used for initialization of commonly used regexes.
-biodivine-lib-bdd = ">=0.5.26, <1.0.0"
-num-bigint = "0.4.6"            # Used as infinite-precision representation in BDDs.
-num-traits = "0.2.19"          # `BigInt::to_f64`
+regex = "1.11"                # Regexes used for parsing of basic .aeon constructs.
+lazy_static = "1.5"           # Used for initialization of commonly used regexes.
+biodivine-lib-bdd = ">=0.6.1, <1.0.0"
+num-bigint = "0.4"            # Used as infinite-precision representation in BDDs.
+num-traits = "0.2"          # `BigInt::to_f64`
 roxmltree = "0.20.0"            # Used for SBML parsing.
 bitvector = "0.1.5"             # Represents Boolean states of complex networks.
-z3 = { version = "0.14.2", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
+z3 = { version = "0.18.2", optional = true }     # Used for fixed-point enumeration (and hopefully other things soon).
 
 [dev-dependencies]
-pretty_assertions = "1.4.0"
+pretty_assertions = "1.4"

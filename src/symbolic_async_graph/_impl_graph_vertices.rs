@@ -6,7 +6,7 @@ use crate::symbolic_async_graph::projected_iteration::{RawProjection, StateProje
 use crate::symbolic_async_graph::{GraphVertexIterator, GraphVertices, SymbolicContext};
 use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use std::convert::TryFrom;
 
 impl GraphVertices {
@@ -42,7 +42,7 @@ impl GraphVertices {
     }
 
     /// Compute exact `BigInt` cardinality of this set.
-    pub fn exact_cardinality(&self) -> BigInt {
+    pub fn exact_cardinality(&self) -> BigUint {
         BddSet::exact_cardinality(self)
     }
 

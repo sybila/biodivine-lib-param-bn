@@ -9,14 +9,14 @@ impl BnSolverContext {
     /// Wrap a `BooleanNetwork` into a `SolverContext` that is attached to the given Z3
     /// context. `SolverContext` will then create the network variables and parameters in this
     /// Z3 context for future manipulation.
-    pub fn new(z3: &z3::Context, network: BooleanNetwork) -> BnSolverContext {
-        let bool_sort = Sort::bool(z3);
+    pub fn new(network: BooleanNetwork) -> BnSolverContext {
+        let bool_sort = Sort::bool();
 
         let variable_constructors = network
             .variables()
             .map(|it| {
                 let name = network.get_variable_name(it);
-                FuncDecl::new(z3, name.as_str(), &[], &bool_sort)
+                FuncDecl::new(name.as_str(), &[], &bool_sort)
             })
             .collect::<Vec<_>>();
 
@@ -33,7 +33,7 @@ impl BnSolverContext {
                 let domain = (0..param.get_arity())
                     .map(|_| &bool_sort)
                     .collect::<Vec<_>>();
-                FuncDecl::new(z3, name.as_str(), &domain, &bool_sort)
+                FuncDecl::new(name.as_str(), &domain, &bool_sort)
             })
             .collect::<Vec<_>>();
 
@@ -46,7 +46,7 @@ impl BnSolverContext {
                     let domain = (0..regulators.len())
                         .map(|_| &bool_sort)
                         .collect::<Vec<_>>();
-                    Some(FuncDecl::new(z3, name.as_str(), &domain, &bool_sort))
+                    Some(FuncDecl::new(name.as_str(), &domain, &bool_sort))
                 } else {
                     None
                 }
@@ -55,7 +55,7 @@ impl BnSolverContext {
 
         let data = BnSolverContextData {
             network,
-            z3: z3.clone(),
+            z3: z3::Context::thread_local(),
             variable_constructors,
             variable_constants,
             explicit_parameter_constructors,
@@ -70,13 +70,13 @@ impl BnSolverContext {
     /// Create fresh declarations of `n` Boolean variables (zero-arity functions) corresponding
     /// to the `n` network variables, using the given `prefix` when naming the variables.
     pub fn declare_state_variables(&self, prefix: &str) -> Vec<FuncDecl> {
-        let bool_sort = Sort::bool(self.as_z3());
+        let bool_sort = Sort::bool();
         self.data
             .network
             .variables()
             .map(|it| {
                 let name = format!("{}{}", prefix, self.data.network.get_variable_name(it));
-                FuncDecl::new(self.as_z3(), name.as_str(), &[], &bool_sort)
+                FuncDecl::new(name.as_str(), &[], &bool_sort)
             })
             .collect::<Vec<_>>()
     }
@@ -117,7 +117,7 @@ impl BnSolverContext {
     pub fn mk_empty_solver(&self) -> BnSolver {
         BnSolver {
             context: self.clone(),
-            solver: Solver::new(self.as_z3()),
+            solver: Solver::new(),
         }
     }
 
@@ -174,7 +174,7 @@ impl BnSolverContext {
     pub fn mk_explicit_const_parameter(&self, parameter: ParameterId, args: &[bool]) -> Bool {
         let args: Vec<Bool> = args
             .iter()
-            .map(|it| Bool::from_bool(self.as_z3(), *it))
+            .map(|it| Bool::from_bool(*it))
             .collect::<Vec<_>>();
         let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
         self.data.explicit_parameter_constructors[parameter.to_index()]
@@ -209,7 +209,7 @@ impl BnSolverContext {
         assert!(self.data.network.get_update_function(var).is_none());
         let args = args
             .iter()
-            .map(|it| Bool::from_bool(self.as_z3(), *it))
+            .map(|it| Bool::from_bool(*it))
             .collect::<Vec<_>>();
         let arg_refs: Vec<&dyn Ast> = args.iter().map(|it| it as &dyn Ast).collect();
         self.data.implicit_parameter_constructors[var.to_index()]
@@ -224,7 +224,7 @@ impl BnSolverContext {
     /// given network variable.
     pub fn mk_update_function(&self, var: VariableId) -> Bool {
         if let Some(function) = self.data.network.get_update_function(var) {
-            self.translate_update_function(
+            Self::translate_update_function(
                 function,
                 &self.data.variable_constructors,
                 &self.data.explicit_parameter_constructors,
@@ -258,7 +258,7 @@ impl BnSolverContext {
             }
         }
         let args: Vec<&Bool> = args.iter().collect();
-        Bool::and(self.as_z3(), &args)
+        Bool::and(&args)
     }
 
     /// A helper method for translating between update functions and Z3 AST.
@@ -266,13 +266,12 @@ impl BnSolverContext {
     /// It explicitly takes as arguments the variable and parameter constructors such that you
     /// can build the AST using other than the default set of variables if you so desire.
     pub fn translate_update_function(
-        &self,
         update: &FnUpdate,
         variable_constructors: &[FuncDecl],
         parameter_constructors: &[FuncDecl],
     ) -> Bool {
         match update {
-            FnUpdate::Const(value) => Bool::from_bool(self.as_z3(), *value),
+            FnUpdate::Const(value) => Bool::from_bool(*value),
             FnUpdate::Var(id) => {
                 // Call the variable constructor - result must be a Bool because variables
                 // are declared as Bools
@@ -285,7 +284,7 @@ impl BnSolverContext {
                 let args: Vec<Bool> = args
                     .iter()
                     .map(|it| {
-                        self.translate_update_function(
+                        Self::translate_update_function(
                             it,
                             variable_constructors,
                             parameter_constructors,
@@ -299,7 +298,7 @@ impl BnSolverContext {
                     .unwrap()
             }
             FnUpdate::Not(inner) => {
-                let inner = self.translate_update_function(
+                let inner = Self::translate_update_function(
                     inner,
                     variable_constructors,
                     parameter_constructors,
@@ -307,19 +306,19 @@ impl BnSolverContext {
                 inner.not()
             }
             FnUpdate::Binary(op, left, right) => {
-                let left = self.translate_update_function(
+                let left = Self::translate_update_function(
                     left,
                     variable_constructors,
                     parameter_constructors,
                 );
-                let right = self.translate_update_function(
+                let right = Self::translate_update_function(
                     right,
                     variable_constructors,
                     parameter_constructors,
                 );
                 match op {
-                    BinaryOp::And => Bool::and(self.as_z3(), &[&left, &right]),
-                    BinaryOp::Or => Bool::or(self.as_z3(), &[&left, &right]),
+                    BinaryOp::And => Bool::and(&[&left, &right]),
+                    BinaryOp::Or => Bool::or(&[&left, &right]),
                     BinaryOp::Xor => left.xor(&right),
                     BinaryOp::Iff => left.iff(&right),
                     BinaryOp::Imp => left.implies(&right),

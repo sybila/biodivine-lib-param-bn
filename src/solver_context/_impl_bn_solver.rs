@@ -54,7 +54,7 @@ impl BnSolver {
             .map(|space| self.context.mk_space(space))
             .collect();
         let spaces: Vec<&Bool> = spaces.iter().collect();
-        let assertion = Bool::or(self.as_z3(), &spaces);
+        let assertion = Bool::or(&spaces);
         self.solver.assert(&assertion);
     }
 
@@ -66,7 +66,7 @@ impl BnSolver {
             .map(|space| self.context.mk_space(space))
             .collect();
         let spaces: Vec<&Bool> = spaces.iter().collect();
-        let assertion = Bool::or(self.as_z3(), &spaces).not();
+        let assertion = Bool::or(&spaces).not();
         self.solver.assert(&assertion);
     }
 
@@ -85,12 +85,12 @@ impl BnSolver {
             let reg_var = self.context.mk_var(reg);
 
             if reg == source {
-                let one = Bool::from_bool(self.as_z3(), true);
-                let zero = Bool::from_bool(self.as_z3(), false);
+                let one = Bool::from_bool(true);
+                let zero = Bool::from_bool(false);
                 positive_update = positive_update.substitute(&[(&reg_var, &one)]);
                 negative_update = negative_update.substitute(&[(&reg_var, &zero)]);
             } else {
-                let fresh = Bool::fresh_const(self.as_z3(), "_o_");
+                let fresh = Bool::fresh_const("_o_");
                 positive_update = positive_update.substitute(&[(&reg_var, &fresh)]);
                 negative_update = negative_update.substitute(&[(&reg_var, &fresh)]);
             }
@@ -122,12 +122,12 @@ impl BnSolver {
             let reg_var = self.context.mk_var(reg);
 
             if reg == source {
-                let one = Bool::from_bool(self.as_z3(), true);
-                let zero = Bool::from_bool(self.as_z3(), false);
+                let one = Bool::from_bool(true);
+                let zero = Bool::from_bool(false);
                 positive_update = positive_update.substitute(&[(&reg_var, &one)]);
                 negative_update = negative_update.substitute(&[(&reg_var, &zero)]);
             } else {
-                let fresh = Bool::fresh_const(self.as_z3(), "_m_");
+                let fresh = Bool::fresh_const("_m_");
                 positive_update = positive_update.substitute(&[(&reg_var, &fresh)]);
                 negative_update = negative_update.substitute(&[(&reg_var, &fresh)]);
                 bounds.push(fresh);
@@ -144,7 +144,7 @@ impl BnSolver {
 
         let bounds: Vec<&dyn Ast> = bounds.iter().map(|it| it as &dyn Ast).collect();
 
-        let assertion = forall_const(self.as_z3(), &bounds, &[], &assertion);
+        let assertion = forall_const(&bounds, &[], &assertion);
 
         self.solver.assert(&assertion);
     }
@@ -157,13 +157,13 @@ impl BnSolver {
         assert!(i < function.arity());
         // (exists) x1...x(n-1) such that f(x1,...,x(n-1),1) != f(x1,...,x(n-1),0)
         let fresh_args: Vec<Bool> = (0..function.arity())
-            .map(|_| Bool::fresh_const(self.as_z3(), "_o_"))
+            .map(|_| Bool::fresh_const("_o_"))
             .collect();
         let mut positive_args: Vec<&dyn Ast> = Vec::new();
         let mut negative_args: Vec<&dyn Ast> = Vec::new();
 
-        let one = Bool::from_bool(self.as_z3(), true);
-        let zero = Bool::from_bool(self.as_z3(), false);
+        let one = Bool::from_bool(true);
+        let zero = Bool::from_bool(false);
 
         for (j, arg) in fresh_args.iter().enumerate() {
             if i == j {
@@ -178,7 +178,7 @@ impl BnSolver {
         let pos_invoke = function.apply(&positive_args).as_bool().unwrap();
         let neg_invoke = function.apply(&negative_args).as_bool().unwrap();
 
-        self.solver.assert(&pos_invoke.iff(&neg_invoke).not());
+        self.solver.assert(pos_invoke.iff(&neg_invoke).not());
     }
 
     /// Add an assertion to this solver that the `i`-th argument of the given Boolean function must
@@ -194,13 +194,13 @@ impl BnSolver {
         assert!(i < function.arity());
         // (forall) x1...x(n-1) holds that f(x1,...,x(n-1),1) <= f(x1,...,x(n-1),0) (or >=)
         let fresh_args: Vec<Bool> = (0..function.arity())
-            .map(|_| Bool::fresh_const(self.as_z3(), "_m_"))
+            .map(|_| Bool::fresh_const("_m_"))
             .collect();
         let mut positive_args: Vec<&dyn Ast> = Vec::new();
         let mut negative_args: Vec<&dyn Ast> = Vec::new();
 
-        let one = Bool::from_bool(self.as_z3(), true);
-        let zero = Bool::from_bool(self.as_z3(), false);
+        let one = Bool::from_bool(true);
+        let zero = Bool::from_bool(false);
 
         for (j, arg) in fresh_args.iter().enumerate() {
             if i == j {
@@ -225,7 +225,7 @@ impl BnSolver {
 
         let bounds: Vec<&dyn Ast> = fresh_args.iter().map(|it| it as &dyn Ast).collect();
 
-        let assertion = forall_const(self.as_z3(), &bounds, &[], &assertion);
+        let assertion = forall_const(&bounds, &[], &assertion);
 
         self.solver.assert(&assertion);
     }
@@ -258,8 +258,7 @@ mod tests {
         let b = bn.as_graph().find_variable("b").unwrap();
         let c = bn.as_graph().find_variable("c").unwrap();
 
-        let z3 = z3::Context::new(&z3::Config::new());
-        let ctx = BnSolverContext::new(&z3, bn.clone());
+        let ctx = BnSolverContext::new(bn.clone());
         let solver = ctx.mk_empty_solver();
 
         // Regulation `c -> a` is declared but not used.
@@ -323,8 +322,7 @@ mod tests {
         let f = bn.find_parameter("f").unwrap();
         let g = bn.find_parameter("g").unwrap();
 
-        let z3 = z3::Context::new(&z3::Config::new());
-        let ctx = BnSolverContext::new(&z3, bn.clone());
+        let ctx = BnSolverContext::new(bn.clone());
         let solver = ctx.mk_empty_solver();
 
         let f_z3 = ctx.get_explicit_parameter_constructor(f);

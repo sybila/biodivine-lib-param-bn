@@ -4,7 +4,7 @@ use crate::symbolic_async_graph::bdd_set::BddSet;
 use crate::symbolic_async_graph::projected_iteration::{FnUpdateProjection, RawProjection};
 use crate::symbolic_async_graph::{GraphColors, SymbolicAsyncGraph, SymbolicContext};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 use std::convert::TryFrom;
 
 impl GraphColors {
@@ -58,7 +58,7 @@ impl GraphColors {
     }
 
     /// Compute exact `BigInt` cardinality of this set.
-    pub fn exact_cardinality(&self) -> BigInt {
+    pub fn exact_cardinality(&self) -> BigUint {
         BddSet::exact_cardinality(self)
     }
 

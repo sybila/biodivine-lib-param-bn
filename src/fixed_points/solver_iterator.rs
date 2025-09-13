@@ -188,11 +188,9 @@ mod tests {
 
     #[test]
     pub fn basic_solver_test() {
-        let z3 = z3::Context::new(&z3::Config::new());
-
         let bn = BooleanNetwork::try_from_file("aeon_models/g2a_p1026.aeon").unwrap();
         let stg = SymbolicAsyncGraph::new(&bn).unwrap();
-        let ctx = BnSolverContext::new(&z3, bn.clone());
+        let ctx = BnSolverContext::new(bn.clone());
 
         let mut fixed_points = FixedPoints::naive_symbolic(&stg, stg.unit_colored_vertices());
         let mut fixed_vertices = fixed_points.vertices();

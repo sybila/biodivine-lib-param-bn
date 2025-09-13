@@ -97,17 +97,16 @@ impl Iterator for RawBnModelIterator {
                     // This was the last item, we are done.
                     // Just add an explicit contradiction to the solver
                     // so that it is not satisfiable ever again.
-                    let contradiction = Bool::from_bool(self.as_z3(), false);
+                    let contradiction = Bool::from_bool(false);
                     self.as_z3_solver().assert(&contradiction);
                     return None;
                 }
             } else {
                 // Apply the current block term restriction.
                 self.solver.push();
-                self.as_z3_solver()
-                    .assert(&self.block_term(&model, i_block));
+                self.as_z3_solver().assert(self.block_term(&model, i_block));
                 for i in i_start..i_block {
-                    self.as_z3_solver().assert(&self.fix_term(&model, i));
+                    self.as_z3_solver().assert(self.fix_term(&model, i));
                 }
 
                 if self.solver.check() == Sat {

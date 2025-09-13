@@ -5,7 +5,7 @@ use crate::symbolic_async_graph::projected_iteration::RawProjection;
 use crate::trap_spaces::{NetworkSpaces, SpaceIterator, SymbolicSpaceContext};
 use crate::{ExtendedBoolean, Space};
 use biodivine_lib_bdd::{Bdd, BddVariable};
-use num_bigint::BigInt;
+use num_bigint::BigUint;
 
 impl NetworkSpaces {
     /// Create a new set of network spaces using a "raw" [Bdd] object w.r.t. the given `context`.
@@ -41,7 +41,7 @@ impl NetworkSpaces {
     }
 
     /// The exact size of this set (i.e. number of elements).
-    pub fn exact_cardinality(&self) -> BigInt {
+    pub fn exact_cardinality(&self) -> BigUint {
         BddSet::exact_cardinality(self)
     }
 
@@ -183,7 +183,7 @@ impl Iterator for SpaceIterator {
 mod tests {
     use crate::trap_spaces::{NetworkSpaces, SymbolicSpaceContext};
     use crate::{BooleanNetwork, ExtendedBoolean, Space};
-    use num_bigint::BigInt;
+    use num_bigint::BigUint;
     use num_traits::One;
 
     #[test]
@@ -197,7 +197,7 @@ mod tests {
 
         let singleton = unit.pick_singleton();
         assert_eq!(1.0, singleton.approx_cardinality());
-        assert_eq!(BigInt::one(), singleton.exact_cardinality());
+        assert_eq!(BigUint::one(), singleton.exact_cardinality());
         assert_eq!(1, singleton.iter().count());
 
         let mut space = Space::new(&bn);
