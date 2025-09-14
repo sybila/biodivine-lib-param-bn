@@ -122,44 +122,20 @@ impl FnUpdate {
 
     /// Build an expression which is equivalent to the conjunction of the given expressions.
     pub fn mk_conjunction(items: &[FnUpdate]) -> FnUpdate {
-        if items.is_empty() {
-            // Empty conjunction is `true`.
-            return Self::mk_true();
-        }
-        if items.len() == 1 {
-            return items[0].clone();
-        }
-        if items.len() == 2 {
-            return Self::mk_binary(And, items[0].clone(), items[1].clone());
-        }
-
-        let Some(first) = items.first() else {
-            // Empty conjunction is `true`.
-            return Self::mk_true();
-        };
-        let rest = Self::mk_conjunction(&items[1..]);
-        first.clone().and(rest)
+        items
+            .iter()
+            .cloned()
+            .reduce(|acc, it| acc.and(it))
+            .unwrap_or_else(Self::mk_true)
     }
 
     /// Build an expression which is equivalent to the disjunction of the given expressions.
     pub fn mk_disjunction(items: &[FnUpdate]) -> FnUpdate {
-        if items.is_empty() {
-            // Empty conjunction is `true`.
-            return Self::mk_true();
-        }
-        if items.len() == 1 {
-            return items[0].clone();
-        }
-        if items.len() == 2 {
-            return Self::mk_binary(Or, items[0].clone(), items[1].clone());
-        }
-
-        let Some(first) = items.first() else {
-            // Empty conjunction is `true`.
-            return Self::mk_true();
-        };
-        let rest = Self::mk_disjunction(&items[1..]);
-        first.clone().or(rest)
+        items
+            .iter()
+            .cloned()
+            .reduce(|acc, it| acc.or(it))
+            .unwrap_or_else(Self::mk_false)
     }
 }
 
@@ -1118,12 +1094,14 @@ mod tests {
         .unwrap();
         let args = bn.variables().map(FnUpdate::mk_var).collect::<Vec<_>>();
         assert_eq!(
-            FnUpdate::try_from_str("a & b & c", &bn).unwrap(),
+            FnUpdate::try_from_str("(a & b) & c", &bn).unwrap(),
             FnUpdate::mk_conjunction(&args)
         );
         assert_eq!(
-            FnUpdate::try_from_str("a | b | c", &bn).unwrap(),
+            FnUpdate::try_from_str("(a | b) | c", &bn).unwrap(),
             FnUpdate::mk_disjunction(&args)
         );
+        assert_eq!(FnUpdate::mk_conjunction(&[]), FnUpdate::mk_true());
+        assert_eq!(FnUpdate::mk_disjunction(&[]), FnUpdate::mk_false());
     }
 }
