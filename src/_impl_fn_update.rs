@@ -125,7 +125,8 @@ impl FnUpdate {
         items
             .iter()
             .cloned()
-            .reduce(|acc, it| acc.and(it))
+            .rev()
+            .reduce(|acc, it| it.and(acc))
             .unwrap_or_else(Self::mk_true)
     }
 
@@ -134,7 +135,8 @@ impl FnUpdate {
         items
             .iter()
             .cloned()
-            .reduce(|acc, it| acc.or(it))
+            .rev()
+            .reduce(|acc, it| it.or(acc))
             .unwrap_or_else(Self::mk_false)
     }
 }
@@ -1093,14 +1095,26 @@ mod tests {
         )
         .unwrap();
         let args = bn.variables().map(FnUpdate::mk_var).collect::<Vec<_>>();
+        // C/C++, logical operators are right-to-left associative, which we enforce
+        // here using parentheses.
         assert_eq!(
-            FnUpdate::try_from_str("(a & b) & c", &bn).unwrap(),
+            FnUpdate::try_from_str("a & (b & c)", &bn).unwrap(),
             FnUpdate::mk_conjunction(&args)
         );
         assert_eq!(
-            FnUpdate::try_from_str("(a | b) | c", &bn).unwrap(),
+            FnUpdate::try_from_str("a | (b | c)", &bn).unwrap(),
             FnUpdate::mk_disjunction(&args)
         );
+        // However, the parser should also respect this by default.
+        assert_eq!(
+            FnUpdate::try_from_str("a & b & c", &bn).unwrap(),
+            FnUpdate::mk_conjunction(&args)
+        );
+        assert_eq!(
+            FnUpdate::try_from_str("a | b | c", &bn).unwrap(),
+            FnUpdate::mk_disjunction(&args)
+        );
+
         assert_eq!(FnUpdate::mk_conjunction(&[]), FnUpdate::mk_true());
         assert_eq!(FnUpdate::mk_disjunction(&[]), FnUpdate::mk_false());
     }
