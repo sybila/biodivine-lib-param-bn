@@ -1,0 +1,1 @@
+./target/release/bench_fixed_points_naive 100000 $1

@@ -43,7 +43,8 @@ solver-z3 = ["dep:z3"]
 fxhash = "0.2.1"
 regex = "1.11.1"                # Regexes used for parsing of basic .aeon constructs.
 lazy_static = "1.5.0"           # Used for initialization of commonly used regexes.
-biodivine-lib-bdd = ">=0.5.26, <1.0.0"
+#biodivine-lib-bdd = ">=0.5.26, <1.0.0"
+biodivine-lib-bdd = { git = "https://github.com/sybila/biodivine-lib-bdd.git", rev = "299218b8b4408b0d9ad38a17e1d40805a4877000"}
 num-bigint = "0.4.6"            # Used as infinite-precision representation in BDDs.
 num-traits = "0.2.19"          # `BigInt::to_f64`
 roxmltree = "0.20.0"            # Used for SBML parsing.

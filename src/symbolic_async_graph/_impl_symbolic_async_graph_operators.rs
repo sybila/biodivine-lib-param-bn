@@ -362,6 +362,26 @@ impl SymbolicAsyncGraph {
             })
     }
 
+    pub fn pre_with_size_target(
+        &self,
+        initial: &GraphColoredVertices,
+        target: usize,
+    ) -> GraphColoredVertices {
+        self.variables()
+            .fold(self.mk_empty_colored_vertices(), |r, v| {
+                let result = r.union(&self.var_pre(v, initial));
+                if result.as_bdd().size() > target {
+                    //println!("Exceeded size target {} with {} {}", target, result.as_bdd().size(), result.as_bdd().exact_cardinality());
+                    let approx = r.as_bdd().underapproximate_to_size(target);
+                    let result = GraphColoredVertices::new(approx, self.symbolic_context());
+                    //println!("Approximated to {} {}", result.as_bdd().size(), result.as_bdd().exact_cardinality());
+                    result
+                } else {
+                    result
+                }
+            })
+    }
+
     /// Compute the subset of `set` that can perform *some* `post` operation.
     pub fn can_post(&self, set: &GraphColoredVertices) -> GraphColoredVertices {
         self.variables()

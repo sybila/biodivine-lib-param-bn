@@ -89,7 +89,8 @@ fn global_log_level() -> usize {
 }
 
 fn log_essential(log_level: usize, symbolic_size: usize) -> bool {
-    log_level >= LOG_VERBOSE || (symbolic_size > 100_000 && log_level >= LOG_ESSENTIAL)
+    true
+    //log_level >= LOG_VERBOSE || (symbolic_size > 100_000 && log_level >= LOG_ESSENTIAL)
 }
 
 fn should_log(log_level: usize) -> bool {
