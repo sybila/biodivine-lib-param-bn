@@ -39,8 +39,12 @@ mod _impl_boolean_network;
 mod _impl_boolean_network_display;
 /// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
 mod _impl_boolean_network_from_bnet;
+/// **(internal)** Implements `.booleannet` parser for `BooleanNetwork`.
+mod _impl_boolean_network_from_booleannet;
 /// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
 mod _impl_boolean_network_to_bnet;
+/// **(internal)** Implements `.booleannet` writer for `BooleanNetwork`.
+mod _impl_boolean_network_to_booleannet;
 /// **(internal)** All methods implemented by the `ExtendedBoolean` object.
 mod _impl_extended_boolean;
 /// **(internal)** Utility methods for `FnUpdate`.
