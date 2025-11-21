@@ -1,13 +1,69 @@
 use crate::_aeon_parser::{FnUpdateTemp, RegulationTemp};
-use crate::{BooleanNetwork, Parameter, RegulatoryGraph};
+use crate::{BooleanNetwork, ModelAnnotation, Parameter, RegulatoryGraph};
 use regex::Regex;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::convert::TryFrom;
 
 impl TryFrom<&str> for BooleanNetwork {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
+        // This parsing should never fail, so it should be safe to do this...
+        let annotations = ModelAnnotation::from_model_string(value);
+
+        // If the model is requesting a declaration check, we should perform it. Otherwise,
+        // declarations are only informative.
+        let check_declarations = annotations
+            .get_child(&["check_declarations"])
+            .and_then(|it| it.value())
+            .map(|it| it.as_str() == "true")
+            .unwrap_or(false);
+
+        // Read declared variables. Variable is declared either as a string name in the "variable"
+        // annotation, or by a corresponding child annotation.
+        let expected_variables = if let Some(decl) = annotations.get_child(&["variable"]) {
+            let mut data = decl.read_multiline_value();
+            for child in decl.children().keys() {
+                data.push(child.clone());
+            }
+            data
+        } else {
+            Vec::new()
+        };
+
+        // Try to read parameter declarations from the model annotation data. A parameter is
+        // declared if it is present as a name inside "function" annotation, or if it is present
+        // as one of its children. If arity is not present, it is zero.
+        let expected_parameters = if let Some(decl) = annotations.get_child(&["function"]) {
+            let all_names = decl.read_multiline_value();
+            let mut expected = HashMap::new();
+            for name in all_names {
+                let arity = decl
+                    .get_value(&[name.as_str(), "arity"])
+                    .cloned()
+                    .unwrap_or_else(|| "0".to_string());
+                expected.insert(name, arity);
+            }
+            for (child, data) in decl.children() {
+                if !expected.contains_key(child) {
+                    let arity = data
+                        .get_value(&["arity"])
+                        .cloned()
+                        .unwrap_or_else(|| "0".to_string());
+                    expected.insert(child.clone(), arity);
+                }
+            }
+            expected
+        } else {
+            HashMap::new()
+        };
+
+        if (!expected_variables.is_empty() || !expected_parameters.is_empty())
+            && !check_declarations
+        {
+            eprintln!("WARNING: Network contains variable or function declarations, but integrity checking is turned off.");
+        }
+
         // trim lines and remove comments
         let lines = value.lines().filter_map(|l| {
             let line = l.trim();
@@ -50,6 +106,25 @@ impl TryFrom<&str> for BooleanNetwork {
         let mut variable_names: Vec<String> = variable_names.into_iter().collect();
         variable_names.sort();
 
+        // If a variable is declared, but not present in the graph, we can still create it.
+        // But if it is present yet not declared, that's a problem.
+        if check_declarations {
+            for var in &variable_names {
+                if !expected_variables.contains(var) {
+                    return Err(format!(
+                        "Variable `{}` used, but not declared in annotations.",
+                        var
+                    ));
+                }
+            }
+            for var in &expected_variables {
+                if !variable_names.contains(var) {
+                    variable_names.push(var.clone());
+                }
+            }
+            variable_names.sort();
+        }
+
         let mut rg = RegulatoryGraph::new(variable_names);
 
         for reg in regulations {
@@ -76,7 +151,33 @@ impl TryFrom<&str> for BooleanNetwork {
 
         // Add the parameters (if there is a cardinality clash, here it will be thrown).
         for parameter in &parameters {
+            if check_declarations {
+                if let Some(expected_arity) = expected_parameters.get(&parameter.name) {
+                    if &format!("{}", parameter.arity) != expected_arity {
+                        return Err(format!(
+                            "Parameter `{}` is declared with arity `{}`, but used with arity `{}`.",
+                            parameter.name, expected_arity, parameter.arity
+                        ));
+                    }
+                } else {
+                    return Err(format!(
+                        "Network has parameter `{}` that is not declared in annotations.",
+                        parameter.name
+                    ));
+                }
+            }
             bn.add_parameter(&parameter.name, parameter.arity)?;
+        }
+
+        if check_declarations {
+            for param_name in expected_parameters.keys() {
+                if bn.find_parameter(param_name).is_none() {
+                    return Err(format!(
+                        "Parameter `{}` declared in annotations, but not found in the network.",
+                        param_name
+                    ));
+                }
+            }
         }
 
         // Actually build and add the functions
@@ -199,7 +300,47 @@ mod tests {
 
     #[test]
     fn test_bn_from_and_to_string() {
-        let bn_string = "a -> b
+        // Without parameters:
+        let bn_string = format!(
+            "#!check_declarations:true
+#!variable:a
+#!variable:b
+#!variable:c
+#!variable:d
+#!version:lib_param_bn:{}
+
+a -> b
+a -?? a
+b -|? c
+c -? a
+c -> d
+$a: a & !c
+$b: a
+$c: !b
+",
+            env!("CARGO_PKG_VERSION")
+        );
+
+        assert_eq!(
+            bn_string,
+            BooleanNetwork::try_from(bn_string.as_str())
+                .unwrap()
+                .to_string()
+        );
+
+        // With parameters:
+        let bn_string = format!(
+            "#!check_declarations:true
+#!function:k:arity:0
+#!function:p:arity:1
+#!function:q:arity:2
+#!variable:a
+#!variable:b
+#!variable:c
+#!variable:d
+#!version:lib_param_bn:{}
+
+a -> b
 a -?? a
 b -|? c
 c -? a
@@ -207,11 +348,74 @@ c -> d
 $a: a & (p(c) => (c | c))
 $b: p(a) <=> q(a, a)
 $c: q(b, b) => !(b ^ k)
-";
+",
+            env!("CARGO_PKG_VERSION")
+        );
 
         assert_eq!(
             bn_string,
-            BooleanNetwork::try_from(bn_string).unwrap().to_string()
+            BooleanNetwork::try_from(bn_string.as_str())
+                .unwrap()
+                .to_string()
         );
+    }
+
+    #[test]
+    fn test_bn_with_parameter_declarations() {
+        let bn_string = r"
+        #! check_declarations:true
+        #! function: f: arity: 2
+        #! variable: a
+        #! variable: b
+        #! variable: x
+        
+        a -> x
+        b -> x
+        $x: f(a, b)
+        ";
+        assert!(BooleanNetwork::try_from(bn_string).is_ok());
+
+        // Wrong arity
+        let bn_string = r"
+        #! check_declarations:true
+        #! function: f: arity: 1
+        #! variable: a
+        #! variable: b
+        #! variable: x
+        
+        a -> x
+        b -> x
+        $x: f(a, b)
+        ";
+        assert!(BooleanNetwork::try_from(bn_string).is_err());
+
+        // Unused declaration
+        let bn_string = r"
+        #! check_declarations:true
+        #! function: f: arity: 2
+        #! function: g: arity: 1
+        #! variable: a
+        #! variable: b
+        #! variable: x
+        
+        a -> x
+        b -> x
+        $x: f(a, b)
+        ";
+        assert!(BooleanNetwork::try_from(bn_string).is_err());
+
+        // Parameter not declared
+        let bn_string = r"
+        #! check_declarations:true
+        #! function: f: arity: 2
+        #! variable: a
+        #! variable: b
+        #! variable: x
+        
+        a -> x
+        b -> x
+        $x: g(a, b)
+        ";
+        assert!(BooleanNetwork::try_from(bn_string).is_err());
     }
 }
