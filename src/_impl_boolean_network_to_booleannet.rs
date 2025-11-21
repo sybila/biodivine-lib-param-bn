@@ -379,4 +379,20 @@ mod tests {
 
         assert_eq!(network.num_vars(), reimported.num_vars());
     }
+
+    #[test]
+    fn test_formatting_with_operator_translation() {
+        let bn = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> B
+            $B: (A & B) => A
+            ",
+        )
+        .unwrap();
+
+        let booleannet_str = bn.to_booleannet().unwrap();
+        // This is the expected *correct* translation for implication.
+        assert!(booleannet_str.contains("(not (A & B)) or A"));
+    }
 }

@@ -395,4 +395,14 @@ B = False
         let network = BooleanNetwork::try_from_booleannet(model).unwrap();
         assert_eq!(2, network.num_vars());
     }
+
+    #[test]
+    fn test_sanitized_uniqueness() {
+        // This should not parse correctly, because there is a duplicate variable named A_plus_
+        let model = r"
+1: A+ *= not A+
+1: A+ *= A+ and A+
+";
+        assert!(BooleanNetwork::try_from_booleannet(model).is_err());
+    }
 }
