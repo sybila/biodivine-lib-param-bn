@@ -104,7 +104,7 @@ fn tokenize_function_group(
 
 /// **(internal)** Check if given char can appear in a name.
 fn is_valid_in_name(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '{' || c == '}'
+    c.is_alphanumeric() || c == '_' || c == '{' || c == '}' || c == '+' || c == '-'
 }
 
 /// **(internal)** Parse a `FnUpdateTemp` using the recursive steps.
