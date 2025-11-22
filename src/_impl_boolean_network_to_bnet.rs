@@ -32,12 +32,12 @@ impl BooleanNetwork {
         for v in network.variables() {
             let name = network.get_variable_name(v);
             if let Some(function) = network.get_update_function(v) {
-                let function_string = fn_update_to_bnet_string(v, function, self)?;
+                let function_string = fn_update_to_bnet_string(v, function, &network)?;
                 let line = format!("{}, {}\n", name, function_string);
                 model.push_str(line.as_str());
             } else {
                 // If there is no update function, we can skip it assuming it has no inputs (constant).
-                if self.regulators(v).is_empty() {
+                if network.regulators(v).is_empty() {
                     continue;
                 } else {
                     return Err("Parametrised network cannot be converted to .bnet.".to_string());
@@ -93,7 +93,7 @@ fn fn_update_to_bnet_string(
 
 #[cfg(test)]
 mod tests {
-    use crate::BooleanNetwork;
+    use crate::{BinaryOp, BooleanNetwork, FnUpdate, RegulatoryGraph, VariableId};
     use std::convert::TryFrom;
 
     #[test]
@@ -137,5 +137,26 @@ mod tests {
         // Network with names starting with numbers cannot be exported.
         assert!(bn.to_bnet(false).is_err());
         assert!(bn.to_bnet(true).is_ok());
+    }
+
+    #[test]
+    fn test_network_with_invalid_names() {
+        let mut rg = RegulatoryGraph::new(vec!["0".to_string(), "1".to_string()]);
+        rg.add_regulation("0", "1", false, None).unwrap();
+        rg.add_regulation("1", "1", false, None).unwrap();
+        let mut bn = BooleanNetwork::new(rg);
+        bn.add_update_function(
+            VariableId::from_index(1),
+            FnUpdate::mk_binary(
+                BinaryOp::And,
+                FnUpdate::mk_var(VariableId::from_index(0)),
+                FnUpdate::mk_var(VariableId::from_index(1)),
+            ),
+        )
+        .unwrap();
+        let bnet = bn.to_bnet(true).unwrap();
+
+        assert!(bnet.contains("_1, (_0 & _1)"));
+        assert!(BooleanNetwork::try_from_bnet(bnet.as_str()).is_ok());
     }
 }
