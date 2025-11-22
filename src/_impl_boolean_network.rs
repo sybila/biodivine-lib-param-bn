@@ -44,7 +44,9 @@ impl BooleanNetwork {
         let is_aeon = extension == Some("aeon");
         let is_bnet = extension == Some("bnet");
         let is_sbml = extension == Some("sbml");
-        if is_aeon || is_bnet || is_sbml {
+        let is_booleannet = extension == Some("txt") || extension == Some("booleannet");
+
+        if is_aeon || is_bnet || is_sbml || is_booleannet {
             let content = std::fs::read_to_string(path);
             match content {
                 Ok(content) => {
@@ -52,8 +54,10 @@ impl BooleanNetwork {
                         Self::try_from(content.as_str())
                     } else if is_bnet {
                         Self::try_from_bnet(content.as_str())
-                    } else {
+                    } else if is_sbml {
                         Self::try_from_sbml(content.as_str()).map(|(x, _)| x)
+                    } else {
+                        Self::try_from_booleannet(content.as_str())
                     }
                 }
                 Err(e) => Err(format!("File not readable: {}", e)),
