@@ -5,11 +5,29 @@ use std::convert::TryFrom;
 use std::iter::Peekable;
 use std::str::Chars;
 
+/// Expression syntax flavor for parsing Boolean expressions.
+///
+/// - `AEON`: Uses symbolic operators (`!`, `&`, `|`, `^`, `=>`, `<=>`) and lowercase literals (`true`, `false`, `0`, `1`).
+/// - `BooleanNet`: Uses keyword operators (`not`, `and`, `or`) and capitalized literals (`True`, `False`).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum ExpressionSyntax {
+    #[default]
+    Aeon,
+    BooleanNet,
+}
+
 impl TryFrom<&str> for FnUpdateTemp {
     type Error = String;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
-        let tokens = tokenize_function_group(&mut value.chars().peekable(), true)?;
+        FnUpdateTemp::try_from_str(value, ExpressionSyntax::Aeon)
+    }
+}
+
+impl FnUpdateTemp {
+    /// Parse an `FnUpdateTemp` from a string using the specified expression syntax.
+    pub fn try_from_str(value: &str, syntax: ExpressionSyntax) -> Result<Self, String> {
+        let tokens = tokenize_function_group(&mut value.chars().peekable(), true, syntax)?;
         Ok(*(parse_update_function(&tokens)?))
     }
 }
@@ -31,30 +49,32 @@ enum Token {
 
 /// **(internal)** Process a peekable iterator of characters into a vector of `Token`s.
 ///
-/// The outer method always consumes the opening parenthesis and the recursive call consumes the
+/// The outer method always consumes the opening parenthesis, and the recursive call consumes the
 /// closing parenthesis. Use `top_level` to indicate that there will be no closing parenthesis.
+///
+/// The `syntax` parameter controls which operator/literal style is expected.
 fn tokenize_function_group(
     data: &mut Peekable<Chars>,
     top_level: bool,
+    syntax: ExpressionSyntax,
 ) -> Result<Vec<Token>, String> {
     let mut output = Vec::new();
     while let Some(c) = data.next() {
         match c {
             c if c.is_whitespace() => { /* Skip whitespace */ }
-            // single char tokens
-            '!' => output.push(Token::Not),
-            ',' => output.push(Token::Comma),
-            '&' => output.push(Token::And),
-            '|' => output.push(Token::Or),
-            '^' => output.push(Token::Xor),
-            '=' => {
+            // Symbolic operators (AEON mode only)
+            '!' if syntax == ExpressionSyntax::Aeon => output.push(Token::Not),
+            '&' if syntax == ExpressionSyntax::Aeon => output.push(Token::And),
+            '|' if syntax == ExpressionSyntax::Aeon => output.push(Token::Or),
+            '^' if syntax == ExpressionSyntax::Aeon => output.push(Token::Xor),
+            '=' if syntax == ExpressionSyntax::Aeon => {
                 if Some('>') == data.next() {
                     output.push(Token::Imp);
                 } else {
                     return Err("Expected '>' after '='.".to_string());
                 }
             }
-            '<' => {
+            '<' if syntax == ExpressionSyntax::Aeon => {
                 if Some('=') == data.next() {
                     if Some('>') == data.next() {
                         output.push(Token::Iff)
@@ -65,8 +85,10 @@ fn tokenize_function_group(
                     return Err("Expected '=' after '<'.".to_string());
                 }
             }
-            // '>' is invalid as a start of a token
-            '>' => return Err("Unexpected '>'.".to_string()),
+            // '>' is invalid as a start of a token (AEON mode)
+            '>' if syntax == ExpressionSyntax::Aeon => return Err("Unexpected '>'.".to_string()),
+            // Common tokens for both modes
+            ',' => output.push(Token::Comma),
             ')' => {
                 return if !top_level {
                     Ok(output)
@@ -76,21 +98,33 @@ fn tokenize_function_group(
             }
             '(' => {
                 // start a nested token group
-                let tokens = tokenize_function_group(data, false)?;
+                let tokens = tokenize_function_group(data, false, syntax)?;
                 output.push(Token::Tokens(tokens));
             }
-            c if is_valid_in_name(c) => {
-                // start of a variable name
+            c if is_valid_in_name(c, syntax) => {
+                // start of a variable name or keyword
                 let mut name = vec![c];
                 while let Some(c) = data.peek() {
-                    if c.is_whitespace() || !is_valid_in_name(*c) {
+                    if c.is_whitespace() || !is_valid_in_name(*c, syntax) {
                         break;
                     } else {
                         name.push(*c);
                         data.next(); // advance iterator
                     }
                 }
-                output.push(Token::Name(name.into_iter().collect()));
+                let name_str: String = name.into_iter().collect();
+
+                // In BooleanNet mode, check for keyword operators
+                if syntax == ExpressionSyntax::BooleanNet {
+                    match name_str.as_str() {
+                        "not" => output.push(Token::Not),
+                        "and" => output.push(Token::And),
+                        "or" => output.push(Token::Or),
+                        _ => output.push(Token::Name(name_str)),
+                    }
+                } else {
+                    output.push(Token::Name(name_str));
+                }
             }
             _ => return Err(format!("Unexpected '{}'.", c)),
         }
@@ -102,9 +136,15 @@ fn tokenize_function_group(
     }
 }
 
-/// **(internal)** Check if given char can appear in a name.
-fn is_valid_in_name(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '{' || c == '}'
+/// **(internal)** Check if a given char can appear in a name.
+///
+/// In AEON mode: alphanumeric, underscore, curly braces.
+/// In BooleanNet mode: alphanumeric, underscore, plus, minus.
+fn is_valid_in_name(c: char, syntax: ExpressionSyntax) -> bool {
+    match syntax {
+        ExpressionSyntax::Aeon => c.is_alphanumeric() || c == '_' || c == '{' || c == '}',
+        ExpressionSyntax::BooleanNet => c.is_alphanumeric() || c == '_' || c == '+' || c == '-',
+    }
 }
 
 /// **(internal)** Parse a `FnUpdateTemp` using the recursive steps.
@@ -112,7 +152,7 @@ fn parse_update_function(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
     iff(data)
 }
 
-/// **(internal)** Utility method to find first occurrence of a specific token in the token tree.
+/// **(internal)** Utility method to find the first occurrence of a specific token in the token tree.
 fn index_of_first(data: &[Token], token: Token) -> Option<usize> {
     data.iter().position(|t| *t == token)
 }
@@ -178,9 +218,10 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
             // This should be either a name or a parenthesis group, anything else does not make sense.
             match &data[0] {
                 Token::Name(name) => {
-                    return if name == "true" || name == "1" {
+                    // Support both AEON literals (true, false, 0, 1) and BooleanNet literals (True, False)
+                    return if name == "true" || name == "1" || name == "True" {
                         Ok(Box::new(Const(true)))
-                    } else if name == "false" || name == "0" {
+                    } else if name == "false" || name == "0" || name == "False" {
                         Ok(Box::new(Const(false)))
                     } else {
                         Ok(Box::new(Var(name.clone())))
@@ -206,7 +247,7 @@ fn terminal(data: &[Token]) -> Result<Box<FnUpdateTemp>, String> {
 /// **(internal)** Parse a list of function arguments. All arguments must be expressions separated
 /// by commas.
 ///
-/// Note that commas *have to* separate individual arguments, because any comma which is a part
+/// Note that commas *have to* separate individual arguments, because any comma that is a part
 /// of a "lower level" function call has to be enclosed in parentheses.
 fn read_args(data: &[Token]) -> Result<Vec<FnUpdateTemp>, String> {
     if data.is_empty() {
@@ -325,6 +366,104 @@ mod tests {
         assert_eq!(
             expected,
             FnUpdateTemp::try_from(formula).unwrap().to_string()
+        );
+    }
+
+    #[test]
+    fn booleannet_syntax_basic() {
+        use super::ExpressionSyntax;
+
+        // Basic operators
+        let result = FnUpdateTemp::try_from_str("A and B", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Binary(
+                BinaryOp::And,
+                Box::new(FnUpdateTemp::Var("A".to_string())),
+                Box::new(FnUpdateTemp::Var("B".to_string()))
+            )
+        );
+
+        let result = FnUpdateTemp::try_from_str("A or B", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Binary(
+                BinaryOp::Or,
+                Box::new(FnUpdateTemp::Var("A".to_string())),
+                Box::new(FnUpdateTemp::Var("B".to_string()))
+            )
+        );
+
+        let result = FnUpdateTemp::try_from_str("not A", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Not(Box::new(FnUpdateTemp::Var("A".to_string())))
+        );
+    }
+
+    #[test]
+    fn booleannet_syntax_literals() {
+        use super::ExpressionSyntax;
+
+        let result = FnUpdateTemp::try_from_str("True", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(result, FnUpdateTemp::Const(true));
+
+        let result = FnUpdateTemp::try_from_str("False", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(result, FnUpdateTemp::Const(false));
+    }
+
+    #[test]
+    fn booleannet_syntax_complex() {
+        use super::ExpressionSyntax;
+
+        // Complex expression with parentheses
+        let result =
+            FnUpdateTemp::try_from_str("(A or B) and not C", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Binary(
+                BinaryOp::And,
+                Box::new(FnUpdateTemp::Binary(
+                    BinaryOp::Or,
+                    Box::new(FnUpdateTemp::Var("A".to_string())),
+                    Box::new(FnUpdateTemp::Var("B".to_string()))
+                )),
+                Box::new(FnUpdateTemp::Not(Box::new(FnUpdateTemp::Var(
+                    "C".to_string()
+                ))))
+            )
+        );
+
+        // Operator precedence: not > and > or
+        let result =
+            FnUpdateTemp::try_from_str("A or B and C", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Binary(
+                BinaryOp::Or,
+                Box::new(FnUpdateTemp::Var("A".to_string())),
+                Box::new(FnUpdateTemp::Binary(
+                    BinaryOp::And,
+                    Box::new(FnUpdateTemp::Var("B".to_string())),
+                    Box::new(FnUpdateTemp::Var("C".to_string()))
+                ))
+            )
+        );
+    }
+
+    #[test]
+    fn booleannet_syntax_special_chars_in_names() {
+        use super::ExpressionSyntax;
+
+        let result =
+            FnUpdateTemp::try_from_str("Ca2+c and H+ATPase", ExpressionSyntax::BooleanNet).unwrap();
+        assert_eq!(
+            result,
+            FnUpdateTemp::Binary(
+                BinaryOp::And,
+                Box::new(FnUpdateTemp::Var("Ca2+c".to_string())),
+                Box::new(FnUpdateTemp::Var("H+ATPase".to_string()))
+            )
         );
     }
 }

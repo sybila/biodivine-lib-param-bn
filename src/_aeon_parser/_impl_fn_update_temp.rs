@@ -34,6 +34,39 @@ impl FnUpdateTemp {
         })
     }
 
+    /// Apply a name transformation function to all variable names in the expression.
+    ///
+    /// This is useful for sanitizing variable names that contain characters not supported
+    /// by the internal representation (e.g., `+` and `-` in BooleanNet format).
+    ///
+    /// The transformation function takes the original name and returns the new name.
+    /// It uses `FnMut` to allow the transformation to maintain state (e.g., building a mapping).
+    pub fn rename_variables<F>(self, transform: &mut F) -> Box<FnUpdateTemp>
+    where
+        F: FnMut(&str) -> String,
+    {
+        Box::new(match self {
+            Const(value) => Const(value),
+            Binary(op, l, r) => Binary(
+                op,
+                l.rename_variables(transform),
+                r.rename_variables(transform),
+            ),
+            Not(inner) => Not(inner.rename_variables(transform)),
+            Param(name, args) => {
+                let args: Vec<FnUpdateTemp> = args
+                    .into_iter()
+                    .map(|it| *it.rename_variables(transform))
+                    .collect();
+                // Note: Parameter names could also be variables in nested expressions,
+                // but we don't transform the parameter name itself since parameters
+                // are defined separately.
+                Param(name, args)
+            }
+            Var(name) => Var(transform(&name)),
+        })
+    }
+
     /// Write all parameters that appear in this function into a given set.
     ///
     /// Note that if there are parameters with the same name but different cardinality,
