@@ -57,10 +57,12 @@ fn read_expression(math: Node) -> Result<MathMl, String> {
             .map(|s| s.trim().to_string())
             .unwrap_or_default();
         let num_type = math.attribute((MATHML, "type"));
-        if num_type.is_some() && num_type.unwrap() != "integer" {
+        if let Some(num_type) = num_type
+            && num_type != "integer"
+        {
             return Err(format!(
                 "Non-integer numeric types ({}) are not supported.",
-                num_type.unwrap()
+                num_type
             ));
         }
         return if let Ok(parsed) = value.parse::<i64>() {
@@ -104,7 +106,7 @@ fn read_expression(math: Node) -> Result<MathMl, String> {
 
 /// Some utility methods for working with MathML trees.
 impl MathMl {
-    /// Returns true if the function contains given identifier (function symbols do not count).
+    /// Returns true if the function contains a given identifier (function symbols do not count).
     pub fn contains_identifier(&self, id: &str) -> bool {
         match self {
             MathMl::Boolean(_) => false,

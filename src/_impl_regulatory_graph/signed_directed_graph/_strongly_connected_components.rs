@@ -1,5 +1,6 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
-use crate::{LOG_NOTHING, VariableId, never_stop, should_log};
+use crate::{LOG_NOTHING, VariableId, should_log};
+use cancel_this::{Cancellable, is_cancelled};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -17,26 +18,22 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<HashSet<VariableId>> {
-        self._restricted_strongly_connected_components(restriction, LOG_NOTHING, &never_stop)
+        self._restricted_strongly_connected_components(restriction, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_strongly_connected_components] with cancellation
     /// and logging.
-    pub fn _restricted_strongly_connected_components<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_strongly_connected_components(
         &self,
         restriction: &HashSet<VariableId>,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<Vec<HashSet<VariableId>>, E> {
+    ) -> Cancellable<Vec<HashSet<VariableId>>> {
         let mut results = Vec::new();
-        scc_recursive(
-            self,
-            restriction.clone(),
-            &mut results,
-            log_level,
-            interrupt,
-        )?;
+        scc_recursive(self, restriction.clone(), &mut results, log_level)?;
         results.sort_by_key(|it| it.len());
         Ok(results)
     }
@@ -47,17 +44,16 @@ impl SdGraph {
 /// The complexity of the procedure is $n^2$. It can be (in theory) improved to $n \cdot log(n)$,
 /// but at the moment I don't really see a benefit to it as it is still sufficiently fast for
 /// most reasonable cases.
-fn scc_recursive<E, F: Fn() -> Result<(), E>>(
+fn scc_recursive(
     graph: &SdGraph,
     mut universe: HashSet<VariableId>,
     results: &mut Vec<HashSet<VariableId>>,
     log_level: usize,
-    interrupt: &F,
-) -> Result<(), E> {
+) -> Cancellable<()> {
     trim_trivial(&graph.successors, &mut universe);
-    interrupt()?;
+    is_cancelled!()?;
     trim_trivial(&graph.predecessors, &mut universe);
-    interrupt()?;
+    is_cancelled!()?;
 
     if universe.is_empty() {
         return Ok(());
@@ -66,10 +62,10 @@ fn scc_recursive<E, F: Fn() -> Result<(), E>>(
     let pivot = universe.iter().next().cloned().unwrap();
 
     let fwd = graph.restricted_forward_reachable(&universe, HashSet::from([pivot]));
-    interrupt()?;
+    is_cancelled!()?;
 
     let bwd = graph.restricted_backward_reachable(&universe, HashSet::from([pivot]));
-    interrupt()?;
+    is_cancelled!()?;
 
     let fwd_or_bwd: HashSet<VariableId> = fwd.union(&bwd).cloned().collect();
     let fwd_and_bwd: HashSet<VariableId> = fwd.intersection(&bwd).cloned().collect();
@@ -86,15 +82,15 @@ fn scc_recursive<E, F: Fn() -> Result<(), E>>(
     let bwd_rest: HashSet<VariableId> = bwd.difference(&fwd).cloned().collect();
 
     if !universe_rest.is_empty() {
-        scc_recursive(graph, universe_rest, results, log_level, interrupt)?;
+        scc_recursive(graph, universe_rest, results, log_level)?;
     }
 
     if !fwd_rest.is_empty() {
-        scc_recursive(graph, fwd_rest, results, log_level, interrupt)?;
+        scc_recursive(graph, fwd_rest, results, log_level)?;
     }
 
     if !bwd_rest.is_empty() {
-        scc_recursive(graph, bwd_rest, results, log_level, interrupt)?;
+        scc_recursive(graph, bwd_rest, results, log_level)?;
     }
 
     Ok(())

@@ -1,5 +1,6 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
-use crate::{LOG_NOTHING, VariableId, never_stop, should_log};
+use crate::{LOG_NOTHING, VariableId, should_log};
+use cancel_this::{Cancellable, is_cancelled};
 use std::collections::{HashMap, HashSet};
 
 impl SdGraph {
@@ -8,17 +9,15 @@ impl SdGraph {
     ///
     /// This is not the complete FVS approximation algorithm, but it is used multiple times,
     /// so we abstract it into this helper method.
-    fn _fvs_helper<F, E, I>(
+    fn _fvs_helper<F>(
         &self,
         subgraph: &mut HashSet<VariableId>,
         mut candidates: HashSet<VariableId>,
         compute_cycle: F,
         log_level: usize,
-        interrupt: &I,
-    ) -> Result<HashSet<VariableId>, E>
+    ) -> Cancellable<HashSet<VariableId>>
     where
         F: Fn(&HashSet<VariableId>, VariableId) -> Option<Vec<VariableId>>,
-        I: Fn() -> Result<(), E>,
     {
         let mut result = HashSet::new();
 
@@ -26,7 +25,7 @@ impl SdGraph {
         let mut shortest_cycle_for_pivot: HashMap<VariableId, Vec<VariableId>> = HashMap::new();
 
         while !candidates.is_empty() {
-            interrupt()?;
+            is_cancelled!()?;
             // Ensure determinism.
             let mut iterable = Vec::from_iter(candidates.clone());
             iterable.sort();
@@ -36,7 +35,7 @@ impl SdGraph {
                 let cycle = if let Some(known_cycle) = shortest_cycle_for_pivot.get(&vertex) {
                     known_cycle
                 } else if let Some(computed_cycle) = compute_cycle(subgraph, vertex) {
-                    interrupt()?;
+                    is_cancelled!()?;
                     shortest_cycle_for_pivot
                         .entry(vertex)
                         .or_insert(computed_cycle)
@@ -88,29 +87,31 @@ impl SdGraph {
     /// is not guaranteed that the result is minimal, as the minimal FVS problem
     /// is NP complete.
     ///
-    /// The algorithm works by greedily picking vertices from the shortest cycles, prioritising
+    /// The algorithm works by greedily picking vertices from the shortest cycles, prioritizing
     /// vertices with the highest overall degree.
     pub fn restricted_feedback_vertex_set(
         &self,
         restriction: &HashSet<VariableId>,
     ) -> HashSet<VariableId> {
-        self._restricted_feedback_vertex_set(restriction, LOG_NOTHING, &never_stop)
+        self._restricted_feedback_vertex_set(restriction, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_feedback_vertex_set] with cancellation
     /// and logging.
-    pub fn _restricted_feedback_vertex_set<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_feedback_vertex_set(
         &self,
         restriction: &HashSet<VariableId>,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<HashSet<VariableId>, E> {
+    ) -> Cancellable<HashSet<VariableId>> {
         let candidates = restriction.clone();
 
         // We then prune the candidates twice: First time, most of the uninteresting nodes are
-        // removed, second time then optimizes the result such that it is (usually) at least
-        // subset minimal. The minimality is still not guaranteed though.
+        // removed, the second time then optimizes the result such that it is (usually) at least
+        // subset minimal. The minimality is still not guaranteed, though.
 
         if should_log(log_level) {
             println!(
@@ -124,7 +125,6 @@ impl SdGraph {
             candidates,
             |g, x| self.shortest_cycle(g, x, usize::MAX),
             log_level,
-            interrupt,
         )?;
 
         if should_log(log_level) {
@@ -139,7 +139,6 @@ impl SdGraph {
             candidates,
             |g, x| self.shortest_cycle(g, x, usize::MAX),
             log_level,
-            interrupt,
         )?;
 
         if should_log(log_level) {
@@ -154,28 +153,30 @@ impl SdGraph {
     ///
     /// A parity feedback vertex set is a set of vertices such that when removed, the graph has
     /// no cycles of the specified parity. See also `restriction_feedback_vertex_set` for notes
-    /// about determinism, minimality and complexity.
+    /// about determinism, minimality, and complexity.
     pub fn restricted_parity_feedback_vertex_set(
         &self,
         restriction: &HashSet<VariableId>,
         parity: Sign,
     ) -> HashSet<VariableId> {
-        self._restricted_parity_feedback_vertex_set(restriction, parity, LOG_NOTHING, &never_stop)
+        self._restricted_parity_feedback_vertex_set(restriction, parity, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_parity_feedback_vertex_set] with cancellation
     /// and logging.
-    pub fn _restricted_parity_feedback_vertex_set<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_parity_feedback_vertex_set(
         &self,
         restriction: &HashSet<VariableId>,
         parity: Sign,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<HashSet<VariableId>, E> {
+    ) -> Cancellable<HashSet<VariableId>> {
         // We will be searching in a subset of a known FVS. This is because FVS detection is
         // a bit faster and usually gives us a reasonable starting point.
-        let candidates = self._restricted_feedback_vertex_set(restriction, log_level, interrupt)?;
+        let candidates = self._restricted_feedback_vertex_set(restriction, log_level)?;
 
         if should_log(log_level) {
             println!(
@@ -184,14 +185,13 @@ impl SdGraph {
             );
         }
 
-        // The same as normal FVS method, but uses different cycle detection. Here, we don't
-        // repeat it again, because in most cases it is not needed.
+        // The same as a normal FVS method but uses different cycle detection. Here, we don't
+        // repeat it again, because in most cases it is unnecessary.
         let result = self._fvs_helper(
             &mut restriction.clone(),
             candidates,
             |g, x| self.shortest_parity_cycle(g, x, parity, usize::MAX),
             log_level,
-            interrupt,
         )?;
 
         if should_log(log_level) {

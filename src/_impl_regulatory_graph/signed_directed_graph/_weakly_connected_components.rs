@@ -1,4 +1,5 @@
-use crate::{LOG_NOTHING, SdGraph, VariableId, never_stop, should_log};
+use crate::{LOG_NOTHING, SdGraph, VariableId, should_log};
+use cancel_this::{Cancellable, is_cancelled};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -12,18 +13,20 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<HashSet<VariableId>> {
-        self._restricted_weakly_connected_components(restriction, LOG_NOTHING, &never_stop)
+        self._restricted_weakly_connected_components(restriction, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_weakly_connected_components] with cancellation
     /// and logging.
-    pub fn _restricted_weakly_connected_components<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_weakly_connected_components(
         &self,
         restriction: &HashSet<VariableId>,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<Vec<HashSet<VariableId>>, E> {
+    ) -> Cancellable<Vec<HashSet<VariableId>>> {
         if restriction.is_empty() {
             return Ok(Vec::new());
         }
@@ -33,9 +36,9 @@ impl SdGraph {
         let mut component = HashSet::from([pivot]);
         loop {
             let fwd = self.restricted_forward_reachable(restriction, component.clone());
-            interrupt()?;
+            is_cancelled!()?;
             let bwd = self.restricted_backward_reachable(restriction, component.clone());
-            interrupt()?;
+            is_cancelled!()?;
             if fwd.is_subset(&component) && bwd.is_subset(&component) {
                 break;
             }
@@ -52,11 +55,9 @@ impl SdGraph {
         }
 
         result.push(component);
-        result.append(&mut self._restricted_weakly_connected_components(
-            &new_restriction,
-            log_level,
-            interrupt,
-        )?);
+        result.append(
+            &mut self._restricted_weakly_connected_components(&new_restriction, log_level)?,
+        );
 
         Ok(result)
     }

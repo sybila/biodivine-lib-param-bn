@@ -1,5 +1,6 @@
 use crate::_impl_regulatory_graph::signed_directed_graph::{SdGraph, Sign};
-use crate::{LOG_NOTHING, VariableId, never_stop, should_log};
+use crate::{LOG_NOTHING, VariableId, should_log};
+use cancel_this::{Cancellable, is_cancelled};
 use std::collections::HashSet;
 
 impl SdGraph {
@@ -16,23 +17,25 @@ impl SdGraph {
         &self,
         restriction: &HashSet<VariableId>,
     ) -> Vec<Vec<VariableId>> {
-        self._restricted_independent_cycles(restriction, LOG_NOTHING, &never_stop)
+        self._restricted_independent_cycles(restriction, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_independent_cycles] with cancellation
     /// and logging.
-    pub fn _restricted_independent_cycles<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_independent_cycles(
         &self,
         restriction: &HashSet<VariableId>,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<Vec<Vec<VariableId>>, E> {
+    ) -> Cancellable<Vec<Vec<VariableId>>> {
         let mut cycles = Vec::new();
 
         let mut components = self.restricted_strongly_connected_components(restriction);
         while let Some(mut scc) = components.pop() {
-            interrupt()?;
+            is_cancelled!()?;
 
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;
@@ -41,7 +44,7 @@ impl SdGraph {
             scc_iter.sort();
             for x in &scc_iter {
                 if let Some(cycle) = self.shortest_cycle(&scc, *x, best_cycle_len) {
-                    interrupt()?;
+                    is_cancelled!()?;
                     if cycle.len() == 1 {
                         // Cycle of length one will always win, no need to check further.
                         best_cycle = Some(cycle);
@@ -50,9 +53,9 @@ impl SdGraph {
                         best_cycle_len = cycle.len();
                         best_cycle = Some(cycle);
                     }
-                    // Note that for now, we are not breaking ties in any meaningful way, hence
+                    // Note that for now, we are not breaking ties in any meaningful way; hence
                     // the result is non-deterministic. But I'm not even sure that the result of
-                    // cycle detection is deterministic so this might not be a big deal.
+                    // cycle detection is deterministic, so this might not be a big deal.
                 }
             }
 
@@ -86,24 +89,26 @@ impl SdGraph {
         restriction: &HashSet<VariableId>,
         parity: Sign,
     ) -> Vec<Vec<VariableId>> {
-        self._restricted_independent_parity_cycles(restriction, parity, LOG_NOTHING, &never_stop)
+        self._restricted_independent_parity_cycles(restriction, parity, LOG_NOTHING)
             .unwrap()
     }
 
     /// A version of [SdGraph::restricted_independent_parity_cycles] with cancellation
     /// and logging.
-    pub fn _restricted_independent_parity_cycles<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _restricted_independent_parity_cycles(
         &self,
         restriction: &HashSet<VariableId>,
         parity: Sign,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<Vec<Vec<VariableId>>, E> {
+    ) -> Cancellable<Vec<Vec<VariableId>>> {
         let mut cycles = Vec::new();
 
         let mut components = self.restricted_strongly_connected_components(restriction);
         while let Some(mut scc) = components.pop() {
-            interrupt()?;
+            is_cancelled!()?;
             let mut best_cycle = None;
             let mut best_cycle_len = usize::MAX;
             // Not particularly efficient, but keeps this whole thing deterministic.
@@ -111,7 +116,7 @@ impl SdGraph {
             scc_iter.sort();
             for x in &scc_iter {
                 if let Some(cycle) = self.shortest_parity_cycle(&scc, *x, parity, best_cycle_len) {
-                    interrupt()?;
+                    is_cancelled!()?;
                     if cycle.len() == 1 {
                         // Cycle of length one will always win, no need to check further.
                         best_cycle = Some(cycle);

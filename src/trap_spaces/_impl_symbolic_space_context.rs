@@ -1,9 +1,8 @@
 use crate::symbolic_async_graph::{SymbolicAsyncGraph, SymbolicContext};
 use crate::trap_spaces::{NetworkColoredSpaces, NetworkSpaces, SymbolicSpaceContext};
-use crate::{
-    BooleanNetwork, ExtendedBoolean, Space, VariableId, global_log_level, log_essential, never_stop,
-};
+use crate::{BooleanNetwork, ExtendedBoolean, Space, VariableId, global_log_level, log_essential};
 use biodivine_lib_bdd::{Bdd, BddPartialValuation, BddVariable, BddVariableSet, bdd};
+use cancel_this::{Cancellable, is_cancelled};
 use std::collections::HashMap;
 
 impl SymbolicSpaceContext {
@@ -165,12 +164,8 @@ impl SymbolicSpaceContext {
     pub fn mk_has_up_transition(&self, var: BddVariable, function: &Bdd) -> Bdd {
         assert!(self.inner_ctx.state_variables().contains(&var));
         let function_true_in_false_state = function.var_select(var, false);
-        self._mk_can_go_to_true(
-            &function_true_in_false_state,
-            global_log_level(),
-            &never_stop,
-        )
-        .unwrap()
+        self._mk_can_go_to_true(&function_true_in_false_state, global_log_level())
+            .unwrap()
     }
 
     /// Compute a [Bdd] which encodes all spaces in which the value of `function` is false
@@ -184,12 +179,8 @@ impl SymbolicSpaceContext {
     pub fn mk_has_down_transition(&self, var: BddVariable, function: &Bdd) -> Bdd {
         assert!(self.inner_ctx.state_variables().contains(&var));
         let function_false_in_true_state = function.not().var_select(var, true);
-        self._mk_can_go_to_true(
-            &function_false_in_true_state,
-            global_log_level(),
-            &never_stop,
-        )
-        .unwrap()
+        self._mk_can_go_to_true(&function_false_in_true_state, global_log_level())
+            .unwrap()
     }
 
     /// Compute a [Bdd] which encodes all spaces in which the value of `function` can be
@@ -206,23 +197,22 @@ impl SymbolicSpaceContext {
     /// these are to some extent still interesting in some applications.
     ///
     pub fn mk_can_go_to_true(&self, function: &Bdd) -> Bdd {
-        self._mk_can_go_to_true(function, global_log_level(), &never_stop)
+        self._mk_can_go_to_true(function, global_log_level())
             .unwrap()
     }
 
     /// An alternative to [`Self::mk_can_go_to_true`] which returns the subset of spaces
     /// in which exists a state that evaluates the given `function` to `0`.
     pub fn mk_can_go_to_false(&self, function: &Bdd) -> Bdd {
-        self._mk_can_go_to_true(&function.not(), global_log_level(), &never_stop)
+        self._mk_can_go_to_true(&function.not(), global_log_level())
             .unwrap()
     }
 
-    pub fn _mk_can_go_to_true<E, F: Fn() -> Result<(), E>>(
-        &self,
-        function: &Bdd,
-        log_level: usize,
-        interrupt: &F,
-    ) -> Result<Bdd, E> {
+    /// A version of [`Self::mk_can_go_to_true`] with cancellation and logging.
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _mk_can_go_to_true(&self, function: &Bdd, log_level: usize) -> Cancellable<Bdd> {
         let bdd_vars = self.inner_ctx.bdd_variable_set();
         // Only constrain variables that are relevant to `functions`.
         let support_set = {
@@ -245,7 +235,7 @@ impl SymbolicSpaceContext {
             let (t_var, f_var) = self.dual_variables[index];
             let is_in_space = bdd!(bdd_vars, (state_var => t_var) & ((!state_var) => f_var));
             result = result.and(&is_in_space).var_exists(state_var);
-            interrupt()?;
+            is_cancelled!()?;
 
             if log_essential(log_level, result.size()) {
                 println!(
@@ -265,16 +255,14 @@ impl SymbolicSpaceContext {
     /// and `O(n)` BDD ops to converge (`n` being the number of network variables).
     ///
     pub fn mk_super_spaces(&self, spaces: &Bdd) -> Bdd {
-        self._mk_super_spaces(spaces, global_log_level(), &never_stop)
-            .unwrap()
+        self._mk_super_spaces(spaces, global_log_level()).unwrap()
     }
 
-    pub fn _mk_super_spaces<E, F: Fn() -> Result<(), E>>(
-        &self,
-        spaces: &Bdd,
-        log_level: usize,
-        interrupt: &F,
-    ) -> Result<Bdd, E> {
+    /// A version of [`Self::mk_super_spaces`] with cancellation and logging.
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _mk_super_spaces(&self, spaces: &Bdd, log_level: usize) -> Cancellable<Bdd> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
         for (i, (t_var, f_var)) in self.dual_variables.iter().rev().enumerate() {
@@ -289,7 +277,7 @@ impl SymbolicSpaceContext {
                 Some(*t_var),
                 and_and_not,
             );
-            interrupt()?;
+            is_cancelled!()?;
 
             // Symmetrically for `t_false`.
             let f_var_bdd = vars.mk_literal(*f_var, false);
@@ -300,11 +288,11 @@ impl SymbolicSpaceContext {
                 Some(*f_var),
                 and_and_not,
             );
-            interrupt()?;
+            is_cancelled!()?;
 
             if !adds_true.is_false() || !adds_false.is_false() {
                 result = bdd!(vars, result | (adds_true | adds_false));
-                interrupt()?;
+                is_cancelled!()?;
                 if log_essential(log_level, result.size()) {
                     println!(
                         "Computing super-spaces[{}/{}]: {}[nodes:{}].",
@@ -323,16 +311,14 @@ impl SymbolicSpaceContext {
     ///
     /// The same notes as for [SymbolicSpaceContext::mk_super_spaces] apply.
     pub fn mk_sub_spaces(&self, spaces: &Bdd) -> Bdd {
-        self._mk_sub_spaces(spaces, global_log_level(), &never_stop)
-            .unwrap()
+        self._mk_sub_spaces(spaces, global_log_level()).unwrap()
     }
 
-    pub fn _mk_sub_spaces<E, F: Fn() -> Result<(), E>>(
-        &self,
-        spaces: &Bdd,
-        log_level: usize,
-        interrupt: &F,
-    ) -> Result<Bdd, E> {
+    /// A version of [`Self::mk_sub_spaces`] with cancellation and logging.
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _mk_sub_spaces(&self, spaces: &Bdd, log_level: usize) -> Cancellable<Bdd> {
         let vars = self.bdd_variable_set();
         let mut result = spaces.clone();
         for (i, (t_var, f_var)) in self.dual_variables.clone().into_iter().rev().enumerate() {
@@ -348,7 +334,7 @@ impl SymbolicSpaceContext {
                 Some(t_var),
                 and_and_not,
             );
-            interrupt()?;
+            is_cancelled!()?;
 
             // Symmetrically for `t_false`.
             let removes_false = Bdd::fused_ternary_flip_op(
@@ -358,11 +344,11 @@ impl SymbolicSpaceContext {
                 Some(f_var),
                 and_and_not,
             );
-            interrupt()?;
+            is_cancelled!()?;
 
             if !removes_true.is_false() || !removes_false.is_false() {
                 result = bdd!(vars, result | (removes_true | removes_false));
-                interrupt()?;
+                is_cancelled!()?;
 
                 if log_essential(log_level, result.size()) {
                     println!(

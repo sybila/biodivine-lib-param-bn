@@ -1,6 +1,7 @@
 use crate::biodivine_std::traits::Set;
 use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::{VariableId, global_log_level, log_essential, never_stop, should_log};
+use crate::{VariableId, global_log_level, log_essential, should_log};
+use cancel_this::{Cancellable, is_cancelled};
 use std::cmp::max;
 
 pub struct Reachability {
@@ -48,22 +49,22 @@ impl Reachability {
         initial: &GraphColoredVertices,
         step: F,
     ) -> GraphColoredVertices {
-        Self::_reach_basic_saturation(graph, initial, step, global_log_level(), &never_stop)
-            .unwrap()
+        Self::_reach_basic_saturation(graph, initial, step, global_log_level()).unwrap()
     }
 
     /// A version of [Reachability::reach_basic_saturation] with cancellation
     /// and logging.
-    pub fn _reach_basic_saturation<F, I, E>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _reach_basic_saturation<F>(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
         step: F,
         log_level: usize,
-        interrupt: &I,
-    ) -> Result<GraphColoredVertices, E>
+    ) -> Cancellable<GraphColoredVertices>
     where
         F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
-        I: Fn() -> Result<(), E>,
     {
         if should_log(log_level) {
             println!(
@@ -80,7 +81,7 @@ impl Reachability {
         'reach: loop {
             for var in graph.variables().rev() {
                 let step = step(graph, &result, var);
-                interrupt()?;
+                is_cancelled!()?;
                 if !step.is_empty() {
                     result = result.union(&step);
                     max_size = max(max_size, result.symbolic_size());
@@ -125,103 +126,25 @@ impl Reachability {
         initial: &GraphColoredVertices,
         step: F,
     ) -> GraphColoredVertices {
-        Reachability::_reach(graph, initial, step, global_log_level(), &never_stop).unwrap()
+        Reachability::_reach(graph, initial, step, global_log_level()).unwrap()
     }
 
     /// A version of [Reachability::reach] with cancellation
     /// and logging.
-    pub fn _reach<F, E, I>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _reach<F>(
         graph: &SymbolicAsyncGraph,
         initial: &GraphColoredVertices,
         step: F,
         log_level: usize,
-        interrupt: &I,
-    ) -> Result<GraphColoredVertices, E>
+    ) -> Cancellable<GraphColoredVertices>
     where
         F: Fn(&SymbolicAsyncGraph, &GraphColoredVertices, VariableId) -> GraphColoredVertices,
-        I: Fn() -> Result<(), E>,
     {
-        Self::_reach_basic_saturation(graph, initial, step, log_level, interrupt)
-
-        // TODO:
-        //   The algorithm below is useful, but apparently not always complete. We need to
-        //   fix this in the subsequent releases.
-
-        /*if should_log(log_level) {
-            println!(
-                "Start symbolic reachability with {}[nodes:{}] candidates.",
-                initial.approx_cardinality(),
-                initial.symbolic_size()
-            );
-        }
-
-        // Construct a symbolic regulators relation (this is more accurate than the normal regulatory graph,
-        // and does not require an underlying Boolean network).
-        let targets_of_var = graph
-            .variables()
-            .map(|regulator| {
-                let targets = graph
-                    .variables()
-                    .filter(|var| {
-                        let update = graph.get_symbolic_fn_update(*var);
-                        let state_variable = graph.symbolic_context().get_state_variable(regulator);
-                        update.support_set().contains(&state_variable)
-                    })
-                    .collect::<Vec<_>>();
-                (regulator, targets)
-            })
-            .collect::<HashMap<_, _>>();
-
-        interrupt()?;
-
-        let mut result = initial.clone();
-        let mut max_size = 0;
-
-        // A set of saturated variables. We can only remove a variable from here if it's regulator has been changed.
-        let mut saturated = HashSet::new();
-        'reach: loop {
-            for var in graph.variables().rev() {
-                let next_step = step(graph, &result, var);
-                interrupt()?;
-
-                if next_step.is_empty() {
-                    saturated.insert(var);
-                } else {
-                    result = result.union(&next_step);
-                    max_size = max(max_size, result.symbolic_size());
-
-                    if log_essential(log_level, result.symbolic_size()) {
-                        let current = result.approx_cardinality();
-                        let max = graph.unit_colored_vertices().approx_cardinality();
-                        println!(
-                            " >> [{}/{} saturated] Reach progress: {}[nodes:{}] candidates ({:.2} log-%).",
-                            saturated.len(),
-                            graph.num_vars(),
-                            result.approx_cardinality(),
-                            result.symbolic_size(),
-                            (current.log2() / max.log2()) * 100.0
-                        );
-                    }
-
-                    if !saturated.contains(&var) {
-                        for t in &targets_of_var[&var] {
-                            saturated.remove(t);
-                        }
-                        continue 'reach;
-                    }
-                }
-            }
-
-            if should_log(log_level) {
-                println!(
-                    "Structural reachability done: {}[nodes:{}] candidates. Max intermediate size: {}.",
-                    result.approx_cardinality(),
-                    result.symbolic_size(),
-                    max_size
-                );
-            }
-
-            return Ok(result);
-        }*/
+        Self::_reach_basic_saturation(graph, initial, step, log_level)
+        // Note: There used to be a fancy algorithm here, but it turns out it was not correct.
+        // So for now, we just delegate to the basic implementation.
     }
 }
