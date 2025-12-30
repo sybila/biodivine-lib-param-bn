@@ -31,6 +31,7 @@ mod _independent_cycles;
 ///
 /// TODO: If we rewrite the API at some point, this should merge with `Monotonicity`.
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Sign {
     Positive,
     Negative,
@@ -41,6 +42,7 @@ pub enum Sign {
 ///
 /// TODO: If we rewrite the API at some point, this should just merge with a `RegulatoryGraph`.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SdGraph {
     successors: Vec<Vec<(VariableId, Sign)>>,
     predecessors: Vec<Vec<(VariableId, Sign)>>,

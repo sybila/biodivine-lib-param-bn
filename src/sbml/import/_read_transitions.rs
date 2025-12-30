@@ -4,6 +4,7 @@ use roxmltree::{ExpandedName, Node};
 
 /// Maps almost directly to the SBML transition input tag.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlTransitionInput {
     pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
@@ -14,6 +15,7 @@ pub struct SbmlTransitionInput {
 
 /// Maps almost directly to the SBML transition output tag.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlTransitionOutput {
     pub id: Option<String>, // Note that a missing ID is not entirely according to spec, but they do appear in models people use.
     pub qual_species: String,
@@ -22,12 +24,14 @@ pub struct SbmlTransitionOutput {
 
 /// Represents an SBML transition term (note that default term should not have math in it).
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlTransitionTerm {
     pub result_level: u32,
     pub math: Option<MathMl>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlTransition {
     pub id: Option<String>,
     pub inputs: Vec<SbmlTransitionInput>,

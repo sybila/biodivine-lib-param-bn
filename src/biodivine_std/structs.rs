@@ -2,7 +2,7 @@ use crate::biodivine_std::traits::State;
 use std::collections::HashMap;
 /// Basic structs which are carried over from lib-biodivine_std for now.
 ///
-/// In the future, these will be replaced by a more stable variants.
+/// In the future, these will be replaced by a more stable variant.
 use std::fmt::{Display, Error, Formatter};
 use std::hash::Hash;
 
@@ -23,10 +23,12 @@ where
 
 /// A very basic implementation of a `State` which simply stores a single `usize` index.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IdState(usize);
 
 /// A simple `IdState` iterator used for graphs where the states are consecutive integers.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IdStateRange {
     next: usize,
     remaining: usize,
@@ -101,7 +103,7 @@ mod tests {
         assert!(!state.get_bit(3));
         assert!(state.get_bit(4));
         let flipped = state.flip_bit(3);
-        assert_eq!(0b11110_usize, flipped.into());
+        assert_eq!(0b11110_usize, usize::from(flipped));
     }
 
     #[test]

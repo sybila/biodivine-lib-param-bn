@@ -10,6 +10,7 @@ const TRUE_TAG: (&str, &str) = (MATHML, "true");
 const FALSE_TAG: (&str, &str) = (MATHML, "false");
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum MathMl {
     Boolean(bool),
     Integer(i64),

@@ -24,6 +24,7 @@ mod _impl_trap_spaces;
 /// (see also [crate::symbolic_async_graph::SymbolicAsyncGraph::with_space_context]).
 ///
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SymbolicSpaceContext {
     inner_ctx: SymbolicContext,
     dual_variables: Vec<(BddVariable, BddVariable)>,
@@ -35,6 +36,7 @@ pub struct SymbolicSpaceContext {
 ///
 /// This is in principle similar to [crate::symbolic_async_graph::GraphVertices], but uses [SymbolicSpaceContext] for encoding.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NetworkSpaces {
     bdd: Bdd,
     dual_variables: Vec<(BddVariable, BddVariable)>,
@@ -51,6 +53,7 @@ pub struct SpaceIterator {
 /// This is similar to [crate::symbolic_async_graph::GraphColoredVertices], but uses [SymbolicSpaceContext] for encoding
 /// of spaces. Colors/parameters are encoded the same way as in the normal [SymbolicContext].
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NetworkColoredSpaces {
     bdd: Bdd,
     dual_variables: Vec<(BddVariable, BddVariable)>,

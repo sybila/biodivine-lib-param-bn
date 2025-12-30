@@ -108,6 +108,7 @@ fn never_stop() -> Result<(), ()> {
 ///
 /// **Warning:** Do not mix type-safe indices between different networks/graphs!
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariableId(usize);
 
 /// A type-safe index of a `Parameter` inside a `BooleanNetwork`.
@@ -118,12 +119,14 @@ pub struct VariableId(usize);
 ///
 /// **Warning:** Do not mix type-safe indices between different networks!
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParameterId(usize);
 
 /// Possible monotonous effects of a `Regulation` in a `RegulatoryGraph`.
 ///
 /// Activation means positive and inhibition means negative monotonicity.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Monotonicity {
     Activation,
     Inhibition,
@@ -134,6 +137,7 @@ pub enum Monotonicity {
 /// `Variable` can be only created by and borrowed from a `RegulatoryGraph`.
 /// It has no public constructor.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Variable {
     name: String,
 }
@@ -144,6 +148,7 @@ pub struct Variable {
 /// `Parameter` can be only created by and borrowed form the `BooleanNetwork` itself.
 /// It has no public constructor.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Parameter {
     name: String,
     arity: u32,
@@ -170,6 +175,7 @@ pub struct Parameter {
 /// Regulations cannot be created directly, they are only borrowed from a `RegulatoryGraph`
 /// or a `BooleanNetwork`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Regulation {
     pub regulator: VariableId,
     pub target: VariableId,
@@ -206,6 +212,7 @@ pub struct Regulation {
 ///  b -| b
 /// ```
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RegulatoryGraph {
     variables: Vec<Variable>,
     regulations: Vec<Regulation>,
@@ -214,6 +221,7 @@ pub struct RegulatoryGraph {
 
 /// Possible binary Boolean operators that can appear in `FnUpdate`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BinaryOp {
     And,
     Or,
@@ -229,6 +237,7 @@ pub enum BinaryOp {
 /// `BooleanNetwork`. The arguments used in the function must be the same as specified
 /// by the `RegulatoryGraph` of the network.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FnUpdate {
     /// A true/false constant.
     Const(bool),
@@ -266,6 +275,7 @@ pub enum FnUpdate {
 /// networks. This is because we want to preserve the property that `VariableId` and `ParameterId`
 /// objects are interchangeable as long as networks are equivalent.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BooleanNetwork {
     graph: RegulatoryGraph,
     parameters: Vec<Parameter>,
@@ -284,6 +294,7 @@ pub type RegulationIterator<'a> = std::slice::Iter<'a, Regulation>;
 
 /// An enum representing the possible state of each variable when describing a hypercube.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExtendedBoolean {
     Zero,
     One,
@@ -295,6 +306,7 @@ pub enum ExtendedBoolean {
 /// Keep in mind that there is no way of representing an empty hypercube at the moment. So any API
 /// that can take/return an empty set has to use `Option<Space>` or something similar.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Space(Vec<ExtendedBoolean>);
 
 /// Annotations are "meta" objects that can be declared as part of AEON models to add additional
@@ -341,7 +353,286 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// retain whitespace around annotation values. As mentioned, multi-line values can be split
 /// into multiple annotation comments.
 #[derive(PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModelAnnotation {
     value: Option<String>,
     inner: HashMap<String, ModelAnnotation>,
+}
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use std::convert::TryFrom;
+
+    fn test_round_trip<T>(value: &T)
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
+    {
+        // Test JSON serialization
+        let json = serde_json::to_string(value).expect("Serialization should succeed");
+        let deserialized: T = serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(
+            value, &deserialized,
+            "Round-trip serialization should preserve value"
+        );
+    }
+
+    fn test_round_trip_clone<T>(value: T)
+    where
+        T: Clone + serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
+    {
+        test_round_trip(&value);
+    }
+
+    #[test]
+    fn test_boolean_network_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&network);
+
+        // Test with a more complex network
+        let network2 = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+            a -> a
+            a -> c
+            $a: !c & !a
+            $b: a
+            $c: a
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&network2);
+    }
+
+    #[test]
+    fn test_regulatory_graph_serialization() {
+        let graph = RegulatoryGraph::try_from(
+            r"
+            A -> B
+            B -?? A
+            C -> A
+            C -|? B
+            A -| A
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&graph);
+    }
+
+    #[test]
+    fn test_symbolic_async_graph_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        // Test serialization (can't test equality as SymbolicAsyncGraph doesn't implement PartialEq)
+        let json = serde_json::to_string(&stg).expect("Serialization should succeed");
+        let deserialized: SymbolicAsyncGraph =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // Verify basic properties are preserved
+        assert_eq!(
+            stg.unit_colored_vertices().approx_cardinality(),
+            deserialized.unit_colored_vertices().approx_cardinality()
+        );
+        assert_eq!(
+            stg.unit_colored_vertices().vertices().approx_cardinality(),
+            deserialized
+                .unit_colored_vertices()
+                .vertices()
+                .approx_cardinality()
+        );
+        assert_eq!(
+            stg.unit_colored_vertices().colors().approx_cardinality(),
+            deserialized
+                .unit_colored_vertices()
+                .colors()
+                .approx_cardinality()
+        );
+    }
+
+    #[test]
+    fn test_graph_colored_vertices_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit = stg.unit_colored_vertices();
+        test_round_trip_clone(unit.clone());
+
+        // Test empty set
+        let empty = stg.empty_colored_vertices();
+        test_round_trip_clone(empty.clone());
+
+        // Test a specific vertex set
+        let id_a = network.as_graph().find_variable("A").unwrap();
+        let a_true = stg.fix_network_variable(id_a, true);
+        test_round_trip_clone(a_true.clone());
+    }
+
+    #[test]
+    fn test_graph_vertices_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit_vertices = stg.unit_colored_vertices().vertices();
+        test_round_trip_clone(unit_vertices.clone());
+
+        // Test empty set
+        let empty_vertices = stg.empty_colored_vertices().vertices();
+        test_round_trip_clone(empty_vertices.clone());
+    }
+
+    #[test]
+    fn test_graph_colors_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: f(A)
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit_colors = stg.unit_colored_vertices().colors();
+        test_round_trip_clone(unit_colors.clone());
+
+        // Test empty set
+        let empty_colors = stg.empty_colored_vertices().colors();
+        test_round_trip_clone(empty_colors.clone());
+    }
+
+    #[test]
+    fn test_space_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+        ",
+        )
+        .unwrap();
+
+        // Create space with specific values for testing
+        let space1_values = vec![ExtendedBoolean::Zero, ExtendedBoolean::One];
+        let space1 = Space(space1_values);
+        test_round_trip_clone(space1.clone());
+
+        let space2_values = vec![
+            ExtendedBoolean::Any,
+            ExtendedBoolean::Zero,
+            ExtendedBoolean::One,
+        ];
+        let space2 = Space(space2_values);
+        test_round_trip_clone(space2.clone());
+
+        // Test with a space created from network
+        let space3 = Space::new(&network);
+        test_round_trip_clone(space3.clone());
+    }
+
+    #[test]
+    fn test_fn_update_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            A -> A
+            $A: B & !A
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let id_a = network.as_graph().find_variable("A").unwrap();
+        let id_b = network.as_graph().find_variable("B").unwrap();
+
+        let update_a = network.get_update_function(id_a).as_ref().unwrap().clone();
+        test_round_trip_clone(update_a.clone());
+
+        let update_b = network.get_update_function(id_b).as_ref().unwrap().clone();
+        test_round_trip_clone(update_b.clone());
+    }
+
+    #[test]
+    fn test_regulation_serialization() {
+        let graph = RegulatoryGraph::try_from(
+            r"
+            A -> B
+            B -> A
+            C -|? B
+            A -| A
+        ",
+        )
+        .unwrap();
+
+        for regulation in graph.regulations() {
+            test_round_trip(regulation);
+        }
+    }
+
+    #[test]
+    fn test_variable_and_parameter_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: f(B)
+        ",
+        )
+        .unwrap();
+
+        for var_id in network.variables() {
+            let variable = network.get_variable(var_id);
+            test_round_trip(variable);
+        }
+
+        for param_id in network.parameters() {
+            let parameter = network.get_parameter(param_id);
+            test_round_trip(parameter);
+        }
+    }
 }

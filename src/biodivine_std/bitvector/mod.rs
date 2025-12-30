@@ -157,4 +157,5 @@ pub struct ArrayBitVector {
 ///
 /// `BitVector58` is also `Copy`, because it is small enough to pass by value.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BitVector58(u64);
