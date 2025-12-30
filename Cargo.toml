@@ -11,6 +11,8 @@ keywords = ["boolean-network", "asynchronous", "symbolic", "graph", "systems-bio
 categories = ["science", "simulation"]
 license = "MIT"
 rust-version = "1.88"
+# When releasing, only include the actual source code of the crate:
+include = ["/src/**", "/Cargo.toml", "/README.md", "/LICENSE", "/docs-head.html"]
 
 [lib]
 name = "biodivine_lib_param_bn"
