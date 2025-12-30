@@ -358,3 +358,281 @@ pub struct ModelAnnotation {
     value: Option<String>,
     inner: HashMap<String, ModelAnnotation>,
 }
+
+#[cfg(all(test, feature = "serde"))]
+mod serde_tests {
+    use super::*;
+    use crate::symbolic_async_graph::SymbolicAsyncGraph;
+    use std::convert::TryFrom;
+
+    fn test_round_trip<T>(value: &T)
+    where
+        T: serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
+    {
+        // Test JSON serialization
+        let json = serde_json::to_string(value).expect("Serialization should succeed");
+        let deserialized: T = serde_json::from_str(&json).expect("Deserialization should succeed");
+        assert_eq!(
+            value, &deserialized,
+            "Round-trip serialization should preserve value"
+        );
+    }
+
+    fn test_round_trip_clone<T>(value: T)
+    where
+        T: Clone + serde::Serialize + serde::de::DeserializeOwned + PartialEq + std::fmt::Debug,
+    {
+        test_round_trip(&value);
+    }
+
+    #[test]
+    fn test_boolean_network_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&network);
+
+        // Test with a more complex network
+        let network2 = BooleanNetwork::try_from(
+            r"
+            a -> b
+            b -> c
+            c -> a
+            a -> a
+            a -> c
+            $a: !c & !a
+            $b: a
+            $c: a
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&network2);
+    }
+
+    #[test]
+    fn test_regulatory_graph_serialization() {
+        let graph = RegulatoryGraph::try_from(
+            r"
+            A -> B
+            B -?? A
+            C -> A
+            C -|? B
+            A -| A
+        ",
+        )
+        .unwrap();
+
+        test_round_trip(&graph);
+    }
+
+    #[test]
+    fn test_symbolic_async_graph_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            C -|? B
+            $B: A
+            C -> A
+            B -> A
+            A -| A
+            $A: C | f(A, B)
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        // Test serialization (can't test equality as SymbolicAsyncGraph doesn't implement PartialEq)
+        let json = serde_json::to_string(&stg).expect("Serialization should succeed");
+        let deserialized: SymbolicAsyncGraph =
+            serde_json::from_str(&json).expect("Deserialization should succeed");
+
+        // Verify basic properties are preserved
+        assert_eq!(
+            stg.unit_colored_vertices().approx_cardinality(),
+            deserialized.unit_colored_vertices().approx_cardinality()
+        );
+        assert_eq!(
+            stg.unit_colored_vertices().vertices().approx_cardinality(),
+            deserialized
+                .unit_colored_vertices()
+                .vertices()
+                .approx_cardinality()
+        );
+        assert_eq!(
+            stg.unit_colored_vertices().colors().approx_cardinality(),
+            deserialized
+                .unit_colored_vertices()
+                .colors()
+                .approx_cardinality()
+        );
+    }
+
+    #[test]
+    fn test_graph_colored_vertices_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit = stg.unit_colored_vertices();
+        test_round_trip_clone(unit.clone());
+
+        // Test empty set
+        let empty = stg.empty_colored_vertices();
+        test_round_trip_clone(empty.clone());
+
+        // Test a specific vertex set
+        let id_a = network.as_graph().find_variable("A").unwrap();
+        let a_true = stg.fix_network_variable(id_a, true);
+        test_round_trip_clone(a_true.clone());
+    }
+
+    #[test]
+    fn test_graph_vertices_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit_vertices = stg.unit_colored_vertices().vertices();
+        test_round_trip_clone(unit_vertices.clone());
+
+        // Test empty set
+        let empty_vertices = stg.empty_colored_vertices().vertices();
+        test_round_trip_clone(empty_vertices.clone());
+    }
+
+    #[test]
+    fn test_graph_colors_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: B
+            $B: f(A)
+        ",
+        )
+        .unwrap();
+
+        let stg = SymbolicAsyncGraph::new(&network).unwrap();
+        let unit_colors = stg.unit_colored_vertices().colors();
+        test_round_trip_clone(unit_colors.clone());
+
+        // Test empty set
+        let empty_colors = stg.empty_colored_vertices().colors();
+        test_round_trip_clone(empty_colors.clone());
+    }
+
+    #[test]
+    fn test_space_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+        ",
+        )
+        .unwrap();
+
+        // Create space with specific values for testing
+        let space1_values = vec![ExtendedBoolean::Zero, ExtendedBoolean::One];
+        let space1 = Space(space1_values);
+        test_round_trip_clone(space1.clone());
+
+        let space2_values = vec![
+            ExtendedBoolean::Any,
+            ExtendedBoolean::Zero,
+            ExtendedBoolean::One,
+        ];
+        let space2 = Space(space2_values);
+        test_round_trip_clone(space2.clone());
+
+        // Test with a space created from network
+        let space3 = Space::new(&network);
+        test_round_trip_clone(space3.clone());
+    }
+
+    #[test]
+    fn test_fn_update_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            A -> A
+            $A: B & !A
+            $B: A
+        ",
+        )
+        .unwrap();
+
+        let id_a = network.as_graph().find_variable("A").unwrap();
+        let id_b = network.as_graph().find_variable("B").unwrap();
+
+        let update_a = network.get_update_function(id_a).as_ref().unwrap().clone();
+        test_round_trip_clone(update_a.clone());
+
+        let update_b = network.get_update_function(id_b).as_ref().unwrap().clone();
+        test_round_trip_clone(update_b.clone());
+    }
+
+    #[test]
+    fn test_regulation_serialization() {
+        let graph = RegulatoryGraph::try_from(
+            r"
+            A -> B
+            B -> A
+            C -|? B
+            A -| A
+        ",
+        )
+        .unwrap();
+
+        for regulation in graph.regulations() {
+            test_round_trip(regulation);
+        }
+    }
+
+    #[test]
+    fn test_variable_and_parameter_serialization() {
+        let network = BooleanNetwork::try_from(
+            r"
+            A -> B
+            B -> A
+            $A: f(B)
+        ",
+        )
+        .unwrap();
+
+        for var_id in network.variables() {
+            let variable = network.get_variable(var_id);
+            test_round_trip(variable);
+        }
+
+        for param_id in network.parameters() {
+            let parameter = network.get_parameter(param_id);
+            test_round_trip(parameter);
+        }
+    }
+}
