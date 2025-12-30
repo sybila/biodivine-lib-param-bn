@@ -64,10 +64,11 @@ impl BooleanNetwork {
             if let Some(rule) = parse_update_rule(line)? {
                 let (var_name, expression) = rule;
 
-                // Check for unsupported features before parsing
-                if expression.contains("Random") {
+                // Check for unsupported 'Random' as a variable name
+                // (Random is a special literal in BooleanNet for stochastic simulation)
+                if var_name == "Random" {
                     return Err(format!(
-                        "Line {}: 'Random' literal is not supported.",
+                        "Line {}: 'Random' is a reserved keyword and cannot be used as a variable name.",
                         line_num + 1
                     ));
                 }
@@ -76,6 +77,16 @@ impl BooleanNetwork {
                 let function_template =
                     FnUpdateTemp::try_from_str(&expression, ExpressionSyntax::BooleanNet)
                         .map_err(|e| format!("Line {}: {}", line_num + 1, e))?;
+
+                // Check for unsupported 'Random' literal by looking for a variable named exactly "Random"
+                let mut expr_variables = HashSet::new();
+                function_template.dump_variables(&mut expr_variables);
+                if expr_variables.contains("Random") {
+                    return Err(format!(
+                        "Line {}: 'Random' literal is not supported.",
+                        line_num + 1
+                    ));
+                }
 
                 // Now sanitize the variable name
                 let sanitized_var = sanitize(&var_name, &mut name_mapping);
@@ -385,6 +396,46 @@ B* = False
     fn test_reject_random_literal() {
         let model = r#"
 A* = Random
+"#;
+        let result = BooleanNetwork::try_from_booleannet(model);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Random"));
+    }
+
+    #[test]
+    fn test_reject_random_in_expression() {
+        // Random used in a larger expression should also be rejected
+        let model = r#"
+A* = True
+B* = A and Random
+"#;
+        let result = BooleanNetwork::try_from_booleannet(model);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Random"));
+    }
+
+    #[test]
+    fn test_allow_random_like_variable_names() {
+        // Variables that contain "Random" as part of their name should be allowed
+        let model = r#"
+A_Random* = True
+RandomVariable* = A_Random
+NotRandom* = RandomVariable and A_Random
+"#;
+        let (network, _) = BooleanNetwork::try_from_booleannet(model).unwrap();
+        assert_eq!(network.num_vars(), 3);
+
+        // Check that all variable names are preserved correctly
+        assert!(network.as_graph().find_variable("A_Random").is_some());
+        assert!(network.as_graph().find_variable("RandomVariable").is_some());
+        assert!(network.as_graph().find_variable("NotRandom").is_some());
+    }
+
+    #[test]
+    fn test_random_as_variable_name_rejected() {
+        // A variable named exactly "Random" should be rejected
+        let model = r#"
+Random* = True
 "#;
         let result = BooleanNetwork::try_from_booleannet(model);
         assert!(result.is_err());
