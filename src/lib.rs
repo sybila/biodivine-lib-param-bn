@@ -108,6 +108,7 @@ fn never_stop() -> Result<(), ()> {
 ///
 /// **Warning:** Do not mix type-safe indices between different networks/graphs!
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VariableId(usize);
 
 /// A type-safe index of a `Parameter` inside a `BooleanNetwork`.
@@ -118,12 +119,14 @@ pub struct VariableId(usize);
 ///
 /// **Warning:** Do not mix type-safe indices between different networks!
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ParameterId(usize);
 
 /// Possible monotonous effects of a `Regulation` in a `RegulatoryGraph`.
 ///
 /// Activation means positive and inhibition means negative monotonicity.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Monotonicity {
     Activation,
     Inhibition,
@@ -134,6 +137,7 @@ pub enum Monotonicity {
 /// `Variable` can be only created by and borrowed from a `RegulatoryGraph`.
 /// It has no public constructor.
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Variable {
     name: String,
 }
@@ -144,6 +148,7 @@ pub struct Variable {
 /// `Parameter` can be only created by and borrowed form the `BooleanNetwork` itself.
 /// It has no public constructor.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Parameter {
     name: String,
     arity: u32,
@@ -170,6 +175,7 @@ pub struct Parameter {
 /// Regulations cannot be created directly, they are only borrowed from a `RegulatoryGraph`
 /// or a `BooleanNetwork`.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Regulation {
     pub regulator: VariableId,
     pub target: VariableId,
@@ -206,6 +212,7 @@ pub struct Regulation {
 ///  b -| b
 /// ```
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RegulatoryGraph {
     variables: Vec<Variable>,
     regulations: Vec<Regulation>,
@@ -214,6 +221,7 @@ pub struct RegulatoryGraph {
 
 /// Possible binary Boolean operators that can appear in `FnUpdate`.
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BinaryOp {
     And,
     Or,
@@ -229,6 +237,7 @@ pub enum BinaryOp {
 /// `BooleanNetwork`. The arguments used in the function must be the same as specified
 /// by the `RegulatoryGraph` of the network.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum FnUpdate {
     /// A true/false constant.
     Const(bool),
@@ -266,6 +275,7 @@ pub enum FnUpdate {
 /// networks. This is because we want to preserve the property that `VariableId` and `ParameterId`
 /// objects are interchangeable as long as networks are equivalent.
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BooleanNetwork {
     graph: RegulatoryGraph,
     parameters: Vec<Parameter>,
@@ -284,6 +294,7 @@ pub type RegulationIterator<'a> = std::slice::Iter<'a, Regulation>;
 
 /// An enum representing the possible state of each variable when describing a hypercube.
 #[derive(Copy, Clone, Eq, PartialEq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ExtendedBoolean {
     Zero,
     One,
@@ -295,6 +306,7 @@ pub enum ExtendedBoolean {
 /// Keep in mind that there is no way of representing an empty hypercube at the moment. So any API
 /// that can take/return an empty set has to use `Option<Space>` or something similar.
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Space(Vec<ExtendedBoolean>);
 
 /// Annotations are "meta" objects that can be declared as part of AEON models to add additional
@@ -341,6 +353,7 @@ pub struct Space(Vec<ExtendedBoolean>);
 /// retain whitespace around annotation values. As mentioned, multi-line values can be split
 /// into multiple annotation comments.
 #[derive(PartialEq, Eq, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ModelAnnotation {
     value: Option<String>,
     inner: HashMap<String, ModelAnnotation>,

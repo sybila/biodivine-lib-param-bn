@@ -23,10 +23,12 @@ where
 
 /// A very basic implementation of a `State` which simply stores a single `usize` index.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IdState(usize);
 
 /// A simple `IdState` iterator used for graphs where the states are consecutive integers.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct IdStateRange {
     next: usize,
     remaining: usize,

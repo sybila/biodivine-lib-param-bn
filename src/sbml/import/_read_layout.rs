@@ -9,6 +9,7 @@ use std::collections::HashMap;
 /// If contains dimensions of the layout and a mapping
 /// from SBML ids to coordinates in such layout.
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlLayout {
     pub dimensions: (f64, f64),
     pub glyphs: HashMap<String, (f64, f64)>,

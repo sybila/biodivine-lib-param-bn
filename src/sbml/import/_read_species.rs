@@ -4,6 +4,7 @@ use roxmltree::Node;
 /// Approximate representation of an SBML specie. Note that only ID is required, all other
 /// properties are optional.
 #[derive(Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SbmlSpecie {
     pub id: String,
     pub compartment: Option<String>,

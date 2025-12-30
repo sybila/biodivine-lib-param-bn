@@ -71,6 +71,7 @@ pub(crate) mod bdd_set;
 ///
 /// Implementation contains all symbolic variables, but state variables are unconstrained.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GraphColors {
     pub(crate) bdd: Bdd,
     pub(crate) parameter_variables: Vec<BddVariable>,
@@ -78,6 +79,7 @@ pub struct GraphColors {
 
 /// Symbolic representation of a coloured set of graph vertices, i.e. a subset of $V \times C$.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GraphColoredVertices {
     bdd: Bdd,
     state_variables: Vec<BddVariable>,
@@ -88,6 +90,7 @@ pub struct GraphColoredVertices {
 ///
 /// Implementation contains all symbolic variables, but parameter variables are unconstrained.
 #[derive(Clone, Eq, PartialEq, Hash, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GraphVertices {
     bdd: Bdd,
     state_variables: Vec<BddVariable>,
@@ -117,6 +120,7 @@ pub struct GraphVertexIterator {
 ///
 /// Provides standard pre- / post-operations for exploring the graph symbolically.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SymbolicAsyncGraph {
     // If available, provides the original network that was used to create the graph.
     // We should not rely on the network being available though, as the graph can be created
@@ -148,6 +152,7 @@ pub struct SymbolicAsyncGraph {
 /// Note that while this is technically public, it should not be used unless absolutely necessary.
 /// Playing with raw `BDDs` is dangerous.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SymbolicContext {
     bdd: BddVariableSet,
     // One symbolic variable for each network variable.
@@ -170,6 +175,7 @@ pub struct SymbolicContext {
 /// pairs of `Vec<bool>` (function input assignment) and `BddVariable`
 /// (corresponding symbolic variable).
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FunctionTable {
     /// Original name of the function. This can be derived from the names of the symbolic variables, but it
     /// is useful to have it around if we ever want to translate between representations.

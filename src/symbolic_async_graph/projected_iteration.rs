@@ -39,6 +39,7 @@ use std::collections::HashSet;
 /// its valuations, we do not repeat valuations that only differ in variables that
 /// are not retained.
 #[derive(Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct RawProjection {
     retained_variables: Vec<BddVariable>,
     bdd: Bdd,
