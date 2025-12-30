@@ -1,0 +1,8 @@
+reviews:
+  path_filters:
+    - "!aeon_models/**"
+    - "!booleannet_models/**"
+    - "!sbml_models/**"
+issue_enrichment:
+  auto_enrich:
+    enabled: false

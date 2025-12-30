@@ -41,10 +41,14 @@ impl BooleanNetwork {
     pub fn try_from_file<T: AsRef<Path>>(path: T) -> Result<BooleanNetwork, String> {
         let path: &Path = path.as_ref();
         let extension = path.extension().and_then(|it| it.to_str());
+        let path_str = path.to_str().unwrap_or("");
         let is_aeon = extension == Some("aeon");
         let is_bnet = extension == Some("bnet");
         let is_sbml = extension == Some("sbml");
-        if is_aeon || is_bnet || is_sbml {
+        // BooleanNet files can have .booleannet.txt or .booleannet extension
+        let is_booleannet =
+            extension == Some("booleannet") || path_str.ends_with(".booleannet.txt");
+        if is_aeon || is_bnet || is_sbml || is_booleannet {
             let content = std::fs::read_to_string(path);
             match content {
                 Ok(content) => {
@@ -52,6 +56,8 @@ impl BooleanNetwork {
                         Self::try_from(content.as_str())
                     } else if is_bnet {
                         Self::try_from_bnet(content.as_str())
+                    } else if is_booleannet {
+                        Self::try_from_booleannet(content.as_str()).map(|(x, _)| x)
                     } else {
                         Self::try_from_sbml(content.as_str()).map(|(x, _)| x)
                     }

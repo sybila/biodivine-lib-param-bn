@@ -1,6 +1,6 @@
 //! A library for analysis of Boolean networks. As of now, the library supports:
 //!  - Regulatory graphs with monotonicity and observability constraints.
-//!  - Boolean networks, possibly with partially unknown and parametrised update functions.
+//!  - Boolean networks, possibly with partially unknown and parametrized update functions.
 //!  - Full SBML-qual support for import/export as well as custom string format `.aeon`.
 //!  - Fully symbolic asynchronous state-space generator using BDDs (great overall performance).
 //!  - Semi-symbolic state-space generator, using BDDs used only for the network parameters
@@ -39,8 +39,12 @@ mod _impl_boolean_network;
 mod _impl_boolean_network_display;
 /// **(internal)** Implements experimental `.bnet` parser for `BooleanNetwork`.
 mod _impl_boolean_network_from_bnet;
+/// **(internal)** Implements BooleanNet format parser for `BooleanNetwork`.
+mod _impl_boolean_network_from_booleannet;
 /// **(internal)** Implements an experimental `.bnet` writer for `BooleanNetwork`.
 mod _impl_boolean_network_to_bnet;
+/// **(internal)** Implements BooleanNet format writer for `BooleanNetwork`.
+mod _impl_boolean_network_to_booleannet;
 /// **(internal)** All methods implemented by the `ExtendedBoolean` object.
 mod _impl_extended_boolean;
 /// **(internal)** Utility methods for `FnUpdate`.
@@ -552,7 +556,7 @@ mod serde_tests {
         )
         .unwrap();
 
-        // Create space with specific values for testing
+        // Create a space with specific values for testing
         let space1_values = vec![ExtendedBoolean::Zero, ExtendedBoolean::One];
         let space1 = Space(space1_values);
         test_round_trip_clone(space1.clone());
@@ -565,7 +569,7 @@ mod serde_tests {
         let space2 = Space(space2_values);
         test_round_trip_clone(space2.clone());
 
-        // Test with a space created from network
+        // Test with a space created from a network
         let space3 = Space::new(&network);
         test_round_trip_clone(space3.clone());
     }

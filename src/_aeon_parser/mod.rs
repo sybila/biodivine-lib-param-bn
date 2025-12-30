@@ -15,6 +15,9 @@ mod _impl_fn_update_temp;
 /// **(internal)** Parsing utility methods for the `RegulatoryGraph`.
 mod _impl_regulatory_graph;
 
+// Re-export ExpressionSyntax for use in BooleanNet parsing
+pub(crate) use _from_string_for_fn_update_temp::ExpressionSyntax;
+
 /// **(internal)** A helper struct for representing a parsed `Regulation` that has not been
 /// integrated into a `RegulatoryGraph` yet.
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
