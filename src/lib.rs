@@ -96,10 +96,6 @@ fn should_log(log_level: usize) -> bool {
     log_level > LOG_NOTHING
 }
 
-fn never_stop() -> Result<(), ()> {
-    Ok(())
-}
-
 /// A type-safe index of a `Variable` inside a `RegulatoryGraph` (or a `BooleanNetwork`).
 ///
 /// If needed, it can be converted into `usize` for serialisation and safely read

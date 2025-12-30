@@ -7,8 +7,10 @@ use crate::{ExtendedBoolean, Space, VariableId};
 /// This mainly includes reachability and similar fixed-point properties.
 ///
 /// In some cases, you may want to re-implement these algorithms, since they do not have
-/// more advanced features, like logging or cancellation. But for most general use-cases, these
-/// should be the best we can do right now in terms of performance.
+/// more advanced features, like logging or cancellation. However, note that the underlying
+/// reachability methods (`Reachability::reach_fwd`, `Reachability::reach_bwd`, etc.) do support
+/// cancellation through their `_reach` and `_reach_basic_saturation` variants. But for most
+/// general use-cases, these should be the best we can do right now in terms of performance.
 impl SymbolicAsyncGraph {
     /// Compute the set of forward-reachable vertices from the given `initial` set.
     ///

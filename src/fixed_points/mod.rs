@@ -1,37 +1,37 @@
 //! This module contains algorithms and data structures for efficiently computing fixed-points
 //! of large Boolean networks.
 //!
-//! There are two main approaches one can use to obtain the fixed-points:
+//! There are two main approaches one can use to get the fixed-points:
 //!
-//! 1. A solver based method (relying on Z3). This method works well for enumerating
-//!    small batches of fixed-points, but does not scale very well for high numbers
+//! 1. A solver-based method (relying on Z3). This method works well for enumerating
+//!    small batches of fixed-points but does not scale very well for high numbers
 //!    of fixed-points, as each of them has to be explicitly returned by the solver.
 //!
 //! 2. A symbolic BDD-based method. This approach generally suffers more from the state space
 //!    explosion (it can take a long time for large networks), but if the number of results
-//!    if very high, it can still outperform enumeration based on solvers. Also, it can be
-//!    easily restricted to arbitrary symbolic sets,
-
-use crate::biodivine_std::traits::Set;
-use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
-use crate::symbolic_async_graph::{GraphColors, GraphVertices};
-use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
-use std::collections::{HashMap, HashSet};
+//!    is very high, it can still outperform enumeration based on solvers. Also, it can be
+//!    easily restricted to arbitrary symbolic sets.
 
 #[cfg(feature = "solver-z3")]
 use crate::Space;
+use crate::biodivine_std::traits::Set;
 #[cfg(feature = "solver-z3")]
 use crate::fixed_points::solver_iterator::{
     SolverColorIterator, SolverIterator, SolverVertexIterator,
 };
 #[cfg(feature = "solver-z3")]
 use crate::solver_context::{BnSolver, BnSolverContext};
+use crate::symbolic_async_graph::{GraphColoredVertices, SymbolicAsyncGraph};
+use crate::symbolic_async_graph::{GraphColors, GraphVertices};
+use biodivine_lib_bdd::{Bdd, BddVariable, BddVariableSet};
+use cancel_this::{Cancellable, is_cancelled};
+use std::collections::{HashMap, HashSet};
 
 /// **(internal)** Implements the iterator used by `FixedPoints::symbolic_iterator`.
 /// (The module is hidden, but we re-export iterator in this module)
 mod symbolic_iterator;
 use crate::symbolic_async_graph::projected_iteration::MixedProjection;
-use crate::{BooleanNetwork, VariableId, global_log_level, log_essential, never_stop, should_log};
+use crate::{BooleanNetwork, VariableId, global_log_level, log_essential, should_log};
 pub use symbolic_iterator::SymbolicIterator;
 
 /// Implements the iterator used by `FixedPoints::solver_iterator`.
@@ -120,17 +120,17 @@ impl FixedPoints {
     }
 
     /// A better version of the `Self::naive_symbolic` algorithm that can actually scale to
-    /// reasonably sized networks (e.g. 100-200 variables + parameters).
+    /// reasonably sized networks (e.g., 100-200 variables plus parameters).
     ///
     /// Only fixed-points from the `restriction` set are returned. However, the state has to
     /// be a *global* fixed point, not just a fixed-point within the `restriction` set.
     ///
     /// **Characteristics:** Instead of merging individual constraints one by one, this algorithm
     /// greedily selects the constraint that leads to the smallest intermediate BDD. This requires
-    /// more symbolic operations, but can work better as the intermediate BDDs tend to be smaller.
+    /// more symbolic operations but can work better as the intermediate BDDs tend to be smaller.
     ///
-    /// In particular, this tends to work better for cases where no fixed points exist, because
-    /// the process will often quickly find a combination on constraints that prevent
+    /// In particular, this tends to work better for cases where no fixed points exist. Here,
+    /// the process will often quickly find a combination of constraints that prevent
     /// the fixed point from existing (whereas for `naive_symbolic`, this process is much more
     /// random).
     ///
@@ -139,25 +139,27 @@ impl FixedPoints {
     ///
     /// You can often scale the algorithm to very large networks as well, but the hardest
     /// bottleneck seems to be the total number of fixed points. As such, if the network is large
-    /// (e.g. 1000 variables) but has only a few fixed points, it can often still be solved by this
-    /// method. However, if there are many parameters (e.g. >50) and the number of fixed points
+    /// (e.g., 1000 variables) but has only a few fixed points, it can often still be solved by this
+    /// method. However, if there are many parameters (e.g., >50) and the number of fixed points
     /// is proportional to the number of parameters, you will be bounded by the inherent
     /// combinatorial complexity of the resulting set of states.
     pub fn symbolic(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphColoredVertices {
-        Self::_symbolic(stg, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_symbolic(stg, restriction, global_log_level()).unwrap()
     }
 
     /// A version of [FixedPoints::symbolic] with cancellation
     /// and logging.
-    pub fn _symbolic<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _symbolic(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<GraphColoredVertices, E> {
+    ) -> Cancellable<GraphColoredVertices> {
         if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point search with {}[nodes:{}] candidates.",
@@ -166,7 +168,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
+        let mut to_merge = Self::prepare_to_merge(stg, log_level)?;
 
         /*
            Note to self: There is actually a marginally faster version of this algorithm that
@@ -175,12 +177,12 @@ impl FixedPoints {
            results have to be preserved, so I ultimately decided not to use it.
         */
 
-        // Finally add the global requirement on the whole state space, if it is relevant.
+        // Finally, add the global requirement on the whole state space if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
 
-        interrupt()?;
+        is_cancelled!()?;
 
         let fixed_points = Self::symbolic_merge(
             stg.symbolic_context().bdd_variable_set(),
@@ -188,7 +190,7 @@ impl FixedPoints {
             HashSet::default(),
         );
 
-        interrupt()?;
+        is_cancelled!()?;
 
         let fixed_points = stg.unit_colored_vertices().copy(fixed_points);
 
@@ -215,7 +217,7 @@ impl FixedPoints {
     /// we have a much finer control over what network elements are retained.
     ///
     /// Naturally, you can use empty `retain_state` or `retain_function` to implement a projection
-    /// to subset of states/functions. For now, we do not provide extra methods for this, as it
+    /// to a subset of states/functions. For now, we do not provide extra methods for this, as it
     /// is not a very common use case. But if you want it, get in touch.
     pub fn symbolic_projection<'a>(
         network: &BooleanNetwork,
@@ -232,7 +234,7 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge = Self::prepare_to_merge(stg, global_log_level(), &never_stop).unwrap();
+        let mut to_merge = Self::prepare_to_merge(stg, global_log_level()).unwrap();
 
         // Now compute the BDD variables that should be projected away.
         let ctx = stg.symbolic_context();
@@ -262,7 +264,7 @@ impl FixedPoints {
             }
         }
 
-        // Finally add the global requirement on the whole state space, if it is relevant.
+        // Finally, add the global requirement on the whole state space if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
@@ -286,10 +288,10 @@ impl FixedPoints {
         )
     }
 
-    /// This is a helper method that is used by `Self::symbolic_vertices` and
+    /// This is a helper method used by `Self::symbolic_vertices` and
     /// `Self::symbolic_colors`.
     ///
-    /// It greedily performs a conjunction of the given BDDs, but eliminates the symbolic
+    /// It greedily performs a conjunction of the given BDDs but eliminates the symbolic
     /// variables given in `project`. Using this method, you can implement arbitrary projected
     /// fixed-point detection. However, the method is inherently unsafe because currently
     /// there is no way to give a type-safe result for operations other than `symbolic_vertices`
@@ -301,18 +303,20 @@ impl FixedPoints {
         // The set of variables that will be eliminated from the result.
         project: HashSet<BddVariable>,
     ) -> Bdd {
-        Self::_symbolic_merge(universe, to_merge, project, global_log_level(), &never_stop).unwrap()
+        Self::_symbolic_merge(universe, to_merge, project, global_log_level()).unwrap()
     }
 
     /// A version of [FixedPoints::symbolic_merge] with cancellation
     /// and logging.
-    pub fn _symbolic_merge<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _symbolic_merge(
         universe: &BddVariableSet,
         to_merge: Vec<Bdd>,
         mut project: HashSet<BddVariable>,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<Bdd, E> {
+    ) -> Cancellable<Bdd> {
         // First, assign each merge item a unique integer identifier.
         let mut to_merge: HashMap<usize, Bdd> = to_merge.into_iter().enumerate().collect();
 
@@ -338,7 +342,7 @@ impl FixedPoints {
 
         let mut result = universe.mk_true();
         let mut merged = HashSet::new();
-        interrupt()?;
+        is_cancelled!()?;
 
         /*
            Note to self: It seems that not all projections are always beneficial to the BDD size.
@@ -356,7 +360,7 @@ impl FixedPoints {
                 if dependencies.is_subset(&merged) {
                     result = result.var_exists(p_var);
                     project.remove(&p_var);
-                    interrupt()?;
+                    is_cancelled!()?;
 
                     if log_essential(log_level, result.size()) {
                         println!(
@@ -384,7 +388,7 @@ impl FixedPoints {
                     &result,
                     biodivine_lib_bdd::op_function::and,
                 );
-                interrupt()?;
+                is_cancelled!()?;
 
                 if let Some(bdd) = bdd {
                     // At this point, the size of the BDD should be smaller or equal to the
@@ -397,7 +401,7 @@ impl FixedPoints {
             }
 
             // This may not be true in the last iteration if the only thing left to do
-            // are projections.
+            // is projections.
             if best_result_size != usize::MAX {
                 result = best_result;
                 to_merge.remove(&best_index);
@@ -417,7 +421,7 @@ impl FixedPoints {
             }
         }
 
-        interrupt()?;
+        is_cancelled!()?;
 
         if should_log(log_level) {
             println!("Merge finished with {} BDD nodes.", result.size(),);
@@ -431,7 +435,7 @@ impl FixedPoints {
         Ok(result)
     }
 
-    /// The result of the function are all vertices that can appear as fixed-points for **some**
+    /// The result of the function is all vertices that can appear as fixed-points for **some**
     /// parameter valuation. That is, for every returned vertex, there is at least one color
     /// for which the vertex is a fixed-point.
     ///
@@ -449,17 +453,19 @@ impl FixedPoints {
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphVertices {
-        Self::_symbolic_vertices(stg, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_symbolic_vertices(stg, restriction, global_log_level()).unwrap()
     }
 
     /// A version of [FixedPoints::symbolic_vertices] with cancellation
     /// and logging.
-    pub fn _symbolic_vertices<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _symbolic_vertices(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<GraphVertices, E> {
+    ) -> Cancellable<GraphVertices> {
         if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point vertex search with {}[nodes:{}] candidates.",
@@ -468,9 +474,9 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
+        let mut to_merge = Self::prepare_to_merge(stg, log_level)?;
 
-        // Finally add the global requirement on the whole state space, if it is relevant.
+        // Finally, add the global requirement on the whole state space if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
@@ -482,14 +488,14 @@ impl FixedPoints {
             .cloned()
             .collect();
 
-        interrupt()?;
+        is_cancelled!()?;
 
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
         let vertices = stg.empty_colored_vertices().vertices().copy(bdd);
 
-        interrupt()?;
+        is_cancelled!()?;
 
         if should_log(log_level) {
             println!(
@@ -508,17 +514,19 @@ impl FixedPoints {
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
     ) -> GraphColors {
-        Self::_symbolic_colors(stg, restriction, global_log_level(), &never_stop).unwrap()
+        Self::_symbolic_colors(stg, restriction, global_log_level()).unwrap()
     }
 
     /// A version of [FixedPoints::symbolic_colors] with cancellation
     /// and logging.
-    pub fn _symbolic_colors<E, F: Fn() -> Result<(), E>>(
+    ///
+    /// Cancellation implemented using [cancel-this](https://crates.io/crates/cancel-this).
+    /// For more information, see crate documentation.
+    pub fn _symbolic_colors(
         stg: &SymbolicAsyncGraph,
         restriction: &GraphColoredVertices,
         log_level: usize,
-        interrupt: &F,
-    ) -> Result<GraphColors, E> {
+    ) -> Cancellable<GraphColors> {
         if should_log(log_level) {
             println!(
                 "Start symbolic fixed-point color search with {}[nodes:{}] candidates.",
@@ -527,9 +535,9 @@ impl FixedPoints {
             );
         }
 
-        let mut to_merge = Self::prepare_to_merge(stg, log_level, interrupt)?;
+        let mut to_merge = Self::prepare_to_merge(stg, log_level)?;
 
-        // Finally add the global requirement on the whole state space, if it is relevant.
+        // Finally, add the global requirement on the whole state space if it is relevant.
         if !stg.unit_colored_vertices().is_subset(restriction) {
             to_merge.push(restriction.as_bdd().clone());
         }
@@ -541,14 +549,14 @@ impl FixedPoints {
             .cloned()
             .collect();
 
-        interrupt()?;
+        is_cancelled!()?;
 
         let bdd =
             Self::symbolic_merge(stg.symbolic_context().bdd_variable_set(), to_merge, project);
 
         let colors = stg.empty_colored_vertices().colors().copy(bdd);
 
-        interrupt()?;
+        is_cancelled!()?;
 
         if should_log(log_level) {
             println!(
@@ -569,7 +577,7 @@ impl FixedPoints {
     /// a hint as to how large (in terms of BDD nodes) you want the resulting sets to be.
     /// This value depends on how much memory and time you have, but a good starting value
     /// tends to be somewhere between `1_000_000` and `10_000_000`. If you'd rather want more
-    /// smaller sets, but get them quickly, you can go as low as `10_000` or `100_000` (given
+    /// smaller sets but get them quickly, you can go as low as `10_000` or `100_000` (given
     /// the model is not too large).
     ///
     /// It is not strictly guaranteed that the results are within this size limit, but the
@@ -600,7 +608,7 @@ impl FixedPoints {
     /// Finally, note that there is a certain minimal value of `size_limit` below which the
     /// algorithm cannot really fork effectively, because the sets are simply too large for the
     /// limit. For truly large networks (>1000 nodes), it is not always a good idea to set the
-    /// limit too low. If you only want to find *some* fixed point for *some* parametrisation,
+    /// limit too low. If you only want to find *some* fixed point for *some* parametrization,
     /// it is recommended that you either use the solver-based approach (`Self::solver_iterator`),
     /// or one of the projection methods (`Self::symbolic_vertices` or `Self::symbolic_colors`).
     pub fn symbolic_iterator<'a>(
@@ -669,7 +677,7 @@ impl FixedPoints {
         SolverColorIterator::new_with_solver(context, solver)
     }
 
-    /// Build a solver that is satisfied exactly by all combinations of fixed-point
+    /// Build a solver satisfied exactly by all combinations of fixed-point
     /// vertices and parameter valuations.
     ///
     /// This is mainly for building very custom fixed-point iterators, and you don't have to call
@@ -691,16 +699,12 @@ impl FixedPoints {
         solver
     }
 
-    fn prepare_to_merge<E, F: Fn() -> Result<(), E>>(
-        stg: &SymbolicAsyncGraph,
-        log_level: usize,
-        interrupt: &F,
-    ) -> Result<Vec<Bdd>, E> {
+    fn prepare_to_merge(stg: &SymbolicAsyncGraph, log_level: usize) -> Cancellable<Vec<Bdd>> {
         let mut to_merge = Vec::new();
         for var in stg.variables() {
             let can_step = stg.var_can_post(var, stg.unit_colored_vertices());
             let is_stable = stg.unit_colored_vertices().minus(&can_step);
-            interrupt()?;
+            is_cancelled!()?;
 
             if log_essential(log_level, is_stable.symbolic_size()) {
                 println!(
