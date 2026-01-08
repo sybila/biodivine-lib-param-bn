@@ -4,12 +4,12 @@
 //! members of a symbolic set, but only up to a certain subset of variables.
 //!
 //! For example, in a model with 200 variables, it may not be realistic to iterate over all
-//! attractor states, because the state space is simply too large. However, if we can narrow
+//! attractor states because the state space is simply too large. However, if we can narrow
 //! this search down to, e.g., 10 variables, we can use `StateProjection` to enumerate the
 //! valuations of these variables that appear in the original set.
 //!
 //! Similarly, we can use `FnUpdateProjection` and `MixedProjection` to iterate over instantiations
-//! of individual update functions, and over combinations of variable and update function
+//! of individual update functions and over combinations of variable and update function
 //! instantiations.
 //!
 //! If you want to implement another form of projection, you can start with a `RawProjection`,
@@ -34,7 +34,7 @@ use std::collections::HashSet;
 /// A helper object that stores the result of a "raw projection" so that we can create
 /// iterators over such projection.
 ///
-/// Note that the representation is slightly misleading, because the underlying `Bdd` actually
+/// Note that the representation is slightly misleading because the underlying `Bdd` actually
 /// has all non-retained variables fixed to `False`. This ensures that when we iterate through
 /// its valuations, we do not repeat valuations that only differ in variables that
 /// are not retained.
@@ -101,6 +101,16 @@ impl RawProjection {
             raw_projection: self,
             inner_iterator: self.bdd.sat_valuations(),
         }
+    }
+
+    /// The BDD restricted down to the retained variables (everything else if fixed to zero).
+    pub fn bdd(&self) -> &Bdd {
+        &self.bdd
+    }
+
+    /// The variables that are retained in this BDD.
+    pub fn retained_variables(&self) -> &[BddVariable] {
+        &self.retained_variables
     }
 }
 
@@ -501,9 +511,9 @@ mod tests {
         // Now, we also require b=false and remove everything that can update b.
         let set = a1_and_update.intersect(&b_is_false).minus(&can_update_b);
 
-        // This still leaves three functions for `a`, but only one function for b: b=false.
-        // This is because we know that b must be false, a must be true, and so b=true would
-        // update, as well as b=a would update.
+        // This still leaves three functions for `a`, but only one function for `b`: `b=false`.
+        // This is because we know that `b` must be `false`, `a` must be `true`, and so `b=true`
+        // would update, as well as `b=a` would update.
         assert_eq!(2, set.fn_update_projection(&[a], &stg).iter().count());
         assert_eq!(1, set.fn_update_projection(&[b], &stg).iter().count());
         assert_eq!(3, set.fn_update_projection(&[c], &stg).iter().count());
